@@ -1,0 +1,14 @@
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+SQLAlchemy==1.4.51
+# psycopg2-binary==2.9.9  # Only needed for PostgreSQL in Docker; local dev uses SQLite
+pydantic==1.10.13
+python-multipart==0.0.6
+requests==2.31.0
+pandas==2.1.4
+spacy==3.7.2
+beautifulsoup4==4.12.3
+lxml==5.1.0
+python-dateutil==2.8.2
+apscheduler==3.10.4
+google-genai==0.3.0
