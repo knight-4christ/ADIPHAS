@@ -347,7 +347,7 @@ async def startup_event():
                     vm = get_vector_manager()
                     
                     rag_query = "Latest major disease outbreaks and critical health alerts"
-                    rag_response = vm.hybrid_search(rag_query, k=5)
+                    rag_response = vm.hybrid_search(rag_query, k=5, force_combine=True)
                     rag_context = ""
                     
                     if rag_response and "results" in rag_response:

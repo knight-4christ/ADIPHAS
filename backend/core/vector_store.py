@@ -165,33 +165,43 @@ class ChromaManager:
             })
         return formatted_results
 
-    def hybrid_search(self, query: str, k: int = 3, threshold: float = 0.5):
+    def hybrid_search(self, query: str, k: int = 3, threshold: float = 0.5, force_combine: bool = False):
         """
         Local-first search. If similarity score is low (high distance), 
-        fall back to Tavily web search.
+        fall back to Tavily web search. If force_combine is True, merges both.
         """
         local_results = self.search_knowledge(query, k=k)
 
-        # In Chroma, lower score usually means closer distance (higher similarity)
-        if local_results and local_results[0]['score'] < threshold:
-            return {
-                "source": "local_rag",
-                "results": local_results
-            }
+        if not force_combine:
+            # In Chroma, lower score usually means closer distance (higher similarity)
+            if local_results and local_results[0]['score'] < threshold:
+                return {
+                    "source": "local_rag",
+                    "results": local_results
+                }
 
-        # Fallback to Tavily if key is available
+        web_results = []
+        # Fallback (or combine) to Tavily if key is available
         tavily_key = os.getenv("TAVILY_API_KEY")
         if tavily_key:
             try:
                 from langchain_community.tools.tavily_search import TavilySearchResults
                 web_search = TavilySearchResults(api_key=tavily_key)
                 web_results = web_search.run(query)
-                return {
-                    "source": "web_search",
-                    "results": web_results
-                }
             except Exception as e:
                 logger.error(f"Web search failed: {e}")
+
+        if force_combine:
+            return {
+                "source": "combined",
+                "results": local_results + web_results
+            }
+
+        if web_results:
+            return {
+                "source": "web_search",
+                "results": web_results
+            }
 
         return {
             "source": "local_rag_fallback",
