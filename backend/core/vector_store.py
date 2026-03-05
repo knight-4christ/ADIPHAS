@@ -1,7 +1,6 @@
 import os
 import logging
 import chromadb
-from chromadb.config import Settings
 # from langchain_text_splitters import RecursiveCharacterTextSplitter # REPLACED: Avoids torch/transformers import
 from langchain_chroma import Chroma
 from sqlalchemy.orm import Session
@@ -10,8 +9,6 @@ from ..models import EBSAlert
 from dotenv import load_dotenv
 
 load_dotenv()
-logger = logging.getLogger(__name__)
-
 logger = logging.getLogger(__name__)
 
 class SimpleLocalEmbeddings:
@@ -95,12 +92,20 @@ class ChromaManager:
             chunk_size=1000,
             chunk_overlap=100
         )
-        # Initialize vector store
-        self.vector_store = Chroma(
-            persist_directory=self.persist_directory,
-            embedding_function=self.embeddings,
-            collection_name="adiphas_knowledge"
-        )
+        # Initialize vector store with explicit collection creation check
+        try:
+            self._chroma_client = chromadb.PersistentClient(path=self.persist_directory)
+            # Ensure the collection exists
+            self._chroma_client.get_or_create_collection("adiphas_v2")
+            
+            self.vector_store = Chroma(
+                client=self._chroma_client,
+                embedding_function=self.embeddings,
+                collection_name="adiphas_v2",
+            )
+        except Exception as e:
+            logger.error(f"[VectorEngine] Failed to initialize Chroma: {e}")
+            raise e
 
     def ingest_ebs_alerts(self, db: Session):
         """Fetch only UN-VECTORIZED alerts and index them. Marks them after success."""

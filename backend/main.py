@@ -53,6 +53,15 @@ models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="ADIPHAS API", version="1.1.0")
 
+# --- CORS Configuration ---
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # --- Gemini Initialization ---
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 gemini_model = None
@@ -451,14 +460,7 @@ def get_system_metrics(db: Session = Depends(get_db)):
         "last_updated": datetime.now().replace(microsecond=0).isoformat()
     }
 
-# --- Dependencies ---
-
-def get_db():
-    db = database.SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+# --- Dependencies (using get_db defined above) ---
 
 # --- Security Dependencies ---
 
@@ -596,20 +598,7 @@ def upload_idsr(file: UploadFile = File(...), db: Session = Depends(get_db)):
     result = ingestion_agent.process_idsr_csv(content, db)
     return result
 
-@app.get("/idsr/history")
-def get_idsr_history(lga_code: str = None, disease: str = None, db: Session = Depends(get_db)):
-    """Returns weekly IDSR case counts for chart rendering."""
-    query = db.query(models.IDSRRecord)
-    if lga_code:
-        query = query.filter(models.IDSRRecord.lga_code == lga_code)
-    if disease:
-        query = query.filter(models.IDSRRecord.disease == disease)
-    records = query.order_by(models.IDSRRecord.week_start).all()
-    return [
-        {"week_start": str(r.week_start), "cases": r.cases,
-         "lga_code": r.lga_code, "disease": r.disease}
-        for r in records
-    ]
+# NOTE: /idsr/history endpoint is defined below (near line 826) with full field set
 
 @app.get("/acquisition/news/scrape")
 def scrape_news():

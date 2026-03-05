@@ -36,7 +36,7 @@ class RiskEngine:
         Interpret risk score using a hybrid (Thresholds + AI) approach.
         """
         trace = []
-        trace.append({"step": f"Interpreting final risk score: {score:.2f}", "timestamp": datetime.now().isoformat()})
+        trace.append({"step": f"Interpreting final risk score: {score:.2f}", "timestamp": datetime.now().replace(microsecond=0)})
         
         # 1. CORE SKELETON (Thresholds)
         if score < 30: category = "Low"
@@ -44,7 +44,7 @@ class RiskEngine:
         elif score < 75: category = "High"
         else: category = "Critical"
         
-        trace.append({"step": f"Risk category: {category}", "timestamp": datetime.now().isoformat()})
+        trace.append({"step": f"Risk category: {category}", "timestamp": datetime.now().replace(microsecond=0)})
         
         result = {"category": category, "trace": trace}
 
@@ -53,7 +53,7 @@ class RiskEngine:
             summary = self.generate_risk_summary(score, category, user_traits, active_alerts)
             if summary:
                 result["ai_situational_summary"] = summary
-                trace.append({"step": "AI Situational Risk Summary generated.", "timestamp": datetime.now().isoformat()})
+                trace.append({"step": "AI Situational Risk Summary generated.", "timestamp": datetime.now().replace(microsecond=0)})
         
         return result
 
@@ -90,7 +90,7 @@ class RiskEngine:
         
         trending_diseases = self.identify_trending_diseases(active_alerts)
         if trending_diseases:
-            trace.append({"step": f"Identified Trending Diseases in Lagos: {', '.join(trending_diseases)}", "timestamp": datetime.now().isoformat()})
+            trace.append({"step": f"Identified Trending Diseases in Lagos: {', '.join(trending_diseases)}", "timestamp": datetime.now().replace(microsecond=0)})
 
         # Priority diseases
         priority_diseases = ["Cholera", "Measles", "Lassa Fever", "Malaria"]
@@ -103,10 +103,10 @@ class RiskEngine:
             # Critical Disease Bonus
             if alert.disease in priority_diseases:
                 base_p += 15.0
-                trace.append({"step": f"Priority Disease Penalty applied for {alert.disease}: +15.0", "timestamp": datetime.now().isoformat()})
+                trace.append({"step": f"Priority Disease Penalty applied for {alert.disease}: +15.0", "timestamp": datetime.now().replace(microsecond=0)})
             elif alert.disease in trending_diseases:
                 base_p += 10.0
-                trace.append({"step": f"Trending Disease Penalty applied for {alert.disease}: +10.0", "timestamp": datetime.now().isoformat()})
+                trace.append({"step": f"Trending Disease Penalty applied for {alert.disease}: +10.0", "timestamp": datetime.now().replace(microsecond=0)})
             
             env_penalty += base_p
 
