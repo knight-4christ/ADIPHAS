@@ -2,7 +2,6 @@ import streamlit as st
 import api_client
 import plotly.graph_objects as go
 import pandas as pd
-import random
 from datetime import datetime
 
 def render_heartbeat():
@@ -70,18 +69,14 @@ def render_heartbeat():
     """, unsafe_allow_html=True)
 
 def render():
-    from streamlit_autorefresh import st_autorefresh
-    # Auto-refresh the dashboard every 60 seconds
-    st_autorefresh(interval=60000, limit=None, key="home_autorefresh")
+    # NO st_autorefresh — user clicks "Refresh" manually to avoid UI blur
     
     st.title("🛡️ ADIPHAS Command Centre")
     
     # Check System Status
     status = api_client.healthcheck()
-    # Fixed: bool({}) is always True — check the actual status field instead
     is_online = isinstance(status, dict) and status.get("status") == "ok"
     
-    # Status Header
     # Status Header
     if is_online:
         col1, col2, col3 = st.columns([1, 2, 1])
@@ -93,7 +88,6 @@ def render():
             st.caption("System Pulse")
             render_heartbeat()
     else:
-        # User Requested "Calm" Offline Mode
         st.warning("💤 **System is Resting**")
         st.write("The intelligence engine is currently offline. Please check back in a moment.")
         
@@ -105,6 +99,51 @@ def render():
         
         st.divider()
 
+    # --- AI Startup Insight (generated once at server start) ---
+    startup = api_client.get_startup_insight()
+    if isinstance(startup, dict) and startup.get("insight"):
+        st.markdown("### 🧠 AI Intelligence Summary")
+        st.info(f"**So Far...** {startup['insight']}")
+        if startup.get("generated_at"):
+            st.caption(f"Generated at server startup: {startup['generated_at']}")
+    
+    # --- Intelligence Engine Metrics ---
+    st.markdown("### 📡 Intelligence Engine Status")
+    metrics = api_client.get_system_metrics()
+    
+    if isinstance(metrics, dict) and not metrics.get("error"):
+        m1, m2, m3 = st.columns(3)
+        agent_counts = metrics.get("today_activity_by_agent", {})
+        m1.metric("📰 Total Alerts in DB", metrics.get("total_alerts_in_db", 0))
+        m2.metric("✅ Verified Alerts", metrics.get("verified_alerts", 0))
+        m3.metric("⚙️ Today's Agent Actions", sum(agent_counts.values()))
+        
+        # Token Usage
+        token_data = api_client.get_token_usage()
+        model_status = api_client.get_model_status()
+        
+        if isinstance(token_data, dict) and not token_data.get("error"):
+            with st.expander("🔑 Gemini AI Status & Token Usage"):
+                # Model Status Header
+                if isinstance(model_status, dict) and not model_status.get("error"):
+                    cur_model = model_status.get("current_model", "Unknown")
+                    switches = model_status.get("switch_count", 0)
+                    st.markdown(f"**Active Model:** `{cur_model}` " + (f" (Fallback active: {switches} switches)" if switches > 0 else ""))
+                    st.divider()
+
+                t1, t2, t3 = st.columns(3)
+                t1.metric("Prompt Tokens", token_data.get("prompt_tokens", 0))
+                t2.metric("Response Tokens", token_data.get("candidate_tokens", 0))
+                t3.metric("Total Tokens", token_data.get("total_tokens", 0))
+                st.caption(f"API Calls: {token_data.get('call_count', 0)} | Snapshot: {token_data.get('snapshot_time', 'N/A')}")
+
+    
+    st.write("---")
+    
+    # --- Manual Refresh Button (replaces st_autorefresh) ---
+    if st.button("🔄 Refresh Dashboard", type="primary"):
+        st.rerun()
+    
     st.subheader("📡 Live System Monitoring")
     
     try:

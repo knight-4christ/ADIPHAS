@@ -77,6 +77,7 @@ class PredictionReport(BaseModel):
     epidemiological_narrative: Optional[str] = None
     policy_recommendation_plan: Optional[str] = None
     anomaly_flag: bool = False
+    data_points_used: Optional[int] = None
     trace: Optional[List[dict]] = None
 
 # --- Authentication Schemas ---

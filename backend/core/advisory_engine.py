@@ -15,16 +15,20 @@ class AdvisoryEngine:
         }
         self.gemini_model = gemini_model
 
-    def analyze_with_ai(self, symptoms: list, duration_days: int) -> str:
+    def analyze_with_ai(self, symptoms: list, duration_days: int, context_str: str = "") -> str:
         """
         Uses Gemini to provide a deep clinical analysis of symptoms.
+        Optionally enriched with RAG context from local DB + Tavily.
         """
         if not self.gemini_model:
             return None
+
+        context_block = f"\n\nVerified Intelligence Context:\n{context_str}" if context_str else ""
             
         prompt = f"""
         Act as a Senior Clinical Epidemiologist and Medical Consultant in Nigeria.
         Condition: Patient reports {', '.join(symptoms)} over {duration_days} days.
+        {context_block}
         
         Provide a concise (2 sentence) actionable advisory. 
         Focus on: 
@@ -32,11 +36,9 @@ class AdvisoryEngine:
         2. Public Health Action (e.g., "Report to LGA surveillance officer if symptoms persist").
         """
         try:
-            response = self.gemini_model.models.generate_content(
-                model='gemini-2.5-flash',
-                contents=prompt
-            )
-            return response.text.strip()
+            from backend.core.model_config import smart_generate
+            text, model_used = smart_generate(self.gemini_model, prompt, context="SymptomCheck")
+            return text or "AI clinical deep-dive currently unavailable."
         except:
             return "AI clinical deep-dive currently unavailable."
 

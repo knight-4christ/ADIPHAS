@@ -132,3 +132,19 @@ def advisory_search(query, k=3):
 def get_intelligence_sources():
     """Returns the dictionary of monitored sources and their weights from the backend."""
     return _safe_request("GET", f"{API_URL}/intelligence/sources")
+
+def get_startup_insight():
+    """Returns the one-time AI startup insight."""
+    return _safe_request("GET", f"{API_URL}/system/startup-insight")
+
+def get_token_usage():
+    """Returns current Gemini API token usage for this session."""
+    return _safe_request("GET", f"{API_URL}/system/token-usage")
+
+def get_system_metrics():
+    """Returns today's scraping and intelligence metrics."""
+    return _safe_request("GET", f"{API_URL}/system/metrics")
+
+def get_model_status():
+    """Returns the current Gemini model fallback status."""
+    return _safe_request("GET", f"{API_URL}/system/model-status")

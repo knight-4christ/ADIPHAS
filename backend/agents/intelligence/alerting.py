@@ -31,11 +31,9 @@ class AlertingEngine:
         2. A clear Public Health Preparedness Action Plan.
         """
         try:
-            response = self.gemini_model.models.generate_content(
-                model='gemini-2.5-flash',
-                contents=prompt
-            )
-            return response.text.strip()
+            from backend.core.model_config import smart_generate
+            text, model_used = smart_generate(self.gemini_model, prompt, context="ForecastNarrative")
+            return text or "Narrative generation currently unavailable."
         except:
             return "Narrative generation currently unavailable."
 
@@ -56,21 +54,20 @@ class AlertingEngine:
         """
         Z-score anomaly detection. A data point is anomalous when it
         exceeds mean + 2 * std_dev of the historical baseline.
-        Pass historical_counts (list of int) for real data; uses a synthetic
-        baseline when omitted (backwards-compatible).
+        Requires at least 4 real data points; returns False with an
+        'insufficient data' trace when unavailable.
         """
         trace = []
         trace.append({"step": f"Anomaly detection: {disease} in {lga_code}",
                        "timestamp": datetime.now().replace(microsecond=0)})
 
-        # Use provided or synthetic baseline
-        if historical_counts and len(historical_counts) >= 4:
-            baseline = np.array(historical_counts[:-1], dtype=float)
-            latest = float(historical_counts[-1])
-        else:
-            # Synthetic baseline — slightly conservative so forecasts aren't always flagged
-            baseline = np.array([5.0, 6.0, 5.5, 7.0, 6.5, 4.0, 5.0, 6.0])
-            latest = float(historical_counts[-1]) if historical_counts else 6.0
+        if not historical_counts or len(historical_counts) < 4:
+            trace.append({"step": "Insufficient historical data for anomaly detection (need ≥4 data points).",
+                           "timestamp": datetime.now().replace(microsecond=0)})
+            return False, trace
+
+        baseline = np.array(historical_counts[:-1], dtype=float)
+        latest = float(historical_counts[-1])
 
         mean = np.mean(baseline)
         std = np.std(baseline)
@@ -92,14 +89,23 @@ class AlertingEngine:
     def forecast_cases(self, lga_code, disease, historical_data=None, weeks=4):
         """
         Forecast future cases using a hybrid (Math + AI) approach.
+        Requires at least 4 real data points. Returns an 'insufficient data'
+        response when historical records are unavailable.
         """
         trace = []
         trace.append({"step": f"Initializing Forecasting Engine for {disease} in {lga_code}...", "timestamp": datetime.now().replace(microsecond=0)})
         
-        # 1. CORE SKELETON (WMA + Trend Math)
+        # Require real data — no synthetic fallbacks
         if not historical_data or len(historical_data) < 4:
-            historical_data = [8, 10, 9, 11, 10, 12, 11, 13]
+            trace.append({"step": f"Insufficient data: Only {len(historical_data) if historical_data else 0} data points available (need ≥4).", "timestamp": datetime.now().replace(microsecond=0)})
+            return {
+                "forecast": [], "ci_lower": [], "ci_upper": [],
+                "mae": 0.0, "rmse": 0.0, "validation_period": "N/A",
+                "insufficient_data": True,
+                "message": f"Insufficient historical data for {disease} in {lga_code}. Need at least 4 weekly records to generate a forecast. The system is actively collecting real-time intelligence — forecasts will become available as more data accumulates."
+            }, trace
         
+        # 1. CORE SKELETON (WMA + Trend Math) — using REAL data only
         train = historical_data[:-2]; test = historical_data[-2:]
         val_pred = [sum(train)/len(train)] * 2
         mae, rmse = self._calculate_metrics(test, val_pred)
@@ -117,10 +123,11 @@ class AlertingEngine:
             "forecast": forecast,
             "ci_lower": [max(0, round(f - rmse)) for f in forecast],
             "ci_upper": [round(f + rmse) for f in forecast],
-            "mae": mae, "rmse": rmse, "validation_period": "2 weeks"
+            "mae": mae, "rmse": rmse, "validation_period": "2 weeks",
+            "data_points_used": len(historical_data)
         }
 
-        # 2. HYBRID AI ORCHESTRATION 
+        # 2. AI ORCHESTRATION — on-demand only (called by user-facing endpoint)
         if self.gemini_model:
             is_anom, _ = self.detect_anomalies(lga_code, disease, historical_data)
             narrative = self.generate_narrative(lga_code, disease, forecast_data, is_anom)

@@ -42,6 +42,15 @@ def _match_lga(location_text: str):
 def render():
     st.title("🗺️ Lagos Health Interactive Map")
     st.caption("Live outbreak signal visualisation — powered by real EBS alert data.")
+    
+    # --- Browser Geolocation (auto-center on user) ---
+    try:
+        import sys, os
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+        from components.geolocation import render_location_picker
+        render_location_picker()
+    except Exception:
+        pass
 
     # Fetch live alerts
     alerts = api_client.get_alerts()

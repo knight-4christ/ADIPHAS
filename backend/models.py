@@ -66,6 +66,7 @@ class EBSAlert(Base):
     ai_powered = Column(Boolean, default=False)
     policy_alert = Column(Boolean, default=False)
     requires_hitl = Column(Boolean, default=False)
+    is_vectorized = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class SystemActivity(Base):

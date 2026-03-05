@@ -70,21 +70,18 @@ class KnowledgeFusionAgent:
         Output JSON MUST be strictly: {{"synopsis": "...", "fused_advisory": "...", "final_confidence": 0.0}}
         """
         try:
-            response = self.gemini_model.models.generate_content(
-                model='gemini-2.0-flash',
-                contents=prompt
-            )
+            from backend.core.model_config import smart_generate
+            raw_text, model_used = smart_generate(self.gemini_model, prompt, context="KnowledgeFusion")
+            
+            if not raw_text:
+                return {}
+                
             import json
-            clean = response.text.replace("```json", "").replace("```", "").strip()
+            clean = raw_text.replace("```json", "").replace("```", "").strip()
             return json.loads(clean)
         except Exception as e:
-            error_str = str(e).lower()
-            if "429" in error_str or "quota" in error_str:
-                self._circuit_open_until = time.time() + 3600
-                logger.error("[FUSION-DEBUG] Gemini Quota Exhausted! Circuit breaker active for 1 hour.")
-            else:
-                logger.error(f"[FUSION-DEBUG] Gemini Analysis Error: {e}")
-            return None
+            logger.error(f"[Fusion] Failed to fuse reports: {e}")
+            return {}
 
     def fuse_reports(self, reports):
         """

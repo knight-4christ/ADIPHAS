@@ -85,25 +85,24 @@ class NLPProcessor:
             "policy_alert": true or false
         }}
         """
+        # 3. Execution via Gemini
         try:
-            response = self.gemini_model.models.generate_content(
-                model='gemini-2.0-flash',
-                contents=prompt
-            )
-            raw_text = response.text
+            from backend.core.model_config import smart_generate
+            raw_text, model_used = smart_generate(self.gemini_model, prompt, context="NLP_EntityExtraction")
+            
+            if not raw_text:
+                return {"diseases": [], "locations": [], "severity_score": 0.0}
+                
             clean_json = re.sub(r'```json\s*|\s*```', '', raw_text).strip()
             return json.loads(clean_json)
+            
         except Exception as e:
-            error_str = str(e).lower()
-            if "429" in error_str or "quota" in error_str:
-                self._circuit_open_until = time.time() + 900 # Open circuit for 15 minutes
-                logger.error("[NLP-DEBUG] Gemini Quota Exhausted! Circuit breaker active for 15 minutes.")
-            else:
-                logger.error(f"[NLP-DEBUG] Gemini Analysis Error: {e}")
-            return None
+            logger.error(f"[NLP] Parsing error or all models failed: {e}")
+            return {"diseases": [], "locations": [], "severity_score": 0.0}
 
     def extract_entities(self, text):
         """Hybrid extraction: NER + Rule-based + Case-Insensitive Matching."""
+        text = str(text)
         trace = []
         trace.append({"step": "Initializing NLP Extraction...", "timestamp": datetime.now().replace(microsecond=0)})
         

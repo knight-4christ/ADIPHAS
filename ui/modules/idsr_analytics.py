@@ -54,13 +54,21 @@ def render():
                 forecast = api_client.get_forecast(lga_code, disease)
                 
             if forecast and not forecast.get("error"):
-                # Accuracy Metrics (SECTION 2: Evaluation Framework requirements)
-                st.markdown("### 🧬 Model Performance Metrics")
-                m1, m2, m3 = st.columns(3)
-                mae = forecast.get('mae', 0)
-                m1.metric("MAE (Mean Absolute Error)", f"{mae:.2f}")
-                m2.metric("RMSE", f"{forecast.get('rmse', 0):.2f}")
-                m3.metric("Validation Period", "2 Weeks (Backtest)")
+                # Handle Insufficient Data Fallback
+                if forecast.get("forecast") == []:
+                    st.info(f"📊 **Insufficient Historical Data**")
+                    st.write(forecast.get("policy_recommendation_plan", "Need at least 4 weeks of data to generate a forecast."))
+                    st.caption("The system is actively monitoring real-time intelligence for this LGA.")
+                else:
+                    # Accuracy Metrics (SECTION 2: Evaluation Framework requirements)
+                    st.markdown("### 🧬 Model Performance Metrics")
+                    m1, m2, m3 = st.columns(3)
+                    mae = forecast.get('mae', 0)
+                    m1.metric("MAE (Mean Absolute Error)", f"{mae:.2f}")
+                    m2.metric("RMSE", f"{forecast.get('rmse', 0):.2f}")
+                    
+                    data_points = forecast.get('data_points_used', 0)
+                    m3.metric("Validation Period", f"2 Weeks ({data_points} wks data)")
 
                 # Prominent Anomaly Banner (Flagging Feature)
                 if forecast.get("anomaly_flag"):

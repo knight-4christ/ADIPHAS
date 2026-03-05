@@ -25,11 +25,9 @@ class RiskEngine:
         (if relevant to traits) and the single most critical precautionary step to take today.
         """
         try:
-            response = self.gemini_model.models.generate_content(
-                model='gemini-2.5-flash',
-                contents=prompt
-            )
-            return response.text.strip()
+            from backend.core.model_config import smart_generate
+            text, model_used = smart_generate(self.gemini_model, prompt, context="RiskSummary")
+            return text or "AI situational summary currently unavailable."
         except:
             return "AI situational summary currently unavailable."
 
