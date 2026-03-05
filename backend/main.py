@@ -482,10 +482,15 @@ def get_system_metrics(db: Session = Depends(get_db)):
     for sa in intel_activities:
         m_skip = re.search(r'Skipped (\d+)', sa.message)
         if m_skip:
-            articles_skipped = int(m_skip.group(1))
-        m_batch = re.search(r'Processing top (\d+) out of (\d+)', sa.message)
-        if m_batch:
-            articles_batched = int(m_batch.group(2))
+            articles_skipped = max(articles_skipped, int(m_skip.group(1)))
+        
+        m_batch1 = re.search(r'Processing top (\d+) out of (\d+)', sa.message)
+        if m_batch1 and not articles_batched:
+            articles_batched = int(m_batch1.group(2))
+            
+        m_batch2 = re.search(r'Running AI batch extraction on (\d+)', sa.message)
+        if m_batch2 and not articles_batched:
+            articles_batched = int(m_batch2.group(1))
     
     # Alerts saved today
     alerts_saved_msg = [sa for sa in db.query(models.SystemActivity).filter(

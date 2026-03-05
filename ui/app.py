@@ -364,23 +364,26 @@ def main():
             <div id="fab-hook" style="display: none;"></div>
         """, unsafe_allow_html=True)
         
-        if st.button("💬", key="fab_chat", help="Open Advisory Chat"):
-            user_role = st.session_state.user.get("role", "CITIZEN") if authenticated else "GUEST"
-            
+        def handle_fab_click():
+            authenticated = st.session_state.get("authenticated", False)
+            user_role = st.session_state.user.get("role", "CITIZEN") if authenticated and st.session_state.user else "GUEST"
             if authenticated:
                 st.session_state.active_nav_cat = "Intelligence"
                 st.session_state.active_nav_mod = "Advisory Chat"
-                # Hard overwrite the UI widget states
                 st.session_state[f"nav_cat_sb_{user_role}"] = "Intelligence"
                 st.session_state[f"nav_mod_rd_{user_role}"] = "Advisory Chat"
-                st.rerun()
             else:
                 st.session_state.active_nav_cat = "Surveillance"
                 st.session_state.active_nav_mod = "Login / Sign Up"
                 st.session_state[f"nav_cat_sb_{user_role}"] = "Surveillance"
                 st.session_state[f"nav_mod_rd_{user_role}"] = "Login / Sign Up"
-                st.toast("⚠️ Please login to access the Advisory Chat.")
-                st.rerun()
+                st.session_state["_fab_toast"] = "⚠️ Please login to access the Advisory Chat."
+
+        st.button("💬", key="fab_chat", help="Open Advisory Chat", on_click=handle_fab_click)
+        
+        # Display the toast if it was set during the callback
+        if "_fab_toast" in st.session_state:
+            st.toast(st.session_state.pop("_fab_toast"))
 
     from modules import render_footer
     render_footer()
