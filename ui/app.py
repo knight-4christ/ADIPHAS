@@ -34,6 +34,11 @@ def get_ui_counts(alerts, last_check, user_lga, authenticated):
         "total": total_new, "personal": personal_new, "pending": pending_new
     }
 
+# --- NATIVE OVERLAY FUNCTION ---
+@st.dialog("🤖 ADIPHAS Advisory Chat", width="large")
+def show_chat_overlay():
+    chat.render(is_overlay=True)
+
 def main():
     st.set_page_config(
         page_title="ADIPHAS - Autonomous Intelligence",
@@ -323,6 +328,57 @@ def main():
     elif choice == "User Management":
         admin.render()
         
+    # --- FLOATING ADVISORY CHAT ICON ---
+    # Show on all pages EXCEPT when already in the main Advisory Chat page
+    if choice != "Advisory Chat":
+        st.markdown("""
+            <style>
+            /* Flawless CSS injection to target the Streamlit button container without breaking click events */
+            div[data-testid="stElementContainer"]:has(#fab-hook) + div[data-testid="stElementContainer"] {
+                position: fixed !important;
+                top: 75px !important;  /* Moved down slightly per request */
+                right: 40px !important;
+                z-index: 99999 !important;
+                width: auto !important;
+                background: transparent !important;
+            }
+            div[data-testid="stElementContainer"]:has(#fab-hook) + div[data-testid="stElementContainer"] button {
+                background-color: #0ea5e9 !important;
+                color: white !important;
+                border-radius: 50% !important;
+                width: 65px !important;
+                height: 65px !important;
+                font-size: 30px !important;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.6) !important;
+                border: 2px solid #38bdf8 !important;
+                transition: transform 0.2s ease, background-color 0.2s ease;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                line-height: normal !important;
+                padding: 0 !important;
+            }
+            div[data-testid="stElementContainer"]:has(#fab-hook) + div[data-testid="stElementContainer"] button > div {
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            div[data-testid="stElementContainer"]:has(#fab-hook) + div[data-testid="stElementContainer"] button:hover {
+                transform: scale(1.1) !important;
+                background-color: #0284c7 !important;
+            }
+            </style>
+            <div id="fab-hook" style="display: none;"></div>
+        """, unsafe_allow_html=True)
+        
+        if st.button("💬", key="fab_chat", help="Open Advisory Chat Overlay"):
+            if st.session_state.authenticated:
+                show_chat_overlay()
+            else:
+                st.warning("Please login to access the Advisory Chat.")
+                st.session_state.active_nav_cat = "Surveillance"
+                st.session_state.active_nav_mod = "Login / Sign Up"
+                st.rerun()
+
     from modules import render_footer
     render_footer()
 

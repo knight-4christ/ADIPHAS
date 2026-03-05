@@ -34,8 +34,9 @@ def init_chat_session(client, system_instruction, model):
         )
     )
 
-def render():
-    st.markdown("### 🤖 ADIPHAS Health Advisory Chat")
+def render(is_overlay=False):
+    if not is_overlay:
+        st.markdown("### 🤖 ADIPHAS Health Advisory Chat")
     
     # 1. State Management (Conversations)
     if "chat_threads" not in st.session_state:
@@ -95,15 +96,16 @@ def render():
                 "timestamp": datetime.now()
             }
             st.session_state.active_thread_id = new_id
-            st.rerun()
+            if not is_overlay: st.rerun()
 
     if not st.session_state.chat_threads:
+        if is_overlay: return
         st.stop()
         
     if not st.session_state.active_thread_id:
         # Final safety net
         st.session_state.active_thread_id = list(st.session_state.chat_threads.keys())[-1]
-        st.rerun()
+        if not is_overlay: st.rerun()
 
     active_thread = st.session_state.chat_threads[st.session_state.active_thread_id]
     
@@ -115,7 +117,7 @@ def render():
         if st.button("🗑️ Delete", type="secondary", use_container_width=True):
             del st.session_state.chat_threads[st.session_state.active_thread_id]
             st.session_state.active_thread_id = None
-            st.rerun()
+            if not is_overlay: st.rerun()
 
 
     # Render History
@@ -173,5 +175,5 @@ def render():
                             st.write(r.get("content") or r.get("snippet") or str(r))
 
         active_thread["messages"].append({"role": "assistant", "content": reply})
-        st.rerun() # Rerun to update the sidebar title if it changed
+        if not is_overlay: st.rerun() # Rerun to update the sidebar title if it changed
 
