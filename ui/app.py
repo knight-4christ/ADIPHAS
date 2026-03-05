@@ -34,11 +34,6 @@ def get_ui_counts(alerts, last_check, user_lga, authenticated):
         "total": total_new, "personal": personal_new, "pending": pending_new
     }
 
-# --- NATIVE OVERLAY FUNCTION ---
-@st.dialog("🤖 ADIPHAS Advisory Chat", width="large")
-def show_chat_overlay():
-    chat.render(is_overlay=True)
-
 def main():
     st.set_page_config(
         page_title="ADIPHAS - Autonomous Intelligence",
@@ -331,18 +326,21 @@ def main():
     # --- FLOATING ADVISORY CHAT ICON ---
     # Show on all pages EXCEPT when already in the main Advisory Chat page
     if choice != "Advisory Chat":
-        st.markdown("""
+        # Check authentication locally for the button trigger
+        authenticated = st.session_state.get("authenticated", False)
+        
+        # JS Injection to forcefully style and float the button
+        st.markdown(f"""
             <style>
-            /* Flawless CSS injection to target the Streamlit button container without breaking click events */
-            div[data-testid="stElementContainer"]:has(#fab-hook) + div[data-testid="stElementContainer"] {
+            div[data-testid="stElementContainer"]:has(#fab-hook) + div[data-testid="stElementContainer"] {{
                 position: fixed !important;
-                top: 75px !important;  /* Moved down slightly per request */
+                top: 100px !important;
                 right: 40px !important;
                 z-index: 99999 !important;
                 width: auto !important;
                 background: transparent !important;
-            }
-            div[data-testid="stElementContainer"]:has(#fab-hook) + div[data-testid="stElementContainer"] button {
+            }}
+            div[data-testid="stElementContainer"]:has(#fab-hook) + div[data-testid="stElementContainer"] button {{
                 background-color: #0ea5e9 !important;
                 color: white !important;
                 border-radius: 50% !important;
@@ -357,26 +355,31 @@ def main():
                 justify-content: center;
                 line-height: normal !important;
                 padding: 0 !important;
-            }
-            div[data-testid="stElementContainer"]:has(#fab-hook) + div[data-testid="stElementContainer"] button > div {
-                margin: 0 !important;
-                padding: 0 !important;
-            }
-            div[data-testid="stElementContainer"]:has(#fab-hook) + div[data-testid="stElementContainer"] button:hover {
+            }}
+            div[data-testid="stElementContainer"]:has(#fab-hook) + div[data-testid="stElementContainer"] button:hover {{
                 transform: scale(1.1) !important;
                 background-color: #0284c7 !important;
-            }
+            }}
             </style>
             <div id="fab-hook" style="display: none;"></div>
         """, unsafe_allow_html=True)
         
-        if st.button("💬", key="fab_chat", help="Open Advisory Chat Overlay"):
-            if st.session_state.authenticated:
-                show_chat_overlay()
+        if st.button("💬", key="fab_chat", help="Open Advisory Chat"):
+            user_role = st.session_state.user.get("role", "CITIZEN") if authenticated else "GUEST"
+            
+            if authenticated:
+                st.session_state.active_nav_cat = "Intelligence"
+                st.session_state.active_nav_mod = "Advisory Chat"
+                # Hard overwrite the UI widget states
+                st.session_state[f"nav_cat_sb_{user_role}"] = "Intelligence"
+                st.session_state[f"nav_mod_rd_{user_role}"] = "Advisory Chat"
+                st.rerun()
             else:
-                st.warning("Please login to access the Advisory Chat.")
                 st.session_state.active_nav_cat = "Surveillance"
                 st.session_state.active_nav_mod = "Login / Sign Up"
+                st.session_state[f"nav_cat_sb_{user_role}"] = "Surveillance"
+                st.session_state[f"nav_mod_rd_{user_role}"] = "Login / Sign Up"
+                st.toast("⚠️ Please login to access the Advisory Chat.")
                 st.rerun()
 
     from modules import render_footer

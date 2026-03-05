@@ -10,9 +10,9 @@ logger = logging.getLogger(__name__)
 
 try:
     import spacy
-except ImportError as e:
+except Exception as e:
     spacy = None
-    logger.warning(f"spaCy library not found: {e}. NLP will run in keyword-only mode.")
+    logger.warning(f"spaCy library not found or failed to load (DLL error): {e}. NLP will run in keyword-only mode.")
 
 class NLPProcessor:
     def __init__(self, gemini_api_key=None):
@@ -100,6 +100,54 @@ class NLPProcessor:
             logger.error(f"[NLP] Parsing error or all models failed: {e}")
             return {"diseases": [], "locations": [], "severity_score": 0.0}
 
+    def analyze_batch_with_gemini(self, articles_batch):
+        """Perform deep medical reasoning on a bulk array of articles simultaneously."""
+        if not self.gemini_enabled: return None
+        if time.time() < self._circuit_open_until: return None
+        if not articles_batch: return []
+        
+        # Prepare the bulk payload for the prompt
+        payload = []
+        for i, article in enumerate(articles_batch):
+            payload.append({
+                "id": i,
+                "text": article['text'],
+                "baseline": article['baseline']
+            })
+            
+        prompt = f"""
+        Act as a Public Health Intelligence Agent for Lagos State, Nigeria.
+        Analyze this BATCH of {len(payload)} reports.
+        
+        Batch Data: {json.dumps(payload, indent=2)}
+        
+        For each item in the batch, orchestrate the final extraction. Consider the baseline entities strongly, but refine them.
+        Extract and return a valid JSON ARRAY of objects exact structure:
+        [
+          {{
+              "id": (match the id from the input),
+              "diseases": ["list of detected diseases"],
+              "locations": ["list of specific LGAs or LCDAs"],
+              "severity_score": 0.0 to 1.0,
+              "intelligence_summary": "1-sentence technical summary",
+              "public_health_advisory": "Actionable advice for citizens",
+              "category": "Infectious, Environmental, or Other",
+              "policy_alert": true or false
+          }}
+        ]
+        """
+        try:
+            from backend.core.model_config import smart_generate
+            raw_text, model_used = smart_generate(self.gemini_model, prompt, context="NLP_BatchExtraction")
+            
+            if not raw_text: return None
+                
+            clean_json = re.sub(r'```json\s*|\s*```', '', raw_text).strip()
+            return json.loads(clean_json)
+        except Exception as e:
+            logger.error(f"[NLP_BATCH] Parsing error: {e}")
+            return None
+
     def extract_entities(self, text):
         """Hybrid extraction: NER + Rule-based + Case-Insensitive Matching."""
         text = str(text)
@@ -150,3 +198,53 @@ class NLPProcessor:
         
         trace.append({"step": "Extraction cycle complete.", "timestamp": datetime.now().replace(microsecond=0)})
         return entities, trace
+
+    def extract_entities_batch(self, headlines):
+        """
+        Process an array of headlines at once.
+        Returns a list of tuples: (entities_dict, trace_list) corresponding to the input list.
+        """
+        results = []
+        gemini_payload = []
+        traces = []
+        
+        # 1. Run local baselines mathematically (CPU bound, but fast)
+        for i, item in enumerate(headlines):
+            text = str(item.get('title', item.get('text', '')))
+            
+            import time as base_time
+            base_time.sleep(0.005) # Yield GIL
+            
+            base_entities, trace = self.extract_entities(text)
+            traces.append(trace)
+            results.append(base_entities) # Will overwrite with Gemini later if successful
+            
+            if self.gemini_enabled:
+                gemini_payload.append({
+                    "id": i,
+                    "text": text,
+                    "baseline": base_entities
+                })
+                
+        # 2. Bulk process via Gemini
+        if self.gemini_enabled and gemini_payload:
+            gemini_results = self.analyze_batch_with_gemini(gemini_payload)
+            if isinstance(gemini_results, list):
+                # Map back to original indices
+                for g_res in gemini_results:
+                    idx = g_res.get('id')
+                    if idx is not None and 0 <= idx < len(results):
+                        # Merge Gemini intelligence into the result
+                        results[idx].update({
+                            "diseases": [str(d) for d in g_res.get("diseases", []) if str(d).strip()],
+                            "locations": [str(l) for l in g_res.get("locations", []) if str(l).strip()],
+                            "severity_score": float(g_res.get("severity_score", results[idx].get("severity_score"))),
+                            "ai_summary": g_res.get("intelligence_summary"),
+                            "public_health_advisory": g_res.get("public_health_advisory"),
+                            "category": g_res.get("category", "General"),
+                            "policy_alert": g_res.get("policy_alert", False)
+                        })
+                        traces[idx].append({"step": "Gemini deep batch analysis applied."})
+                        
+        # 3. Zip back together
+        return list(zip(results, traces))

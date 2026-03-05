@@ -35,7 +35,7 @@ def switch_to_next_model() -> str:
     _state["last_switch"] = datetime.now().replace(microsecond=0).isoformat()
     _state["switch_count"] += 1
     new_model = get_current_model()
-    logger.warning(f"[ModelFallback] Switched from {old_model} → {new_model} (switch #{_state['switch_count']})")
+    logger.warning(f"[ModelFallback] Switched from {old_model} -> {new_model} (switch #{_state['switch_count']})")
     return new_model
 
 

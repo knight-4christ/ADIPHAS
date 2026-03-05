@@ -3,10 +3,8 @@ import api_client
 from datetime import datetime
 import pandas as pd
 
+@st.fragment(run_every="30s")
 def render():
-    from streamlit_autorefresh import st_autorefresh
-    # Auto-refresh the personal inbox every 60 seconds
-    st_autorefresh(interval=60000, limit=None, key="inbox_autorefresh")
 
     user = st.session_state.user
     lga = user.get('location_lga', 'Unknown')

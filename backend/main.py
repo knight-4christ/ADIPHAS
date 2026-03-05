@@ -203,23 +203,25 @@ def autonomous_monitoring_job():
             log_activity("IntelligenceEngine", f"Batching: Processing top {batch_limit} out of {new_count} new articles.")
             headlines = headlines[:batch_limit]
         
-        # Group reports for fusion (Now LOCAL and INSTANT)
+        # Group reports for fusion (Now LOCAL and INSTANT via Batching)
         pending_reports = []
-        for item in headlines:
-            entities, nlp_trace = nlp_agent.extract_entities(str(item['title']))
+        if headlines:
+            log_activity("IntelligenceEngine", f"Running AI batch extraction on {len(headlines)} articles...")
+            batch_results = nlp_agent.extract_entities_batch(headlines)
             
-            if entities['diseases'] and entities['locations']:
-                for disease in entities['diseases']:
-                    for location in entities['locations']:
-                        pending_reports.append({
-                            "source": item['source'],
-                            "url": item.get('url'),
-                            "disease": disease,
-                            "location": location,
-                            "cases": 1, # Minimal observation
-                            "text": item['title'],
-                            "timestamp": item['timestamp']
-                        })
+            for item, (entities, nlp_trace) in zip(headlines, batch_results):
+                if entities and entities.get('diseases') and entities.get('locations'):
+                    for disease in entities['diseases']:
+                        for location in entities['locations']:
+                            pending_reports.append({
+                                "source": item.get('source', 'Unknown'),
+                                "url": item.get('url'),
+                                "disease": disease,
+                                "location": location,
+                                "cases": 1, # Minimal observation
+                                "text": item.get('title', item.get('text', '')),
+                                "timestamp": item.get('timestamp')
+                            })
         
         if pending_reports:
             log_activity("IntelligenceEngine", f"Fusing {len(pending_reports)} candidate reports...")

@@ -11,38 +11,43 @@ from dotenv import load_dotenv
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-class SimpleLocalEmbeddings:
+class GeminiAPIEmbeddings:
     """
-    A robust, zero-token local embedding engine using TF-IDF.
-    Bypasses torch/onnx DLL issues (WinError 1114) on Windows.
+    Uses Google's text-embedding-004 model via the GenAI SDK.
+    Bypasses all local torch/onnx DLL issues (WinError 1114) on Windows by computing remotely.
     """
-    def __init__(self):
-        from sklearn.feature_extraction.text import TfidfVectorizer
-        # We use a fixed-size vector to keep ChromaDB happy
-        self.vectorizer = TfidfVectorizer(max_features=128)
-        self.is_fitted = False
-
-    def _ensure_fitted(self, corpus=None):
-        if not self.is_fitted:
-            # Seed with common health terms to establish the 128-dim space
-            base_corpus = [
-                "disease outbreak alert", "health surveillance report",
-                "epidemic fever infection", "medical research data",
-                "public health containment", "symptom clinical screening"
-            ]
-            if corpus: base_corpus.extend(corpus)
-            self.vectorizer.fit(base_corpus)
-            self.is_fitted = True
+    def __init__(self, api_key=None):
+        from google import genai
+        if not api_key:
+            api_key = os.getenv("GEMINI_API_KEY")
+        self.client = genai.Client(api_key=api_key)
+        self.model_name = "text-embedding-004"
 
     def embed_documents(self, texts):
-        self._ensure_fitted(texts)
-        vectors = self.vectorizer.transform(texts).toarray()
-        return vectors.tolist()
+        if not texts: return []
+        try:
+            response = self.client.models.embed_content(
+                model=self.model_name,
+                contents=texts,
+            )
+            # GenAI returns a list of representations.
+            return [e.values for e in response.embeddings]
+        except Exception as e:
+            logger.error(f"[GeminiAPIEmbeddings] Batch embedding failed: {e}")
+            # text-embedding-004 returns 768 dimensions by default. Return fallback vector to prevent Chroma crashing
+            return [[0.0] * 768 for _ in texts]
 
     def embed_query(self, text):
-        self._ensure_fitted([text])
-        vector = self.vectorizer.transform([text]).toarray()[0]
-        return vector.tolist()
+        if not text: return [0.0] * 768
+        try:
+            response = self.client.models.embed_content(
+                model=self.model_name,
+                contents=text,
+            )
+            return response.embeddings[0].values
+        except Exception as e:
+            logger.error(f"[GeminiAPIEmbeddings] Query embedding failed: {e}")
+            return [0.0] * 768
 
 class LocalTextSplitter:
     """A simple Character-based splitter that does NOT depend on torch or transformers."""
@@ -75,18 +80,13 @@ class ChromaManager:
     def __init__(self, persist_directory="./data/chroma_db"):
         self.persist_directory = persist_directory
 
-        # --- FREE LOCAL EMBEDDINGS (zero API tokens) ---
-        # Highly stable Sklearn engine to bypass Windows DLL/torch issues
+        # --- HIGH QUALITY AI EMBEDDINGS ---
         try:
-            self.embeddings = SimpleLocalEmbeddings()
-            logger.info("[VectorEngine] Using STABLE local Sklearn embeddings (TF-IDF). Zero API tokens.")
+            self.embeddings = GeminiAPIEmbeddings(os.getenv("GEMINI_API_KEY"))
+            logger.info("[VectorEngine] Initialized Gemini text-embedding-004 API embeddings for high-quality semantic routing.")
         except Exception as e:
-            logger.warning(f"[VectorEngine] Local engine initialization failed: {e}. Using Gemini fallback.")
-            from langchain_google_genai import GoogleGenerativeAIEmbeddings
-            self.embeddings = GoogleGenerativeAIEmbeddings(
-                model="models/gemini-embedding-001",
-                google_api_key=os.getenv("GEMINI_API_KEY")
-            )
+            logger.error(f"[VectorEngine] Failed to initialize Gemini APIs Embeddings: {e}")
+            raise e
 
         self.text_splitter = LocalTextSplitter(
             chunk_size=1000,

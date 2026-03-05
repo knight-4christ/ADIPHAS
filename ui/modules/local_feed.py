@@ -5,10 +5,6 @@ import time
 from datetime import datetime
 
 def render():
-    from streamlit_autorefresh import st_autorefresh
-    # Auto-refresh the feed every 60 seconds
-    st_autorefresh(interval=60000, limit=None, key="feed_autorefresh")
-    
     st.title("📰 Local Health Intelligence Feed")
     st.caption("Real-time health news and autonomous surveillance data.")
     
@@ -42,64 +38,67 @@ def render():
                     else:
                         st.warning(f"Scraper returned: {data}")
 
-    # News Display
-    try:
-        # Use cached alerts from app.py to avoid redundant fetch
-        alerts = st.session_state.get("cached_alerts")
-        if not alerts:
+    # News Display (Runs in autonomous real-time fragment)
+    @st.fragment(run_every="30s")
+    def render_live_feed():
+        try:
+            # Re-fetch alerts directly from backend inside the fragment to get fresh data
             alerts = api_client.get_alerts()
-        
-        if isinstance(alerts, list) and alerts:
-            # Sort by timestamp descending
-            alerts.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
             
-            last_check = st.session_state.get('last_checked_alerts', '1970-01-01T00:00:00')
-            # Filter for only the most recent alerts (last 24 hours or most recent batch)
-            # The user requested to only show most recent scrapes, not whole history
-            recent_alerts = [a for a in alerts if a.get('timestamp', '') > last_check]
-            if not recent_alerts:
-                recent_alerts = alerts[:50] # Fallback to top 50 if none "new" since check
-            
-            feed_data = []
-            for a in recent_alerts:
-                ts = a.get('timestamp', '')
-                created_ts = a.get('created_at', str(ts)) # Fallback to timestamp if created_at is missing
-                is_new = created_ts > last_check
+            if isinstance(alerts, list) and alerts:
+                # Sort by timestamp descending
+                alerts.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
                 
-                dt = ts.replace('T', ' ').split(' ')[0] if (' ' in ts or 'T' in ts) else ts
-                tm = ts.replace('T', ' ').split(' ')[1][:5] if (' ' in ts or 'T' in ts) else ""
+                last_check = st.session_state.get('last_checked_alerts', '1970-01-01T00:00:00')
+                # Filter for only the most recent alerts (last 24 hours or most recent batch)
+                # The user requested to only show most recent scrapes, not whole history
+                recent_alerts = [a for a in alerts if a.get('timestamp', '') > last_check]
+                if not recent_alerts:
+                    recent_alerts = alerts[:50] # Fallback to top 50 if none "new" since check
                 
-                feed_data.append({
-                    "Status": "🆕 NEW" if is_new else "✅ Seen",
-                    "Date": dt,
-                    "Time": tm,
-                    "Source": a.get('source', 'Unknown'),
-                    "Disease": a.get('disease', 'General'),
-                    "Headline": a.get('text', '')
-                })
-            
-            df = pd.DataFrame(feed_data)
-            
-            if not df.empty:
-                # Sort for grouping so NEW appears first
-                df['is_new_val'] = df['Status'] == "🆕 NEW"
-                df = df.sort_values(by=["is_new_val", "Date", "Time"], ascending=[False, False, False]).drop(columns=['is_new_val'])
+                feed_data = []
+                for a in recent_alerts:
+                    ts = a.get('timestamp', '')
+                    created_ts = a.get('created_at', str(ts)) # Fallback to timestamp if created_at is missing
+                    is_new = created_ts > last_check
+                    
+                    dt = ts.replace('T', ' ').split(' ')[0] if (' ' in ts or 'T' in ts) else ts
+                    tm = ts.replace('T', ' ').split(' ')[1][:5] if (' ' in ts or 'T' in ts) else ""
+                    
+                    feed_data.append({
+                        "Status": "🆕 NEW" if is_new else "✅ Seen",
+                        "Date": dt,
+                        "Time": tm,
+                        "Source": a.get('source', 'Unknown'),
+                        "Disease": a.get('disease', 'General'),
+                        "Headline": a.get('text', '')
+                    })
                 
-                st.subheader(f"🆕 Fresh Intelligence ({len(df)} signals)")
-                st.dataframe(
-                    df,
-                    column_config={
-                        "Disease": st.column_config.TextColumn("Disease/Topic", help="Detected entity"),
-                        "Status": st.column_config.TextColumn("Status", width="small")
-                    },
-                    use_container_width=True, 
-                    hide_index=True
-                )
-            
-            # Update last checked timestamp for the badge logic
-            st.session_state.last_checked_alerts = datetime.utcnow().isoformat()
-        else:
-            st.info("No recent intelligence found. The autonomous agents are still scanning.")
-            
-    except Exception as e:
-        st.error(f"Could not load news feed: {e}")
+                df = pd.DataFrame(feed_data)
+                
+                if not df.empty:
+                    # Sort for grouping so NEW appears first
+                    df['is_new_val'] = df['Status'] == "🆕 NEW"
+                    df = df.sort_values(by=["is_new_val", "Date", "Time"], ascending=[False, False, False]).drop(columns=['is_new_val'])
+                    
+                    st.subheader(f"🆕 Fresh Intelligence ({len(df)} signals)")
+                    st.dataframe(
+                        df,
+                        column_config={
+                            "Disease": st.column_config.TextColumn("Disease/Topic", help="Detected entity"),
+                            "Status": st.column_config.TextColumn("Status", width="small")
+                        },
+                        use_container_width=True, 
+                        hide_index=True
+                    )
+                
+                # Update last checked timestamp for the badge logic
+                st.session_state.last_checked_alerts = datetime.utcnow().isoformat()
+            else:
+                st.info("No recent intelligence found. The autonomous agents are still scanning.")
+                
+        except Exception as e:
+            st.error(f"Could not load news feed: {e}")
+
+    # Invoke the live-updating fragment
+    render_live_feed()

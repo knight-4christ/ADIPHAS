@@ -3,80 +3,78 @@ import api_client
 import pandas as pd
 
 def render():
-    from streamlit_autorefresh import st_autorefresh
-    # Auto-refresh the EBS dashboard every 60 seconds for experts
-    st_autorefresh(interval=60000, limit=None, key="ebs_autorefresh")
-    
     st.title("🚨 Expert Verification Panel")
     st.caption("Event-Based Surveillance (EBS) Alert Management")
     
     tab1, tab2 = st.tabs(["🔍 Pending Alerts", "🧠 Knowledge Fusion"])
     
     with tab1:
-        # Use cached alerts from app.py
-        alerts = st.session_state.get("cached_alerts")
-        if not alerts:
+        @st.fragment(run_every="30s")
+        def render_live_alerts():
+            # Always fetch directly inside the fragment to ensure fresh data
             alerts = api_client.get_alerts()
             
-        if not isinstance(alerts, list):
-            st.error("Unable to load alerts. Backend may be offline.")
-            return
-        
-        # Filter for unverified and Sort by Recency
-        pending = [a for a in alerts if not a.get('verified')]
-        pending.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
-        
-        # Search Filter
-        search_query = st.text_input("🔍 Search alerts by disease or location...", placeholder="e.g. Cholera")
-        if search_query:
-            pending = [
-                a for a in pending 
-                if search_query.lower() in (a.get('disease') or "").lower() or 
-                   search_query.lower() in (a.get('location_text') or "").lower()
-            ]
-        
-        if pending:
-            st.write(f"Showing {len(pending)} pending alerts.")
+            if not isinstance(alerts, list):
+                st.error("Unable to load alerts. Backend may be offline.")
+                return
             
-            for alert in pending:
-                with st.expander(f"{alert.get('risk_level', 'Unknown')} Risk: {alert.get('text', 'Alert')}", expanded=True):
-                    if alert.get('requires_hitl'):
-                        st.error("🛑 **MANDATORY HITL**: This signal was discovered via Autonomous Recovery or is High Severity without official confirmation.")
-                    if alert.get('policy_alert'):
-                        st.warning("⚖️ **Policy Watch**: This alert contains mentions of administrative renaming (Area Administrative Councils).")
-                        
-                    col1, col2 = st.columns([3, 1])
-                    with col1:
-                        st.markdown(f"**Location:** {alert.get('location_text')}")
-                        st.markdown(f"**🛡️ Evidence Trace:** Source: {alert.get('source', 'Autonomous Agent')} (ID: {alert.get('alert_id')[:8]})")
-                        st.markdown(f"**Timestamp:** {alert.get('timestamp')}")
-                        
-                        # RAG Verification
-                        if st.button("🔍 Cross-Reference Intelligence", key=f"rag_{alert['alert_id']}"):
-                            with st.spinner("Searching local & global context..."):
-                                sq = f"{alert.get('disease')} outbreaks in {alert.get('location_text')} Nigeria"
-                                rres = api_client.advisory_search(sq)
-                                if rres and not rres.get("error"):
-                                    st.info(f"Source: {rres.get('source').upper()}")
-                                    for rs in rres.get('results', [])[:2]:
-                                        st.caption(rs.get('content') or rs.get('snippet') or str(rs))
-                                else:
-                                    st.write("No similar context found.")
-                    with col2:
-                        if st.button("✅ Verify & Publish", key=f"verify_{alert['alert_id']}"):
-                            res = api_client.verify_alert(st.session_state.token, alert['alert_id'])
-                            if "status" in res:
+            # Filter for unverified and Sort by Recency
+            pending = [a for a in alerts if not a.get('verified')]
+            pending.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+            
+            # Search Filter
+            search_query = st.text_input("🔍 Search alerts by disease or location...", placeholder="e.g. Cholera")
+            if search_query:
+                pending = [
+                    a for a in pending 
+                    if search_query.lower() in (a.get('disease') or "").lower() or 
+                       search_query.lower() in (a.get('location_text') or "").lower()
+                ]
+            
+            if pending:
+                st.write(f"Showing {len(pending)} pending alerts.")
+                
+                for alert in pending:
+                    with st.expander(f"{alert.get('risk_level', 'Unknown')} Risk: {alert.get('text', 'Alert')}", expanded=True):
+                        if alert.get('requires_hitl'):
+                            st.error("🛑 **MANDATORY HITL**: This signal was discovered via Autonomous Recovery or is High Severity without official confirmation.")
+                        if alert.get('policy_alert'):
+                            st.warning("⚖️ **Policy Watch**: This alert contains mentions of administrative renaming (Area Administrative Councils).")
+                            
+                        col1, col2 = st.columns([3, 1])
+                        with col1:
+                            st.markdown(f"**Location:** {alert.get('location_text')}")
+                            st.markdown(f"**🛡️ Evidence Trace:** Source: {alert.get('source', 'Autonomous Agent')} (ID: {alert.get('alert_id')[:8]})")
+                            st.markdown(f"**Timestamp:** {alert.get('timestamp')}")
+                            
+                            # RAG Verification
+                            if st.button("🔍 Cross-Reference Intelligence", key=f"rag_{alert['alert_id']}"):
+                                with st.spinner("Searching local & global context..."):
+                                    sq = f"{alert.get('disease')} outbreaks in {alert.get('location_text')} Nigeria"
+                                    rres = api_client.advisory_search(sq)
+                                    if rres and not rres.get("error"):
+                                        st.info(f"Source: {rres.get('source').upper()}")
+                                        for rs in rres.get('results', [])[:2]:
+                                            st.caption(rs.get('content') or rs.get('snippet') or str(rs))
+                                    else:
+                                        st.write("No similar context found.")
+                        with col2:
+                            if st.button("✅ Verify & Publish", key=f"verify_{alert['alert_id']}"):
+                                res = api_client.verify_alert(st.session_state.token, alert['alert_id'])
+                                if "status" in res:
+                                    st.cache_data.clear() # Clear global alerts cache
+                                    st.session_state.success_banner = f"Intelligence Signal {alert['alert_id'][:8]} verified and published!"
+                                    st.rerun()
+                            
+                            if st.button("🗑️ Discard", key=f"discard_{alert['alert_id']}"):
+                                res = api_client.discard_alert(st.session_state.token, alert['alert_id'])
                                 st.cache_data.clear() # Clear global alerts cache
-                                st.session_state.success_banner = f"Intelligence Signal {alert['alert_id'][:8]} verified and published!"
+                                st.session_state.success_banner = f"Intelligence Signal {alert['alert_id'][:8]} discarded successfully."
                                 st.rerun()
-                        
-                        if st.button("🗑️ Discard", key=f"discard_{alert['alert_id']}"):
-                            res = api_client.discard_alert(st.session_state.token, alert['alert_id'])
-                            st.cache_data.clear() # Clear global alerts cache
-                            st.session_state.success_banner = f"Intelligence Signal {alert['alert_id'][:8]} discarded successfully."
-                            st.rerun()
-        else:
-            st.success("No pending alerts! All autonomous findings have been reviewed.")
+            else:
+                st.success("No pending alerts! All autonomous findings have been reviewed.")
+                
+        render_live_alerts()
             
     with tab2:
         st.subheader("Knowledge Fusion Simulator")

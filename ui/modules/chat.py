@@ -98,8 +98,22 @@ def render(is_overlay=False):
             st.session_state.active_thread_id = new_id
             if not is_overlay: st.rerun()
 
+    # --- Overlay Auto-Init ---
+    if is_overlay and not st.session_state.chat_threads:
+        new_id = "quick_chat"
+        st.session_state.chat_threads[new_id] = {
+            "name": "Quick Assistant",
+            "messages": [],
+            "model": "gemini-2.0-flash",
+            "session": init_chat_session(client, system_instruction, "gemini-2.0-flash"),
+            "timestamp": datetime.now()
+        }
+        st.session_state.active_thread_id = new_id
+
     if not st.session_state.chat_threads:
-        if is_overlay: return
+        if is_overlay:
+            st.info("Please start a new chat session.")
+            return
         st.stop()
         
     if not st.session_state.active_thread_id:
