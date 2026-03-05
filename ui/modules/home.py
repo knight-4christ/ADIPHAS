@@ -174,80 +174,85 @@ def render():
     with t_monitor:
         st.subheader("📡 Live System Monitoring")
         
-        try:
-            alerts = api_client.get_alerts()
-            last_check = st.session_state.get('last_checked_alerts', '1970-01-01T00:00:00')
-            
-            unread_count = 0
-            if isinstance(alerts, list):
-                for a in alerts:
-                    ts = a.get('timestamp', '')
-                    created_ts = a.get('created_at', ts)
-                    if created_ts > last_check:
-                        unread_count += 1
-            
-            c1, c2 = st.columns([1, 2])
-            with c1:
-                st.metric("New Unread Insights", unread_count, delta=f"+{unread_count}" if unread_count > 0 else None)
-                if unread_count > 0:
-                    st.write("Go to **Local Health Feed** to review them.")
+        @st.fragment(run_every="10s")
+        def render_live_monitoring():
+            try:
+                alerts = api_client.get_alerts()
+                last_check = st.session_state.get('last_checked_alerts', '1970-01-01T00:00:00')
                 
-            with c2:
-                if isinstance(alerts, list) and alerts:
-                    # Guard: validate we have a proper list of dicts with 'created_at' before building DataFrame
-                    valid_alerts = [a for a in alerts if isinstance(a, dict) and 'created_at' in a]
-                    if valid_alerts:
-                        # Intelligence Pulse Chart
-                        df_alerts = pd.DataFrame(valid_alerts)
-                        df_alerts['date'] = pd.to_datetime(df_alerts['created_at'], errors='coerce').dt.date
-                        df_alerts = df_alerts.dropna(subset=['date'])
-                        pulse = df_alerts.groupby('date').size().reset_index(name='count')
-                        
-                        fig = go.Figure()
-                        fig.add_trace(go.Scatter(
-                            x=pulse['date'], y=pulse['count'],
-                            mode='lines+markers',
-                            name='Signals Found',
-                            line=dict(color='#0ea5e9', width=3),
-                            fill='tozeroy'
-                        ))
-                        fig.update_layout(
-                            title="System Intelligence Pulse (Signals per Day)",
-                            height=200, margin=dict(l=0, r=0, t=30, b=0),
-                            paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                            xaxis=dict(showgrid=False), yaxis=dict(showgrid=True, gridcolor='#334155')
+                unread_count = 0
+                if isinstance(alerts, list):
+                    for a in alerts:
+                        ts = a.get('timestamp', '')
+                        created_ts = a.get('created_at', ts)
+                        if created_ts > last_check:
+                            unread_count += 1
+                
+                c1, c2 = st.columns([1, 2])
+                with c1:
+                    st.metric("New Unread Insights", unread_count, delta=f"+{unread_count}" if unread_count > 0 else None)
+                    if unread_count > 0:
+                        st.write("Go to **Local Health Feed** to review them.")
+                    
+                with c2:
+                    if isinstance(alerts, list) and alerts:
+                        # Guard: validate we have a proper list of dicts with 'created_at' before building DataFrame
+                        valid_alerts = [a for a in alerts if isinstance(a, dict) and 'created_at' in a]
+                        if valid_alerts:
+                            # Intelligence Pulse Chart
+                            df_alerts = pd.DataFrame(valid_alerts)
+                            df_alerts['date'] = pd.to_datetime(df_alerts['created_at'], errors='coerce').dt.date
+                            df_alerts = df_alerts.dropna(subset=['date'])
+                            pulse = df_alerts.groupby('date').size().reset_index(name='count')
+                            
+                            fig = go.Figure()
+                            fig.add_trace(go.Scatter(
+                                x=pulse['date'], y=pulse['count'],
+                                mode='lines+markers',
+                                name='Signals Found',
+                                line=dict(color='#0ea5e9', width=3),
+                                fill='tozeroy'
+                            ))
+                            fig.update_layout(
+                                title="System Intelligence Pulse (Signals per Day)",
+                                height=200, margin=dict(l=0, r=0, t=30, b=0),
+                                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                                xaxis=dict(showgrid=False), yaxis=dict(showgrid=True, gridcolor='#334155')
+                            )
+                            st.plotly_chart(fig, width='stretch')
+
+                st.write("---")
+                
+                # Activity Log
+                col_log_title, col_log_date = st.columns([2, 1])
+                with col_log_title:
+                    st.subheader("📝 Agent Transaction Log")
+                with col_log_date:
+                    selected_date = st.date_input("View History", datetime.now().date(), key="activity_log_date")
+
+                if selected_date == datetime.now().date():
+                    activities = api_client.get_activity()
+                else:
+                    activities = api_client.get_activity_history(selected_date.strftime("%Y-%m-%d"))
+                    
+                if isinstance(activities, list) and activities:
+                    valid_activities = [a for a in activities if isinstance(a, dict)]
+                    df_log = pd.DataFrame(valid_activities)
+                    if not df_log.empty and 'timestamp' in df_log.columns:
+                        cols = [c for c in ['timestamp', 'agent', 'message'] if c in df_log.columns]
+                        df_display = df_log[cols].copy()
+                        df_display['timestamp'] = df_display['timestamp'].apply(
+                            lambda x: x.replace('T', ' ').split(' ')[1][:8] if isinstance(x, str) and (' ' in x or 'T' in x) else x
                         )
-                        st.plotly_chart(fig, width='stretch')
+                        st.dataframe(df_display, hide_index=True, width='stretch')
+                else:
+                    st.info("System initializing... No activities logged yet.")
+                    
+            except Exception as e:
+                st.error(f"Error refreshing dashboard: {e}")
 
-            st.write("---")
-            
-            # Activity Log
-            col_log_title, col_log_date = st.columns([2, 1])
-            with col_log_title:
-                st.subheader("📝 Agent Transaction Log")
-            with col_log_date:
-                selected_date = st.date_input("View History", datetime.now().date())
-
-            if selected_date == datetime.now().date():
-                activities = api_client.get_activity()
-            else:
-                activities = api_client.get_activity_history(selected_date.strftime("%Y-%m-%d"))
-                
-            if isinstance(activities, list) and activities:
-                valid_activities = [a for a in activities if isinstance(a, dict)]
-                df_log = pd.DataFrame(valid_activities)
-                if not df_log.empty and 'timestamp' in df_log.columns:
-                    cols = [c for c in ['timestamp', 'agent', 'message'] if c in df_log.columns]
-                    df_display = df_log[cols].copy()
-                    df_display['timestamp'] = df_display['timestamp'].apply(
-                        lambda x: x.replace('T', ' ').split(' ')[1][:8] if isinstance(x, str) and (' ' in x or 'T' in x) else x
-                    )
-                    st.dataframe(df_display, hide_index=True, width='stretch')
-            else:
-                st.info("System initializing... No activities logged yet.")
-                
-        except Exception as e:
-            st.error(f"Error refreshing dashboard: {e}")
+        # Execute monitoring fragment
+        render_live_monitoring()
 
     with t_hub:
         st.markdown("### 🔐 Official Channels & Verification Hub")
