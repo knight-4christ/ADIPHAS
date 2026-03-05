@@ -117,6 +117,17 @@ def render():
         m1.metric("📰 Total Alerts in DB", metrics.get("total_alerts_in_db", 0))
         m2.metric("✅ Verified Alerts", metrics.get("verified_alerts", 0))
         m3.metric("⚙️ Today's Agent Actions", sum(agent_counts.values()))
+
+        # --- NEW: Scraping Performance Section ---
+        st.markdown("#### 🕵️‍♂️ Autonomous Scraper Performance")
+        s1, s2, s3 = st.columns(3)
+        s1.metric("Articles Found", metrics.get("last_scrape_articles", 0))
+        s2.metric("Skipped (Old)", metrics.get("articles_skipped", 0))
+        s3.metric("New Data Processed", metrics.get("articles_new", 0))
+        
+        sources = metrics.get("last_scrape_sources", "None")
+        if sources != "None":
+            st.caption(f"📍 **Recent Sources:** {sources}")
         
         # Token Usage
         token_data = api_client.get_token_usage()

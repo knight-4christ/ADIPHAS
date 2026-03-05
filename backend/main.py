@@ -453,10 +453,55 @@ def get_system_metrics(db: Session = Depends(get_db)):
     total_alerts = db.query(func.count(models.EBSAlert.alert_id)).scalar()
     verified_alerts = db.query(func.count(models.EBSAlert.alert_id)).filter(models.EBSAlert.verified == True).scalar()
     
+    # --- Scraping Metrics (from most recent SCOUT activity) ---
+    import re
+    scout_activities = db.query(models.SystemActivity).filter(
+        models.SystemActivity.agent == "SCOUT",
+        cast(models.SystemActivity.timestamp, Date) == today
+    ).order_by(models.SystemActivity.timestamp.desc()).all()
+    
+    last_scrape_count = 0
+    last_scrape_sources = ""
+    for sa in scout_activities:
+        m = re.search(r'Scraped (\d+) articles?\. Sources: (.+)', sa.message)
+        if m:
+            last_scrape_count = int(m.group(1))
+            last_scrape_sources = m.group(2)
+            break
+    
+    # Articles processed/skipped from IntelligenceEngine
+    intel_activities = db.query(models.SystemActivity).filter(
+        models.SystemActivity.agent == "IntelligenceEngine",
+        cast(models.SystemActivity.timestamp, Date) == today
+    ).order_by(models.SystemActivity.timestamp.desc()).all()
+    
+    articles_skipped = 0
+    articles_batched = 0
+    for sa in intel_activities:
+        m_skip = re.search(r'Skipped (\d+)', sa.message)
+        if m_skip:
+            articles_skipped = int(m_skip.group(1))
+        m_batch = re.search(r'Processing top (\d+) out of (\d+)', sa.message)
+        if m_batch:
+            articles_batched = int(m_batch.group(2))
+    
+    # Alerts saved today
+    alerts_saved_msg = [sa for sa in db.query(models.SystemActivity).filter(
+        models.SystemActivity.agent == "AlertingEngine",
+        cast(models.SystemActivity.timestamp, Date) == today
+    ).all()]
+    alerts_saved_today = len(alerts_saved_msg)
+    
     return {
         "today_activity_by_agent": metrics,
         "total_alerts_in_db": total_alerts,
         "verified_alerts": verified_alerts,
+        # Scraping Metrics
+        "last_scrape_articles": last_scrape_count,
+        "last_scrape_sources": last_scrape_sources,
+        "articles_skipped": articles_skipped,
+        "articles_new": articles_batched if articles_batched else max(0, last_scrape_count - articles_skipped),
+        "alerts_saved_today": alerts_saved_today,
         "last_updated": datetime.now().replace(microsecond=0).isoformat()
     }
 

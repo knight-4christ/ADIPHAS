@@ -54,8 +54,14 @@ def render():
             alerts.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
             
             last_check = st.session_state.get('last_checked_alerts', '1970-01-01T00:00:00')
+            # Filter for only the most recent alerts (last 24 hours or most recent batch)
+            # The user requested to only show most recent scrapes, not whole history
+            recent_alerts = [a for a in alerts if a.get('timestamp', '') > last_check]
+            if not recent_alerts:
+                recent_alerts = alerts[:50] # Fallback to top 50 if none "new" since check
+            
             feed_data = []
-            for a in alerts:
+            for a in recent_alerts:
                 ts = a.get('timestamp', '')
                 created_ts = a.get('created_at', str(ts)) # Fallback to timestamp if created_at is missing
                 is_new = created_ts > last_check
@@ -73,29 +79,15 @@ def render():
                 })
             
             df = pd.DataFrame(feed_data)
-            # Sort for grouping
-            df['is_new_val'] = df['Status'] == "🆕 NEW"
-            df = df.sort_values(by=["is_new_val", "Date", "Time"], ascending=[False, False, False])
             
-            new_df = df[df['is_new_val']].drop(columns=['is_new_val'])
-            older_df = df[~df['is_new_val']].drop(columns=['is_new_val'])
-
-            if not new_df.empty:
-                st.subheader("🆕 Fresh Intelligence")
+            if not df.empty:
+                # Sort for grouping so NEW appears first
+                df['is_new_val'] = df['Status'] == "🆕 NEW"
+                df = df.sort_values(by=["is_new_val", "Date", "Time"], ascending=[False, False, False]).drop(columns=['is_new_val'])
+                
+                st.subheader(f"🆕 Fresh Intelligence ({len(df)} signals)")
                 st.dataframe(
-                    new_df,
-                    column_config={
-                        "Disease": st.column_config.TextColumn("Disease/Topic", help="Detected entity"),
-                        "Status": st.column_config.TextColumn("Status", width="small")
-                    },
-                    use_container_width=True, 
-                    hide_index=True
-                )
-            
-            if not older_df.empty:
-                st.subheader("📜 Historical Context")
-                st.dataframe(
-                    older_df,
+                    df,
                     column_config={
                         "Disease": st.column_config.TextColumn("Disease/Topic", help="Detected entity"),
                         "Status": st.column_config.TextColumn("Status", width="small")
