@@ -343,9 +343,29 @@ async def startup_event():
                     return
                 
                 if gemini_model:
+                    from backend.core.vector_store import get_vector_manager
+                    vm = get_vector_manager()
+                    
+                    rag_query = "Latest major disease outbreaks and critical health alerts"
+                    rag_response = vm.hybrid_search(rag_query, k=5)
+                    rag_context = ""
+                    
+                    if rag_response and "results" in rag_response:
+                        if rag_response["source"] == "web_search":
+                            rag_context = "\n".join([f"- {r.get('content', '')}" for r in rag_response["results"] if isinstance(r, dict)])
+                        else:
+                            rag_context = "\n".join([f"- {r.get('content', '')}" for r in rag_response["results"] if isinstance(r, dict)])
+
                     alert_summary = "\n".join([f"- {a.disease} in {a.location_text} (Risk: {a.risk_level})" for a in recent_alerts[:5]])
-                    prompt = f"""You are ADIPHAS Intelligence. Provide a concise (3 sentence max) "So Far..." startup briefing summarizing the current health intelligence landscape based on these recent signals:
+                    
+                    prompt = f"""You are ADIPHAS Intelligence. Provide a concise (3 sentence max) "So Far..." startup briefing summarizing the current health intelligence landscape based on these signals:
+
+Recent Database Alerts:
 {alert_summary}
+
+Semantic RAG Context (Knowledge Base/Web):
+{rag_context}
+
 Focus on: What patterns are emerging? Any immediate concerns? What should be monitored closely?"""
                     from backend.core.model_config import smart_generate
                     text, model_used = smart_generate(gemini_model, prompt, context="StartupInsight")
@@ -353,7 +373,7 @@ Focus on: What patterns are emerging? Any immediate concerns? What should be mon
                     if text:
                         startup_insight_cache["insight"] = text
                         startup_insight_cache["generated_at"] = datetime.now().replace(microsecond=0).isoformat()
-                        logger.info(f"[StartupInsight] Generated successfully using {model_used}.")
+                        logger.info(f"[StartupInsight] Generated successfully using {model_used} with Hybrid RAG.")
                         return
                     else:
                         raise Exception("All models failed for StartupInsight")
