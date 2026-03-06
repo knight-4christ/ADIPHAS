@@ -21,7 +21,7 @@ class GeminiAPIEmbeddings:
         if not api_key:
             api_key = os.getenv("GEMINI_API_KEY")
         self.client = genai.Client(api_key=api_key)
-        self.model_name = "text-embedding-004"
+        self.model_name = "gemini-embedding-001"
 
     def embed_documents(self, texts):
         if not texts: return []
@@ -34,11 +34,11 @@ class GeminiAPIEmbeddings:
             return [e.values for e in response.embeddings]
         except Exception as e:
             logger.error(f"[GeminiAPIEmbeddings] Batch embedding failed: {e}")
-            # text-embedding-004 returns 768 dimensions by default. Return fallback vector to prevent Chroma crashing
-            return [[0.0] * 768 for _ in texts]
+            # gemini-embedding-001 returns 3072 dimensions by default. Return fallback vector to prevent Chroma crashing
+            return [[0.0] * 3072 for _ in texts]
 
     def embed_query(self, text):
-        if not text: return [0.0] * 768
+        if not text: return [0.0] * 3072
         try:
             response = self.client.models.embed_content(
                 model=self.model_name,
@@ -47,7 +47,7 @@ class GeminiAPIEmbeddings:
             return response.embeddings[0].values
         except Exception as e:
             logger.error(f"[GeminiAPIEmbeddings] Query embedding failed: {e}")
-            return [0.0] * 768
+            return [0.0] * 3072
 
 class LocalTextSplitter:
     """A simple Character-based splitter that does NOT depend on torch or transformers."""
@@ -83,7 +83,7 @@ class ChromaManager:
         # --- HIGH QUALITY AI EMBEDDINGS ---
         try:
             self.embeddings = GeminiAPIEmbeddings(os.getenv("GEMINI_API_KEY"))
-            logger.info("[VectorEngine] Initialized Gemini text-embedding-004 API embeddings for high-quality semantic routing.")
+            logger.info("[VectorEngine] Initialized Gemini gemini-embedding-001 API embeddings for high-quality semantic routing.")
         except Exception as e:
             logger.error(f"[VectorEngine] Failed to initialize Gemini APIs Embeddings: {e}")
             raise e
