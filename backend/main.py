@@ -34,6 +34,8 @@ from apscheduler.schedulers.background import BackgroundScheduler
 import logging
 from google import genai
 import threading
+# from backend.core.sms_dispatcher import sms_dispatcher
+# from backend.core.email_dispatcher import email_dispatcher
 
 # Configure logging to both file and console
 log_dir = "logs"
@@ -246,7 +248,19 @@ def autonomous_monitoring_job():
                         risk_level="High" if result.get('severity_score', 0) > 0.7 or result['confidence_score'] > 0.8 else ("Medium" if result['confidence_score'] > 0.5 else "Low")
                     )
                     db.add(alert)
+                    db.flush() # Flush to get IDs
                     log_activity("AlertingEngine", f"Fused alert: {result['disease']} in {result['location']} (confidence={result['confidence_score']:.2f})")
+                    
+                    # --- BROADCAST LOGIC (SMS & Email) - Commented out until needed ---
+                    # if alert.risk_level == "High":
+                    #     # Fetch ALL users for broad notification
+                    #     all_users = db.query(models.User).all()
+                    #     
+                    #     # SMS Broadcast
+                    #     sms_dispatcher.broadcast_anomaly_alert(all_users, alert.disease, alert.location_text, alert.risk_level)
+                    #     
+                    #     # Email Broadcast
+                    #     email_dispatcher.broadcast_anomaly_alert(all_users, alert.disease, alert.location_text, alert.risk_level)
         else:
             # No dual-entity headlines — save disease-only articles as raw signals
             saved_raw = 0
@@ -455,9 +469,20 @@ def get_token_usage():
     from backend.core.token_tracker import get_session_totals
     return get_session_totals()
 
+# Globals for primitive endpoint caching (so we don't spam SQLite during Dashboard polling)
+_cached_system_metrics = None
+_cached_system_metrics_time = 0
+
 @app.get("/system/metrics")
 def get_system_metrics(db: Session = Depends(get_db)):
-    """Returns today's scraping and intelligence metrics from the activity log."""
+    """Returns today's scraping and intelligence metrics. Cached for 5s TTL."""
+    global _cached_system_metrics
+    global _cached_system_metrics_time
+    
+    current_time = time.time()
+    if _cached_system_metrics and (current_time - _cached_system_metrics_time) < 5.0:
+        return _cached_system_metrics
+
     from sqlalchemy import func, cast, Date
     today = datetime.now().date()
     
@@ -482,14 +507,18 @@ def get_system_metrics(db: Session = Depends(get_db)):
         cast(models.SystemActivity.timestamp, Date) == today
     ).order_by(models.SystemActivity.timestamp.desc()).all()
     
-    last_scrape_count = 0
-    last_scrape_sources = ""
+    # User requested cumulative daily totals, not just the last run's count.
+    total_scraped_today = 0
+    all_scrape_sources = set()
+    
     for sa in scout_activities:
         m = re.search(r'Scraped (\d+) articles?\. Sources: (.+)', sa.message)
         if m:
-            last_scrape_count = int(m.group(1))
-            last_scrape_sources = m.group(2)
-            break
+            total_scraped_today += int(m.group(1))
+            sources_chunk = m.group(2)
+            if sources_chunk != "None":
+                for src in map(str.strip, sources_chunk.split(',')):
+                    all_scrape_sources.add(src)
     
     # Articles processed/skipped from IntelligenceEngine
     intel_activities = db.query(models.SystemActivity).filter(
@@ -497,20 +526,22 @@ def get_system_metrics(db: Session = Depends(get_db)):
         cast(models.SystemActivity.timestamp, Date) == today
     ).order_by(models.SystemActivity.timestamp.desc()).all()
     
-    articles_skipped = 0
-    articles_batched = 0
+    total_articles_skipped = 0
+    total_articles_batched = 0
+    
     for sa in intel_activities:
         m_skip = re.search(r'Skipped (\d+)', sa.message)
         if m_skip:
-            articles_skipped = max(articles_skipped, int(m_skip.group(1)))
+            total_articles_skipped += int(m_skip.group(1))
         
         m_batch1 = re.search(r'Processing top (\d+) out of (\d+)', sa.message)
-        if m_batch1 and not articles_batched:
-            articles_batched = int(m_batch1.group(2))
+        if m_batch1:
+            total_articles_batched += int(m_batch1.group(1)) # Count the limited batch
+            continue # Prioritize this over the next regex if both exist
             
         m_batch2 = re.search(r'Running AI batch extraction on (\d+)', sa.message)
-        if m_batch2 and not articles_batched:
-            articles_batched = int(m_batch2.group(1))
+        if m_batch2:
+            total_articles_batched += int(m_batch2.group(1))
     
     # Alerts saved today
     alerts_saved_msg = [sa for sa in db.query(models.SystemActivity).filter(
@@ -519,18 +550,27 @@ def get_system_metrics(db: Session = Depends(get_db)):
     ).all()]
     alerts_saved_today = len(alerts_saved_msg)
     
-    return {
+    # Format sources beautifully
+    last_scrape_sources = ", ".join(sorted(list(all_scrape_sources))) if all_scrape_sources else "None yet"
+    
+    # NEW CACHING IMPLEMENTATION:
+    # Save the computed result before returning
+    computed_metrics = {
         "today_activity_by_agent": metrics,
         "total_alerts_in_db": total_alerts,
         "verified_alerts": verified_alerts,
-        # Scraping Metrics
-        "last_scrape_articles": last_scrape_count,
+        "last_scrape_articles": total_scraped_today,
         "last_scrape_sources": last_scrape_sources,
-        "articles_skipped": articles_skipped,
-        "articles_new": articles_batched if articles_batched else max(0, last_scrape_count - articles_skipped),
+        "articles_skipped": total_articles_skipped,
+        "articles_new": total_articles_batched,
         "alerts_saved_today": alerts_saved_today,
         "last_updated": datetime.now().replace(microsecond=0).isoformat()
     }
+    
+    _cached_system_metrics = computed_metrics
+    _cached_system_metrics_time = current_time
+    
+    return computed_metrics
 
 # --- Dependencies (using get_db defined above) ---
 

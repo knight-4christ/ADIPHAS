@@ -12,3 +12,5 @@ lxml==5.1.0
 python-dateutil==2.8.2
 apscheduler==3.10.4
 google-genai==0.3.0
+twilio==9.0.4
+scrapling==0.4.1

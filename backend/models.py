@@ -25,6 +25,7 @@ class User(Base):
     genotype = Column(String, nullable=True)
     health_conditions = Column(Text, nullable=True)
     location_lga = Column(String, nullable=True)
+    phone_number = Column(String, nullable=True)
     
     # Gamification
     impact_score = Column(Integer, default=0)
