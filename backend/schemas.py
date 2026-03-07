@@ -91,7 +91,7 @@ class UserBase(BaseModel):
     genotype: Optional[str] = None
     health_conditions: Optional[str] = None
     location_lga: Optional[str] = None
-    phone_number: Optional[str] = None
+    # phone_number: Optional[str] = None # Paused SMS integration
     impact_score: int = 0
     contributions: int = 0
 
