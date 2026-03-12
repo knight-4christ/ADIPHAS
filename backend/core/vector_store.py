@@ -29,32 +29,45 @@ class GeminiAPIEmbeddings:
         all_embeddings = []
         batch_size = 50  # Safe limit for Gemini API batch embeddings
         
+        import time
         for i in range(0, len(texts), batch_size):
             batch = texts[i:i + batch_size]
-            try:
-                response = self.client.models.embed_content(
-                    model=self.model_name,
-                    contents=batch,
-                )
-                all_embeddings.extend([e.values for e in response.embeddings])
-            except Exception as e:
-                logger.error(f"[GeminiAPIEmbeddings] Batch embedding failed at chunk {i}: {e}")
-                # gemini-embedding-001 returns 3072 dimensions by default. Return fallback vector to prevent Chroma crashing
+            success = False
+            for attempt in range(3):
+                try:
+                    response = self.client.models.embed_content(
+                        model=self.model_name,
+                        contents=batch,
+                    )
+                    all_embeddings.extend([e.values for e in response.embeddings])
+                    success = True
+                    break
+                except Exception as e:
+                    logger.warning(f"[GeminiAPIEmbeddings] Batch embedding failed at chunk {i}, attempt {attempt+1}: {e}")
+                    time.sleep(2 ** attempt)
+            
+            if not success:
+                logger.error(f"[GeminiAPIEmbeddings] Batch embedding permanently failed at chunk {i} after 3 attempts.")
                 all_embeddings.extend([[0.0] * 3072 for _ in batch])
                 
         return all_embeddings
 
     def embed_query(self, text):
         if not text: return [0.0] * 3072
-        try:
-            response = self.client.models.embed_content(
-                model=self.model_name,
-                contents=text,
-            )
-            return response.embeddings[0].values
-        except Exception as e:
-            logger.error(f"[GeminiAPIEmbeddings] Query embedding failed: {e}")
-            return [0.0] * 3072
+        import time
+        for attempt in range(3):
+            try:
+                response = self.client.models.embed_content(
+                    model=self.model_name,
+                    contents=text,
+                )
+                return response.embeddings[0].values
+            except Exception as e:
+                logger.warning(f"[GeminiAPIEmbeddings] Query embedding failed attempt {attempt+1}: {e}")
+                time.sleep(2 ** attempt)
+        
+        logger.error(f"[GeminiAPIEmbeddings] Query embedding permanently failed after 3 attempts.")
+        return [0.0] * 3072
 
 class LocalTextSplitter:
     """A simple Character-based splitter that does NOT depend on torch or transformers."""
