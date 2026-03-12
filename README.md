@@ -56,10 +56,11 @@ Host the entire stack (FastAPI, Streamlit, PostgreSQL) with a single command:
 docker-compose up --build -d
 ```
 
-### 🚀 Quick Start (Windows PowerShell)
+### 🚀 Quick Start
 The easiest way to run the entire hybrid system (Backend, Frontend, and Autonomous Agents) locally:
+
 1. **Clone & Configure**:
-   ```powershell
+   ```bash
    git clone https://github.com/your-repo/ADIPHAS.git
    cd ADIPHAS
    ```
@@ -71,15 +72,22 @@ The easiest way to run the entire hybrid system (Backend, Frontend, and Autonomo
    ```
 3. **Seed Real Epidemic Data**:
    Ensure the Predictive Agent operates on verified, real-world data (Cholera/Lassa):
-   ```powershell
-   .\myenv\Scripts\python seed_real_data.py
+   ```python
+   python seed_real_data.py
    ```
 4. **Boot the Analytics Engine**:
-   Instantly deploy the FastAPI backend, Streamlit UI, and Background Schedulers:
+   Instantly deploy the FastAPI backend, Streamlit UI, and Background Schedulers. This script automatically handles cold-start delays and port conflicts:
+   
+   **For Windows (PowerShell):**
    ```powershell
    .\start_adiphas.ps1
    ```
-   *The script automatically handles virtual environments, cold-start delays, and prevents port conflicts.*
+   
+   **For Linux / macOS:**
+   ```bash
+   chmod +x start_adiphas.sh
+   ./start_adiphas.sh
+   ```
 
 ---
 
