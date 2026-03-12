@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 MODEL_CHAIN = [
     "gemini-2.0-flash",
     "gemini-2.5-flash",
-    "gemini-1.5-flash",
+    "gemini-2.5-flash-8b",
 ]
 
 # Track which model is currently active
@@ -69,8 +69,8 @@ def smart_generate(gemini_client, prompt: str, context: str = ""):
             
         except Exception as e:
             error_str = str(e)
-            if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
-                logger.warning(f"[Gemini] {model} quota exhausted for {context}. Switching model...")
+            if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str or "404" in error_str or "NOT_FOUND" in error_str:
+                logger.warning(f"[Gemini] {model} failed (Quota/404) for {context}. Switching model... Error: {e}")
                 switch_to_next_model()
             else:
                 logger.error(f"[Gemini] {model} failed for {context}: {e}")
