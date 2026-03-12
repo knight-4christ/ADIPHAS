@@ -14,22 +14,9 @@ class AlertingEngine:
         """Uses Gemini to orchestrate the policy plan based on hard statistical thresholds."""
         if not self.gemini_model: return None
         
-        prompt = f"""
-        Act as the Chief Public Health Orchestrator for Lagos State, Nigeria.
-        
-        Underlying Mathematical Models Output:
-        - Target: {disease} in {lga_code}
-        - 4-week WMA Forecast Cases: {forecast_data['forecast']}
-        - Forecast Error (MAE): {forecast_data['mae']}
-        - Z-Score Anomaly Triggered: {is_anomaly}
-        
-        Your task is to orchestrate a high-level `policy_recommendation_plan`.
-        Because this is a Hybrid AI system, you MUST respect the math: if an anomaly is triggered, your policy must reflect an emergency posture. If the forecast is flat and no anomaly is triggered, maintain a routine surveillance posture. 
-        
-        Provide:
-        1. A concise (1 sentence) epidemiological interpretation of the math.
-        2. A clear Public Health Preparedness Action Plan.
-        """
+        prompt = f"""Forecast: {disease} in {lga_code}. WMA forecast={forecast_data['forecast']}, MAE={forecast_data['mae']}, Anomaly={is_anomaly}.
+If anomaly: emergency posture. If flat/no anomaly: routine surveillance.
+Provide: 1) 1-sentence interpretation of the math. 2) Public Health Action Plan."""
         try:
             from backend.core.model_config import smart_generate
             text, model_used = smart_generate(self.gemini_model, prompt, context="ForecastNarrative")

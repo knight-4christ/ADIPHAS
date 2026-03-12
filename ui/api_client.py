@@ -148,3 +148,11 @@ def get_system_metrics():
 def get_model_status():
     """Returns the current Gemini model fallback status."""
     return _safe_request("GET", f"{API_URL}/system/model-status")
+
+def get_latest_briefing():
+    """Returns the most recent system-wide autonomous briefing snapshot."""
+    return _safe_request("GET", f"{API_URL}/system/briefing")
+
+def get_autonomous_forecasts():
+    """Returns all pre-calculated autonomous forecasts and anomalies."""
+    return _safe_request("GET", f"{API_URL}/system/forecasts")

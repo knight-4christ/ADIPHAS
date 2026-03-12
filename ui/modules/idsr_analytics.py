@@ -70,72 +70,78 @@ def render():
                     data_points = forecast.get('data_points_used', 0)
                     m3.metric("Validation Period", f"2 Weeks ({data_points} wks data)")
 
-                # Prominent Anomaly Banner (Flagging Feature)
-                if forecast.get("anomaly_flag"):
-                    st.error(f"🚨 **EPIDEMIC ANOMALY DETECTED**: Statistical surge detected for {disease} in {lga_input}. Z-score exceeds safety threshold (2.0). Escalating surveillance priority.")
+                    # Prominent Anomaly Banner (Flagging Feature)
+                    if forecast.get("anomaly_flag"):
+                        st.error(f"🚨 **EPIDEMIC ANOMALY DETECTED**: Statistical surge detected for {disease} in {lga_input}. Z-score exceeds safety threshold (2.0). Escalating surveillance priority.")
 
-                st.info(f"💡 Low MAE ({mae:.2f}) indicates high historical accuracy for {disease} in {lga_input}.")
-                
-                # AI Epidemiological Narrative
-                narrative = forecast.get("epidemiological_narrative")
-                if narrative:
-                    st.success(f"🧠 **AI Epidemiological Narrative**: {narrative}")
+                    st.info(f"💡 Low MAE ({mae:.2f}) indicates high historical accuracy for {disease} in {lga_input}.")
+                    
+                    # AI Epidemiological Narrative
+                    narrative = forecast.get("epidemiological_narrative")
+                    if narrative:
+                        st.success(f"🧠 **AI Epidemiological Narrative**: {narrative}")
 
-                # Visualizing multi-week forecast
-                st.subheader("Forecast Trajectory (4 Weeks)")
-                
-                preds = forecast.get('forecast', [10, 10, 10, 10])
-                ci_low = forecast.get('ci_lower', [5, 5, 5, 5])
-                ci_high = forecast.get('ci_upper', [15, 15, 15, 15])
+                    # Visualizing multi-week forecast
+                    st.subheader("Forecast Trajectory (4 Weeks)")
+                    
+                    preds = forecast.get('forecast', [10, 10, 10, 10])
+                    ci_low = forecast.get('ci_lower', [5, 5, 5, 5])
+                    ci_high = forecast.get('ci_upper', [15, 15, 15, 15])
 
-                # --- Real IDSR historical baseline ---
-                hist_res = api_client.get_idsr_history(lga_code=lga_code, disease=disease)
-                if isinstance(hist_res, list) and hist_res:
-                    hist_df = pd.DataFrame(hist_res)
-                    hist_df["week_start"] = pd.to_datetime(hist_df["week_start"])
-                    hist_df = hist_df.sort_values("week_start").tail(8)
-                    hist_dates = hist_df["week_start"].tolist()
-                    hist_vals = hist_df["cases"].tolist()
-                else:
-                    st.caption("ℹ️ No IDSR records for this LGA/disease yet. Upload CSV to see real historical data.")
-                    hist_dates = pd.date_range(end=pd.Timestamp.now(), periods=8, freq='W').tolist()
-                    hist_vals = [0] * 8
+                    # --- Real IDSR historical baseline ---
+                    hist_res = api_client.get_idsr_history(lga_code=lga_code, disease=disease)
+                    if isinstance(hist_res, list) and hist_res:
+                        hist_df = pd.DataFrame(hist_res)
+                        hist_df["week_start"] = pd.to_datetime(hist_df["week_start"])
+                        hist_df = hist_df.sort_values("week_start")
+                        # Take up to last 8 weeks
+                        hist_df = hist_df.tail(8)
+                        hist_dates = hist_df["week_start"].tolist()
+                        hist_vals = hist_df["cases"].tolist()
+                    else:
+                        st.caption("ℹ️ No IDSR records for this LGA/disease yet.")
+                        hist_dates = pd.date_range(end=pd.Timestamp.now(), periods=4, freq='W').tolist()
+                        hist_vals = [0] * 4
 
-                forecast_dates = pd.date_range(start=hist_dates[-1], periods=5, freq='W')[1:].tolist()
+                    hist_len = len(hist_dates)
+                    fcst_len = len(preds)
+                    
+                    # Generate exact number of future dates based on forecast length
+                    forecast_dates = pd.date_range(start=hist_dates[-1], periods=fcst_len + 1, freq='W')[1:].tolist()
 
-                chart_data = pd.DataFrame({
-                    "Date": hist_dates + forecast_dates,
-                    "Cases": hist_vals + preds,
-                    "Lower CI": [None]*8 + ci_low,
-                    "Upper CI": [None]*8 + ci_high,
-                    "Type": ["Historical"]*8 + ["Forecast"]*4
-                })
+                    chart_data = pd.DataFrame({
+                        "Date": hist_dates + forecast_dates,
+                        "Cases": hist_vals + preds,
+                        "Lower CI": [None]*hist_len + ci_low,
+                        "Upper CI": [None]*hist_len + ci_high,
+                        "Type": ["Historical"]*hist_len + ["Forecast"]*fcst_len
+                    })
 
-                fig = px.line(chart_data, x="Date", y="Cases", color="Type", markers=True,
-                             template="plotly_dark",
-                             color_discrete_map={"Historical": "#94a3b8", "Forecast": "#0ea5e9"})
-                
-                # Add confidence intervals
-                fig.add_trace(go.Scatter(
-                    x=chart_data[chart_data["Type"] == "Forecast"]["Date"],
-                    y=chart_data[chart_data["Type"] == "Forecast"]["Upper CI"],
-                    fill=None, mode='lines', line_color='rgba(14, 165, 233, 0)', showlegend=False
-                ))
-                fig.add_trace(go.Scatter(
-                    x=chart_data[chart_data["Type"] == "Forecast"]["Date"],
-                    y=chart_data[chart_data["Type"] == "Forecast"]["Lower CI"],
-                    fill='tonexty', mode='lines', line_color='rgba(14, 165, 233, 0)',
-                    fillcolor='rgba(14, 165, 233, 0.2)', name='95% Confidence Interval'
-                ))
-                
-                fig.update_layout(
-                    margin=dict(l=20, r=20, t=40, b=20),
-                    paper_bgcolor='rgba(0,0,0,0)',
-                    plot_bgcolor='rgba(0,0,0,0)',
-                    font=dict(family="Inter, sans-serif", size=12, color="#94a3b8"),
-                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-                )
-                st.plotly_chart(fig, width='stretch')
+                    fig = px.line(chart_data, x="Date", y="Cases", color="Type", markers=True,
+                                 template="plotly_dark",
+                                 color_discrete_map={"Historical": "#94a3b8", "Forecast": "#0ea5e9"})
+                    
+                    # Add confidence intervals
+                    fig.add_trace(go.Scatter(
+                        x=chart_data[chart_data["Type"] == "Forecast"]["Date"],
+                        y=chart_data[chart_data["Type"] == "Forecast"]["Upper CI"],
+                        fill=None, mode='lines', line_color='rgba(14, 165, 233, 0)', showlegend=False
+                    ))
+                    fig.add_trace(go.Scatter(
+                        x=chart_data[chart_data["Type"] == "Forecast"]["Date"],
+                        y=chart_data[chart_data["Type"] == "Forecast"]["Lower CI"],
+                        fill='tonexty', mode='lines', line_color='rgba(14, 165, 233, 0)',
+                        fillcolor='rgba(14, 165, 233, 0.2)', name='95% Confidence Interval'
+                    ))
+                    
+                    fig.update_layout(
+                        margin=dict(l=20, r=20, t=40, b=20),
+                        paper_bgcolor='rgba(0,0,0,0)',
+                        plot_bgcolor='rgba(0,0,0,0)',
+                        font=dict(family="Inter, sans-serif", size=12, color="#94a3b8"),
+                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                    )
+                    st.plotly_chart(fig, width='stretch')
                 
                 # --- Hybrid RAG Intelligence Section ---
                 st.markdown("---")

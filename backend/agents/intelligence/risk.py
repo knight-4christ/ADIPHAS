@@ -12,18 +12,8 @@ class RiskEngine:
         """Uses Gemini to provide a tailored situational risk summary."""
         if not self.gemini_model: return None
         
-        traits_str = f"Genotype: {user_traits.get('genotype')}, Blood Group: {user_traits.get('blood_group')}"
-        alert_str = ", ".join([f"{a.disease} in {a.location_text}" for a in active_alerts[:3]])
-        
-        prompt = f"""
-        Act as a Professional Personal Health Security Advisor in Nigeria.
-        Situation: Health risk score is {score:.1f} ({category}).
-        User Traits: {traits_str}.
-        LGA Alert Context: {alert_str}.
-        
-        Provide a 1-sentence "Preventative Action" explaining their biological vulnerability 
-        (if relevant to traits) and the single most critical precautionary step to take today.
-        """
+        prompt = f"""Risk score={score:.1f} ({category}). Traits: Genotype={user_traits.get('genotype')}, Blood={user_traits.get('blood_group')}. Local alerts: {', '.join([f'{a.disease} in {a.location_text}' for a in active_alerts[:3]])}.
+1-sentence preventative action considering biological vulnerability and most critical precaution."""
         try:
             from backend.core.model_config import smart_generate
             text, model_used = smart_generate(self.gemini_model, prompt, context="RiskSummary")

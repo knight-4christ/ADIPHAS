@@ -78,6 +78,27 @@ class SystemActivity(Base):
     agent = Column(String, index=True)
     message = Column(Text)
 
+class AutonomousSnapshot(Base):
+    """Stores system-wide briefings and community risk summaries."""
+    __tablename__ = "autonomous_snapshots"
+
+    id = Column(Integer, primary_key=True, index=True)
+    snapshot_type = Column(String, index=True) # "daily_briefing", "community_risk"
+    content = Column(Text) # JSON or Markdown content
+    generated_at = Column(DateTime, default=datetime.utcnow)
+    expires_at = Column(DateTime, nullable=True)
+
+class PredictiveSnapshot(Base):
+    """Stores pre-calculated forecasts and anomalies."""
+    __tablename__ = "predictive_snapshots"
+
+    id = Column(Integer, primary_key=True, index=True)
+    lga_code = Column(String, index=True)
+    disease = Column(String, index=True)
+    forecast_json = Column(Text) # JSON string of forecast data
+    is_anomaly = Column(Boolean, default=False)
+    generated_at = Column(DateTime, default=datetime.utcnow)
+
 class EvaluationSample(Base):
     __tablename__ = "evaluation_samples"
 

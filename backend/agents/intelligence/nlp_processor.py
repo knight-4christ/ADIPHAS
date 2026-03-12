@@ -4,7 +4,6 @@ import json
 from datetime import datetime
 import os
 import time
-from google import genai
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +14,7 @@ except Exception as e:
     logger.warning(f"spaCy library not found or failed to load (DLL error): {e}. NLP will run in keyword-only mode.")
 
 class NLPProcessor:
-    def __init__(self, gemini_api_key=None):
+    def __init__(self, gemini_model=None):
         self.nlp = None
         if spacy:
             try:
@@ -45,17 +44,12 @@ class NLPProcessor:
             "Ikorodu West", "Imota", "Igbogbo-Bayeku", "Lekki", "Ikosi-Ejinrin"
         ]
 
-        # Gemini Integration
-        self.gemini_enabled = False
-        self.gemini_model = None
+        # Gemini Integration — uses the shared client from main.py
+        self.gemini_enabled = gemini_model is not None
+        self.gemini_model = gemini_model
         self._circuit_open_until = 0
-        if gemini_api_key:
-            try:
-                self.gemini_model = genai.Client(api_key=gemini_api_key)
-                self.gemini_enabled = True
-                logger.info("Gemini 2.5 Flash initialized for Deep Analysis.")
-            except Exception as e:
-                logger.error(f"Failed to initialize Gemini: {e}")
+        if self.gemini_enabled:
+            logger.info("NLP Processor: Gemini AI augmentation enabled (shared client).")
 
     def analyze_with_gemini(self, text, baseline_entities):
         """Perform deep medical/epidemiological reasoning using AI, anchored by rule-based extraction."""
@@ -63,28 +57,9 @@ class NLPProcessor:
         if time.time() < self._circuit_open_until:
             return None
         
-        prompt = f"""
-        Act as a Public Health Intelligence Agent for Lagos State, Nigeria.
-        Analyze this report: "{text}"
-        
-        Our underlying mathematical/rule-based system detected the following baseline entities:
-        - Diseases: {baseline_entities.get('diseases')}
-        - Locations: {baseline_entities.get('locations')}
-        - Base Severity Score: {baseline_entities.get('severity_score')}
-
-        Your task is to orchestrate the final extraction. You must SERIOUSLY CONSIDER the baseline entities above, but you can refine them (e.g., correcting false positives or adding missed context).
-        
-        Extract and return valid JSON exact structure:
-        {{
-            "diseases": ["list of detected diseases"],
-            "locations": ["list of specific LGAs or LCDAs"],
-            "severity_score": 0.0 to 1.0 (float, you can adjust the base score if context warrants it),
-            "intelligence_summary": "1-sentence technical summary",
-            "public_health_advisory": "Actionable advice for citizens",
-            "category": "Infectious, Environmental, or Other",
-            "policy_alert": true or false
-        }}
-        """
+        prompt = f"""Extract health entities from: "{text}"
+Baseline: diseases={baseline_entities.get('diseases')}, locations={baseline_entities.get('locations')}, severity={baseline_entities.get('severity_score')}
+Refine baseline. Return JSON: {{"diseases":[], "locations":[], "severity_score":0.0-1.0, "intelligence_summary":"", "public_health_advisory":"", "category":"Infectious/Environmental/Other", "policy_alert":bool}}"""
         # 3. Execution via Gemini
         try:
             from backend.core.model_config import smart_generate
@@ -115,27 +90,9 @@ class NLPProcessor:
                 "baseline": article['baseline']
             })
             
-        prompt = f"""
-        Act as a Public Health Intelligence Agent for Lagos State, Nigeria.
-        Analyze this BATCH of {len(payload)} reports.
-        
-        Batch Data: {json.dumps(payload, indent=2)}
-        
-        For each item in the batch, orchestrate the final extraction. Consider the baseline entities strongly, but refine them.
-        Extract and return a valid JSON ARRAY of objects exact structure:
-        [
-          {{
-              "id": (match the id from the input),
-              "diseases": ["list of detected diseases"],
-              "locations": ["list of specific LGAs or LCDAs"],
-              "severity_score": 0.0 to 1.0,
-              "intelligence_summary": "1-sentence technical summary",
-              "public_health_advisory": "Actionable advice for citizens",
-              "category": "Infectious, Environmental, or Other",
-              "policy_alert": true or false
-          }}
-        ]
-        """
+        prompt = f"""Extract health entities from {len(payload)} reports. Refine baselines.
+Data: {json.dumps(payload)}
+Return JSON array: [{{"id":int, "diseases":[], "locations":[], "severity_score":0.0-1.0, "intelligence_summary":"", "public_health_advisory":"", "category":"Infectious/Environmental/Other", "policy_alert":bool}}]"""
         try:
             from backend.core.model_config import smart_generate
             raw_text, model_used = smart_generate(self.gemini_model, prompt, context="NLP_BatchExtraction")

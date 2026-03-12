@@ -26,6 +26,7 @@ load_dotenv()
 from backend.agents.acquisition.news_scraper import NewsScraperAgent
 from backend.agents.acquisition import ingestion
 from backend.agents.intelligence import nlp_processor, knowledge_fusion, alerting, risk
+from backend.agents.orchestrator import OrchestratorAgent
 # Import Core Engine
 from backend.core.advisory_engine import AdvisoryEngine
 from backend.core.vector_store import get_vector_manager
@@ -34,8 +35,6 @@ from apscheduler.schedulers.background import BackgroundScheduler
 import logging
 from google import genai
 import threading
-# from backend.core.sms_dispatcher import sms_dispatcher
-# from backend.core.email_dispatcher import email_dispatcher
 
 # Configure logging to both file and console
 log_dir = "logs"
@@ -107,11 +106,12 @@ def check_wellness(payload: dict):
 
 # Initialize Agents — all with Gemini model injected
 news_agent = NewsScraperAgent()
-nlp_agent = nlp_processor.NLPProcessor(gemini_api_key=GEMINI_API_KEY)
+nlp_agent = nlp_processor.NLPProcessor(gemini_model=gemini_model)
 fusion_agent = knowledge_fusion.KnowledgeFusionAgent(gemini_model=gemini_model)
 ingestion_agent = ingestion.IngestionAgent()
 alerting_engine = alerting.AlertingEngine(gemini_model=gemini_model)
 risk_engine = risk.RiskEngine(gemini_model=gemini_model)
+orchestrator = OrchestratorAgent(gemini_model=gemini_model)
 
 # System Activity Log (Memory fallback, primary is DB)
 system_activities = []
@@ -299,6 +299,30 @@ def autonomous_monitoring_job():
             logger.error(f"Vector ingestion failed: {e}")
             
         log_activity("AutonomousAgent", "Monitoring cycle complete.")
+        
+        # --- NEW: Autonomous Phase 2 Cycles ---
+        try:
+            orchestrator.run_predictive_cycle(db)
+            log_activity("PredictiveAgent", "Forecast snapshots updated.")
+            
+            orchestrator.run_auto_verification_cycle(db)
+            log_activity("VerifierAgent", "Auto-verification pass complete.")
+            
+            # Realtime Tavily intelligence (self-throttles to every 6h)
+            orchestrator.run_realtime_intelligence_cycle(db)
+            
+            # Briefing run once per day (checks for existing within 24h)
+            last_briefing = db.query(models.AutonomousSnapshot)\
+                .filter(models.AutonomousSnapshot.snapshot_type == "daily_briefing")\
+                .order_by(models.AutonomousSnapshot.generated_at.desc()).first()
+            
+            if not last_briefing or (datetime.utcnow() - last_briefing.generated_at).total_seconds() > 86400:
+                orchestrator.run_briefing_cycle(db)
+                log_activity("BriefingAgent", "New Daily Briefing generated.")
+                
+        except Exception as e:
+            logger.error(f"Error in Phase 2 Autonomous cycles: {e}")
+
     except Exception as e:
         log_activity("System", f"Error in monitoring job: {str(e)}")
         db.rollback()
@@ -360,27 +384,16 @@ async def startup_event():
                     from backend.core.vector_store import get_vector_manager
                     vm = get_vector_manager()
                     
-                    rag_query = "Latest major disease outbreaks and critical health alerts"
-                    rag_response = vm.hybrid_search(rag_query, k=5, force_combine=True)
+                    rag_query = "disease outbreaks health alerts Lagos"
+                    rag_response = vm.hybrid_search(rag_query, k=3, force_combine=True)
                     rag_context = ""
                     
                     if rag_response and "results" in rag_response:
-                        if rag_response["source"] == "web_search":
-                            rag_context = "\n".join([f"- {r.get('content', '')}" for r in rag_response["results"] if isinstance(r, dict)])
-                        else:
-                            rag_context = "\n".join([f"- {r.get('content', '')}" for r in rag_response["results"] if isinstance(r, dict)])
+                        rag_context = "\n".join([f"- {r.get('content', '')}" for r in rag_response["results"] if isinstance(r, dict)][:3])
 
-                    alert_summary = "\n".join([f"- {a.disease} in {a.location_text} (Risk: {a.risk_level})" for a in recent_alerts[:5]])
+                    alert_summary = "\n".join([f"- {a.disease} in {a.location_text} ({a.risk_level})" for a in recent_alerts[:5]])
                     
-                    prompt = f"""You are ADIPHAS Intelligence. Provide a concise (3 sentence max) "So Far..." startup briefing summarizing the current health intelligence landscape based on these signals:
-
-Recent Database Alerts:
-{alert_summary}
-
-Semantic RAG Context (Knowledge Base/Web):
-{rag_context}
-
-Focus on: What patterns are emerging? Any immediate concerns? What should be monitored closely?"""
+                    prompt = f"""3-sentence startup briefing. Alerts:\n{alert_summary}\nContext:\n{rag_context}\nPatterns? Concerns? Monitor?"""
                     from backend.core.model_config import smart_generate
                     text, model_used = smart_generate(gemini_model, prompt, context="StartupInsight")
                     
@@ -468,6 +481,28 @@ def get_token_usage():
     """Returns the running Gemini token usage for this server session."""
     from backend.core.token_tracker import get_session_totals
     return get_session_totals()
+
+@app.get("/system/briefing")
+def get_latest_briefing(db: Session = Depends(get_db)):
+    """Returns the most recent system-wide autonomous briefing."""
+    briefing = db.query(models.AutonomousSnapshot)\
+        .filter(models.AutonomousSnapshot.snapshot_type == "daily_briefing")\
+        .order_by(models.AutonomousSnapshot.generated_at.desc()).first()
+    return briefing
+
+@app.get("/system/forecasts")
+def get_autonomous_forecasts(db: Session = Depends(get_db)):
+    """Returns all pre-calculated forecasts and anomalies."""
+    snapshots = db.query(models.PredictiveSnapshot).all()
+    return snapshots
+
+@app.get("/system/realtime-intel")
+def get_realtime_intelligence(db: Session = Depends(get_db)):
+    """Returns the latest Tavily-powered real-time disease intelligence snapshot."""
+    snapshot = db.query(models.AutonomousSnapshot)\
+        .filter(models.AutonomousSnapshot.snapshot_type == "realtime_intelligence")\
+        .order_by(models.AutonomousSnapshot.generated_at.desc()).first()
+    return snapshot
 
 # Globals for primitive endpoint caching (so we don't spam SQLite during Dashboard polling)
 _cached_system_metrics = None
