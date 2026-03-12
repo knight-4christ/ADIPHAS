@@ -80,23 +80,29 @@ class OrchestratorAgent:
         
         all_results = []
         try:
-            from langchain_community.tools.tavily_search import TavilySearchResults
-            web_search = TavilySearchResults(api_key=tavily_key, max_results=3)
-            
+            import requests
             for query in queries:
                 try:
-                    results = web_search.run(query)
-                    if isinstance(results, list):
-                        for r in results:
-                            content = r.get("content") or r.get("snippet") or str(r)
+                    payload = {
+                        "api_key": tavily_key,
+                        "query": query,
+                        "search_depth": "basic",
+                        "include_answer": False,
+                        "max_results": 3
+                    }
+                    response = requests.post("https://api.tavily.com/search", json=payload, timeout=15)
+                    if response.status_code == 200:
+                        data = response.json()
+                        for r in data.get("results", []):
+                            content = r.get("content") or str(r)
                             url = r.get("url", "")
                             all_results.append(f"- {content[:200]} ({url})")
-                    elif isinstance(results, str):
-                        all_results.append(f"- {results[:300]}")
+                    else:
+                        logger.warning(f"Tavily query failed for '{query}': {response.text}")
                 except Exception as e:
-                    logger.warning(f"Tavily query failed for '{query}': {e}")
-        except ImportError:
-            logger.error("langchain_community not installed — Tavily search unavailable.")
+                    logger.warning(f"Tavily request error for '{query}': {e}")
+        except Exception as global_e:
+            logger.error(f"Tavily search execution failed: {global_e}")
             return
         
         if not all_results:
