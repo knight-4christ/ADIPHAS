@@ -22,10 +22,11 @@ The system leverages **Dempster-Shafer Theory of Evidence** to combine conflicti
 
 ## ✨ Key Features
 
-- **📡 Autonomous Scout (EBS)**: Real-time news scraping and NLP entity extraction using `spaCy` and `Gemini 1.5 Flash`.
+- **📡 Autonomous Scout (EBS)**: Real-time news scraping and NLP entity extraction using `spaCy` and **Gemini 2.5 Flash**.
 - **🧠 Knowledge Fusion**: Mathematical reconciliation of multi-source signals using the **Dempster-Shafer Framework**.
-- **📊 IDSR Analytics**: Deep statistical analysis of historical NCDC data with anomaly flagging and predictive forecasting.
-- **🛡️ Advisory Chat**: A RAG-powered clinical assistant for both citizens and health experts.
+- **🌐 Real-Time Intelligence**: Live global health event tracking powered by the **Tavily Search API**.
+- **📊 IDSR Analytics**: Deep statistical analysis of historical **Verified NCDC Data** with anomaly flagging and predictive forecasting.
+- **🛡️ Advisory Chat**: A High-Dimensional Hybrid RAG-powered clinical assistant for citizens and health experts.
 - **📍 Personalized Risk Scoring**: Genotype-aware health scoring integrated with local environmental alerts.
 
 ---
@@ -55,34 +56,43 @@ Host the entire stack (FastAPI, Streamlit, PostgreSQL) with a single command:
 docker-compose up --build -d
 ```
 
-### 🐍 Manual setup
-1. **Clone & Install**:
-   ```bash
+### 🚀 Quick Start (Windows PowerShell)
+The easiest way to run the entire hybrid system (Backend, Frontend, and Autonomous Agents) locally:
+1. **Clone & Configure**:
+   ```powershell
    git clone https://github.com/your-repo/ADIPHAS.git
    cd ADIPHAS
-   pip install -r requirements.txt
    ```
-2. **Environment Configuration**:
-   Create a `.env` file from the template and add your `GEMINI_API_KEY`.
-3. **Run Services**:
-   - Backend: `uvicorn backend.main:app --reload`
-   - UI: `streamlit run ui/app.py`
+2. **Environment Variables**:
+   Create a `.env` file in the root directory:
+   ```env
+   GEMINI_API_KEY=your_gemini_key
+   TAVILY_API_KEY=your_tavily_key
+   ```
+3. **Seed Real Epidemic Data**:
+   Ensure the Predictive Agent operates on verified, real-world data (Cholera/Lassa):
+   ```powershell
+   .\myenv\Scripts\python seed_real_data.py
+   ```
+4. **Boot the Analytics Engine**:
+   Instantly deploy the FastAPI backend, Streamlit UI, and Background Schedulers:
+   ```powershell
+   .\start_adiphas.ps1
+   ```
+   *The script automatically handles virtual environments, cold-start delays, and prevents port conflicts.*
 
 ---
 
 ## 🔬 Project Defense & Live Simulation
 
-ADIPHAS includes dedicated simulation scripts to demonstrate live outbreak detection:
+ADIPHAS includes dedicated scripts to demonstrate its capabilities during live defenses:
 
-1. **Lassa Fever (Ikeja)**:
-   ```bash
-   python tmp/simulate_lassa_full.py
-   ```
-2. **Cholera (Surulere)**:
-   ```bash
-   python tmp/simulate_cholera_full.py
-   ```
-*Observe the 'Red Anomaly Banners' in the IDSR Analytics module and 'Confirmed Intelligence' in the Expert Panel.*
+1. **Verify Real Epidemiological Seed Data**:
+   - Access the *Predictive Modeling* tab in the UI to view real 2024/2025 NCDC trajectories for Cholera and Lassa Fever.
+2. **Observe Autonomous Cycles**:
+   - Watch the terminal running `start_adiphas.ps1` to see the Orchestrator, Scraper, and NLP processor actively categorizing new intelligence globally every 15 minutes.
+3. **Test the LLM Fallback Engine**:
+   - ADIPHAS features a proprietary robust fallback mechanism (`model_config.py`). If the primary Gemini model is rate-limited, it automatically swerves down the chain to fallback models to keep the system alive without crashing.
 
 ---
 
