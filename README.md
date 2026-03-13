@@ -104,6 +104,12 @@ ADIPHAS includes dedicated scripts to demonstrate its capabilities during live d
 
 ---
 
+## ⚠️ Important Considerations for Production
+
+- **Database Concurrency**: ADIPHAS currently uses SQLite by default for easy setup. However, under high concurrency (many simultaneous UI users + background intelligence agents running), SQLite may encounter `database is locked` errors. For production deployments, it is **highly recommended** to migrate the database `DATABASE_URL` in the `.env` file to PostgreSQL.
+
+---
+
 ## 📜 Documentation
 
 - 📓 **[Methodology](./METHODOLOGY.md)**: Mathematical proof of the Dempster-Shafer Fusion Logic.

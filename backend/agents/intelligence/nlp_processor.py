@@ -169,8 +169,7 @@ Return JSON array: [{{"id":int, "diseases":[], "locations":[], "severity_score":
         for i, item in enumerate(headlines):
             text = str(item.get('title', item.get('text', '')))
             
-            import time as base_time
-            base_time.sleep(0.005) # Yield GIL
+            time.sleep(0.005) # Yield GIL
             
             base_entities, trace = self.extract_entities(text)
             traces.append(trace)

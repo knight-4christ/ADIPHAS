@@ -3,6 +3,7 @@ from datetime import datetime
 import logging
 import time
 import xml.etree.ElementTree as ET
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -353,11 +354,21 @@ class NewsScraperAgent:
                     extracted = self._scrape_html(source)
 
                 for item in extracted:
+                    import html
+                    raw_title = item.get("title", "")
+                    
+                    # Security: Sanitize against basic prompt injections and bloated HTML
+                    clean_title = html.unescape(raw_title)
+                    clean_title = re.sub(r'<[^>]+>', '', clean_title) # Strip HTML tags
+                    clean_title = clean_title.strip()[:500] # Truncate absurdly long text
+                    
+                    if not clean_title: continue
+                    
                     results.append({
                         "source": source["name"],
                         "category": source["category"],
-                        "title": item["title"],
-                        "url": item["url"],
+                        "title": clean_title,
+                        "url": item.get("url", ""),
                         "timestamp": datetime.now().replace(microsecond=0),
                     })
 

@@ -21,7 +21,7 @@ Provide: 1) 1-sentence interpretation of the math. 2) Public Health Action Plan.
             from backend.core.model_config import smart_generate
             text, model_used = smart_generate(self.gemini_model, prompt, context="ForecastNarrative")
             return text or "Narrative generation currently unavailable."
-        except:
+        except Exception:
             return "Narrative generation currently unavailable."
 
     def _calculate_metrics(self, actual, predicted):

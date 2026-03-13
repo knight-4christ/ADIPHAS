@@ -18,7 +18,7 @@ class RiskEngine:
             from backend.core.model_config import smart_generate
             text, model_used = smart_generate(self.gemini_model, prompt, context="RiskSummary")
             return text or "AI situational summary currently unavailable."
-        except:
+        except Exception:
             return "AI situational summary currently unavailable."
 
     def interpret_risk_score(self, score, user_traits=None, active_alerts=None):

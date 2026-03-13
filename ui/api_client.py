@@ -33,23 +33,23 @@ def healthcheck():
 
 def upload_idsr(file):
     files = {"file": file}
-    return _safe_request("POST", f"{API_URL}/idsr/upload", files=files)
+    return _safe_request("POST", f"{API_URL}/api/data/idsr_upload", files=files)
 
 def get_alerts():
-    return _safe_request("GET", f"{API_URL}/alerts/list")
+    return _safe_request("GET", f"{API_URL}/api/ebs/list")
 
 def assess_symptoms(payload):
-    return _safe_request("POST", f"{API_URL}/symptom/assess", json=payload)
+    return _safe_request("POST", f"{API_URL}/api/advisory/symptom_check", json=payload)
 
 def get_forecast(lga_code, disease):
     payload = {"lga_code": lga_code, "disease": disease, "lookahead_weeks": 4}
-    return _safe_request("POST", f"{API_URL}/predict/forecast", json=payload)
+    return _safe_request("POST", f"{API_URL}/api/data/forecast", json=payload)
 
 def scrape_news():
-    return _safe_request("GET", f"{API_URL}/acquisition/news/scrape")
+    return _safe_request("GET", f"{API_URL}/api/acquisition/news/scrape")
 
 def fuse_intelligence(reports):
-    return _safe_request("POST", f"{API_URL}/intelligence/fuse", json=reports)
+    return _safe_request("POST", f"{API_URL}/api/intelligence/fuse", json=reports)
 
 def register(username, password, email=None, full_name=None, role="CITIZEN"):
     payload = {
@@ -59,7 +59,7 @@ def register(username, password, email=None, full_name=None, role="CITIZEN"):
         "full_name": full_name,
         "role": role
     }
-    return _safe_request("POST", f"{API_URL}/auth/register", json=payload)
+    return _safe_request("POST", f"{API_URL}/api/auth/register", json=payload)
 
 def login(username, password):
     payload = {
@@ -67,37 +67,37 @@ def login(username, password):
         "password": password
     }
     # Using data instead of json for OAuth2 form format
-    return _safe_request("POST", f"{API_URL}/auth/login", data=payload)
+    return _safe_request("POST", f"{API_URL}/api/auth/login", data=payload)
 
 def get_me(token):
     headers = {"Authorization": f"Bearer {token}"}
-    return _safe_request("GET", f"{API_URL}/users/me", headers=headers)
+    return _safe_request("GET", f"{API_URL}/api/users/me", headers=headers)
 
 def update_profile(token, profile_data):
     headers = {"Authorization": f"Bearer {token}"}
-    return _safe_request("PUT", f"{API_URL}/users/profile", json=profile_data, headers=headers)
+    return _safe_request("PUT", f"{API_URL}/api/users/profile", json=profile_data, headers=headers)
 
 def get_activity():
-    return _safe_request("GET", f"{API_URL}/system/activity")
+    return _safe_request("GET", f"{API_URL}/api/system/activity")
 
 def get_activity_history(date_str):
-    return _safe_request("GET", f"{API_URL}/system/activity/history", params={"date_str": date_str})
+    return _safe_request("GET", f"{API_URL}/api/system/activity/history", params={"date_str": date_str})
 
 def verify_alert(token, alert_id):
     headers = {"Authorization": f"Bearer {token}"}
-    return _safe_request("POST", f"{API_URL}/alerts/{alert_id}/verify", headers=headers)
+    return _safe_request("POST", f"{API_URL}/api/ebs/{alert_id}/verify", headers=headers)
 
 def get_users(token):
     headers = {"Authorization": f"Bearer {token}"}
-    return _safe_request("GET", f"{API_URL}/users/list", headers=headers)
+    return _safe_request("GET", f"{API_URL}/api/users/list", headers=headers)
 
 def delete_user(token, user_id):
     headers = {"Authorization": f"Bearer {token}"}
-    return _safe_request("DELETE", f"{API_URL}/users/{user_id}", headers=headers)
+    return _safe_request("DELETE", f"{API_URL}/api/users/{user_id}", headers=headers)
 
 def discard_alert(token, alert_id):
     headers = {"Authorization": f"Bearer {token}"}
-    return _safe_request("DELETE", f"{API_URL}/alerts/{alert_id}", headers=headers)
+    return _safe_request("DELETE", f"{API_URL}/api/ebs/{alert_id}", headers=headers)
 
 # --- Evaluation Endpoints ---
 
@@ -111,7 +111,7 @@ def submit_evaluation(payload):
     return _safe_request("POST", f"{API_URL}/api/evaluation/submit", json=payload)
 
 def get_briefing(lga=None, role="CITIZEN"):
-    return _safe_request("GET", f"{API_URL}/intelligence/briefing", params={"lga": lga, "role": role})
+    return _safe_request("GET", f"{API_URL}/api/intelligence/briefing", params={"lga": lga, "role": role})
 
 def nlp_extract(text):
     """Extracts disease/location entities from raw text via the backend NLP agent."""
@@ -124,14 +124,14 @@ def get_idsr_history(lga_code=None, disease=None):
         params["lga_code"] = lga_code
     if disease:
         params["disease"] = disease
-    return _safe_request("GET", f"{API_URL}/idsr/history", params=params)
+    return _safe_request("GET", f"{API_URL}/api/data/idsr_history", params=params)
 def advisory_search(query, k=3):
     """Performs a Hybrid RAG search (Chroma + Tavily) via the backend."""
     return _safe_request("GET", f"{API_URL}/api/advisory/search", params={"query": query, "k": k})
 
 def get_intelligence_sources():
     """Returns the dictionary of monitored sources and their weights from the backend."""
-    return _safe_request("GET", f"{API_URL}/intelligence/sources")
+    return _safe_request("GET", f"{API_URL}/api/intelligence/sources")
 
 def get_startup_insight():
     """Returns the one-time AI startup insight."""
@@ -143,7 +143,7 @@ def get_token_usage():
 
 def get_system_metrics():
     """Returns today's scraping and intelligence metrics."""
-    return _safe_request("GET", f"{API_URL}/system/metrics")
+    return _safe_request("GET", f"{API_URL}/api/system/metrics")
 
 def get_model_status():
     """Returns the current Gemini model fallback status."""
@@ -155,4 +155,4 @@ def get_latest_briefing():
 
 def get_autonomous_forecasts():
     """Returns all pre-calculated autonomous forecasts and anomalies."""
-    return _safe_request("GET", f"{API_URL}/system/forecasts")
+    return _safe_request("GET", f"{API_URL}/api/system/forecasts")

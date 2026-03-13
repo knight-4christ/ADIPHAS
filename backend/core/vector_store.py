@@ -205,24 +205,9 @@ class ChromaManager:
         tavily_key = os.getenv("TAVILY_API_KEY")
         if tavily_key:
             try:
-                import requests
-                payload = {
-                    "api_key": tavily_key,
-                    "query": query,
-                    "search_depth": "basic",
-                    "include_answer": False,
-                    "max_results": 3
-                }
-                response = requests.post("https://api.tavily.com/search", json=payload, timeout=15)
-                if response.status_code == 200:
-                    data = response.json()
-                    for r in data.get("results", []):
-                        web_results.append({
-                            "content": r.get("content", ""),
-                            "url": r.get("url", "")
-                        })
-                else:
-                    logger.error(f"Tavily API error: {response.text}")
+                from langchain_community.tools.tavily_search import TavilySearchResults
+                web_search = TavilySearchResults(api_key=tavily_key)
+                web_results = web_search.run(query)
             except Exception as e:
                 logger.error(f"Web search failed: {e}")
 
@@ -244,7 +229,10 @@ class ChromaManager:
         }
 
 # Singleton instance
-vector_manager = ChromaManager()
+vector_manager = None
 
 def get_vector_manager():
+    global vector_manager
+    if vector_manager is None:
+        vector_manager = ChromaManager()
     return vector_manager

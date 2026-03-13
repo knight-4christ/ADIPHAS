@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from typing import Optional
 
 class AdvisoryEngine:
     """
@@ -15,7 +16,7 @@ class AdvisoryEngine:
         }
         self.gemini_model = gemini_model
 
-    def analyze_with_ai(self, symptoms: list, duration_days: int, context_str: str = "") -> str:
+    def analyze_with_ai(self, symptoms: list, duration_days: int, context_str: str = "") -> Optional[str]:
         """
         Uses Gemini to provide a deep clinical analysis of symptoms.
         Optionally enriched with RAG context from local DB + Tavily.
@@ -39,7 +40,7 @@ class AdvisoryEngine:
             from backend.core.model_config import smart_generate
             text, model_used = smart_generate(self.gemini_model, prompt, context="SymptomCheck")
             return text or "AI clinical deep-dive currently unavailable."
-        except:
+        except Exception:
             return "AI clinical deep-dive currently unavailable."
 
     def analyze_symptoms(self, symptoms: list, duration_days: int) -> dict:
@@ -61,7 +62,7 @@ class AdvisoryEngine:
             result = {
                 "risk_level": "CRITICAL",
                 "disease": "Lassa Fever",
-                "message": "CRITICAL: Potential Lassa Fever detected (Fever + Bleeding). Immedate isolation required.",
+                "message": "CRITICAL: Potential Lassa Fever detected (Fever + Bleeding). Immediate isolation required.",
                 "action": "Go to the nearest isolation center immediately."
             }
         else:
@@ -144,7 +145,7 @@ class AdvisoryEngine:
                 ts = datetime.fromisoformat(s['timestamp'])
                 if ts > seventy_two_hours_ago:
                     recent_signals.append(s)
-            except:
+            except Exception:
                 continue
         
         disease_counts = {}

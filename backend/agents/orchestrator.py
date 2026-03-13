@@ -80,29 +80,23 @@ class OrchestratorAgent:
         
         all_results = []
         try:
-            import requests
+            from langchain_community.tools.tavily_search import TavilySearchResults
+            web_search = TavilySearchResults(api_key=tavily_key, max_results=3)
+            
             for query in queries:
                 try:
-                    payload = {
-                        "api_key": tavily_key,
-                        "query": query,
-                        "search_depth": "basic",
-                        "include_answer": False,
-                        "max_results": 3
-                    }
-                    response = requests.post("https://api.tavily.com/search", json=payload, timeout=15)
-                    if response.status_code == 200:
-                        data = response.json()
-                        for r in data.get("results", []):
-                            content = r.get("content") or str(r)
+                    results = web_search.run(query)
+                    if isinstance(results, list):
+                        for r in results:
+                            content = r.get("content") or r.get("snippet") or str(r)
                             url = r.get("url", "")
                             all_results.append(f"- {content[:200]} ({url})")
-                    else:
-                        logger.warning(f"Tavily query failed for '{query}': {response.text}")
+                    elif isinstance(results, str):
+                        all_results.append(f"- {results[:300]}")
                 except Exception as e:
-                    logger.warning(f"Tavily request error for '{query}': {e}")
-        except Exception as global_e:
-            logger.error(f"Tavily search execution failed: {global_e}")
+                    logger.warning(f"Tavily query failed for '{query}': {e}")
+        except ImportError:
+            logger.error("langchain_community not installed — Tavily search unavailable.")
             return
         
         if not all_results:
@@ -139,7 +133,7 @@ class OrchestratorAgent:
         logger.info("Starting Autonomous Briefing Cycle...")
         
         recent_alerts = db.query(models.EBSAlert).order_by(models.EBSAlert.created_at.desc()).limit(15).all()
-        active_anomalies = db.query(models.PredictiveSnapshot).filter(models.PredictiveSnapshot.is_anomaly == True).all()
+        active_anomalies = db.query(models.PredictiveSnapshot).filter(models.PredictiveSnapshot.is_anomaly.is_(True)).all()
         
         # Also pull latest Tavily intelligence for richer briefings
         realtime_snap = db.query(models.AutonomousSnapshot)\
@@ -181,7 +175,7 @@ Include: 1) Current Landscape 2) Critical Hotspots 3) Recommendation"""
     def run_auto_verification_cycle(self, db: Session):
         """Autonomously verifies alerts using multi-source cross-referencing."""
         logger.info("Starting Autonomous Verification Cycle...")
-        unverified = db.query(models.EBSAlert).filter(models.EBSAlert.verified == False).limit(10).all()
+        unverified = db.query(models.EBSAlert).filter(models.EBSAlert.verified.is_(False)).limit(10).all()
         
         for alert in unverified:
             if alert.source == "Fused Intelligence" and alert.risk_level == "High":
