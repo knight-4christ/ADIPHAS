@@ -79,7 +79,7 @@ async def startup_event():
     logger.info("ADIPHAS startup — running initial monitoring cycle and data normalization...")
     
     # Start the background scheduling loop & initial insight generation
-    start_scheduler()
+    await start_scheduler()
     
     logger.info(f"Gemini AI: {'ACTIVE' if gemini_model else 'OFFLINE (no key)'}")
     logger.info(f"spaCy NLP: {'ACTIVE' if nlp_agent.nlp else 'KEYWORD-ONLY MODE'}")

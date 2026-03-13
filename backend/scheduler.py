@@ -3,8 +3,9 @@ import threading
 import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional
-from apscheduler.schedulers.background import BackgroundScheduler  # type: ignore[import-untyped]
+from apscheduler.schedulers.asyncio import AsyncIOScheduler  # type: ignore[import-untyped]
 from sqlalchemy import text  # type: ignore[import-untyped]
+import asyncio
 
 from backend import models, database  # type: ignore[import-untyped]
 from backend.dependencies import (  # type: ignore[import-untyped]
@@ -41,17 +42,18 @@ def autonomous_monitoring_job():
                 
             # Filter out already existing URLs (DEDUPLICATION LOGIC)
             filtered_headlines = []
-            skipped_count = 0
+            skipped_count: int = 0
             for item in headlines:
-                url = item.get('url')
+                url: Optional[str] = item.get('url')
+                item_title: str = str(item.get('title', ''))
                 if not url:
                     # Fallback to headline text dedupe if no URL provided by scraper
-                    exists = db.query(models.EBSAlert).filter(models.EBSAlert.text == item['title']).first()
+                    exists = db.query(models.EBSAlert).filter(models.EBSAlert.text == item_title).first()
                 else:
                     exists = db.query(models.EBSAlert).filter(models.EBSAlert.url == url).first()
                 
                 if exists:
-                    skipped_count += 1
+                    skipped_count = skipped_count + 1  # type: ignore[operator]
                 else:
                     filtered_headlines.append(item)
             
@@ -69,7 +71,8 @@ def autonomous_monitoring_job():
         new_count = len(headlines)
         if new_count > batch_limit:
             log_activity("IntelligenceEngine", f"Batching: Processing top {batch_limit} out of {new_count} new articles.")
-            headlines = list(headlines)[:batch_limit]
+            hl_list: List[Dict[str, Any]] = list(headlines)
+            headlines = hl_list[:batch_limit]  # type: ignore[index]
         
         # Group reports for fusion (Now LOCAL and INSTANT via Batching)
         pending_reports = []
@@ -121,17 +124,20 @@ def autonomous_monitoring_job():
             # No dual-entity headlines — save disease-only articles as raw signals
             saved_raw = 0
             for item in headlines:
-                entities, _ = nlp_agent.extract_entities(str(item['title']))
+                item_dict = dict(item) if isinstance(item, dict) else {}
+                item_title = str(item_dict.get('title', ''))
+                entities, _ = nlp_agent.extract_entities(item_title)
+                entities_dict: Dict[str, Any] = dict(entities) if isinstance(entities, dict) else {}
                 
-                diseases = entities.get('diseases', [])
-                locations = entities.get('locations', [])
+                diseases: List[str] = entities_dict.get('diseases', [])  # type: ignore[assignment]
+                locations: List[str] = entities_dict.get('locations', [])  # type: ignore[assignment]
                 # Save if at least a disease is found (location defaults to 'Lagos')
                 if diseases:
                     alert = models.EBSAlert(
-                        source=item.get('source', 'NewsScout'),
-                        url=item.get('url'),
-                        text=item['title'],
-                        timestamp=item.get('timestamp') or datetime.now().replace(microsecond=0),
+                        source=item_dict.get('source', 'NewsScout'),
+                        url=item_dict.get('url'),
+                        text=item_title,
+                        timestamp=item_dict.get('timestamp') or datetime.now().replace(microsecond=0),
                         location_text=locations[0] if locations else 'Lagos',
                         disease=diseases[0],
                         collected_by="AutonomousAgent",
@@ -139,8 +145,8 @@ def autonomous_monitoring_job():
                         risk_level="Low"
                     )
                     db.add(alert)
-                    saved_raw: int = saved_raw + 1
-            if saved_raw:
+                    saved_raw = saved_raw + 1  # type: ignore[operator]
+            if saved_raw > 0:
                 log_activity("AlertingEngine", f"Saved {saved_raw} new raw disease signals to EBS database.")
         
         db.commit()
@@ -209,9 +215,11 @@ def _generate_startup_insight():
                 rag_context = ""
                 
                 if rag_response and "results" in rag_response:
-                    rag_context = "\n".join([f"- {r.get('content', '')}" for r in list(rag_response["results"])[:3] if isinstance(r, dict)])
+                    results_list = list(rag_response.get("results", []))
+                    rag_context = "\n".join([f"- {r.get('content', '')}" for r in results_list[:3] if isinstance(r, dict)])  # type: ignore[index, misc]
 
-                alert_summary = "\n".join([f"- {a.disease} in {a.location_text} ({a.risk_level})" for a in recent_alerts[:5]])
+                recent_list = list(recent_alerts)
+                alert_summary = "\n".join([f"- {a.disease} in {a.location_text} ({a.risk_level})" for a in recent_list[:5]])  # type: ignore[index, misc]
                 
                 prompt = f"""3-sentence startup briefing. Alerts:\n{alert_summary}\nContext:\n{rag_context}\nPatterns? Concerns? Monitor?"""
                 from backend.core.model_config import smart_generate  # type: ignore[import-untyped]
@@ -249,12 +257,12 @@ def _generate_startup_insight():
         startup_insight_cache["generated_at"] = datetime.now().replace(microsecond=0).isoformat()
 
 
-def start_scheduler():
+async def start_scheduler():
     """Initializes and starts the background scheduler and deferred startup tasks."""
-    scheduler = BackgroundScheduler()
-    scheduler.add_job(autonomous_monitoring_job, 'interval', minutes=15)
+    scheduler = AsyncIOScheduler()  # type: ignore[no-any-return, call-overload]
+    scheduler.add_job(lambda: asyncio.create_task(asyncio.to_thread(autonomous_monitoring_job)), 'interval', minutes=15)  # type: ignore[arg-type]
     scheduler.start()
-    logger.info("Background Scheduler started.")
+    logger.info("Background Scheduler (AsyncIO) started.")
     
     # Self-healing database sweep
     db = database.SessionLocal()
@@ -275,5 +283,6 @@ def start_scheduler():
     finally:
         db.close()
         
-    threading.Thread(target=_generate_startup_insight, daemon=True).start()
-    threading.Thread(target=autonomous_monitoring_job, daemon=True).start()
+    # Schedule the initial runs on the asyncio event loop thread pool
+    asyncio.create_task(asyncio.to_thread(_generate_startup_insight))  # type: ignore[arg-type]
+    asyncio.create_task(asyncio.to_thread(autonomous_monitoring_job))  # type: ignore[arg-type]
