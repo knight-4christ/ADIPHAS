@@ -1,5 +1,6 @@
-from scrapling.fetchers import Fetcher, StealthyFetcher
+from scrapling.fetchers import Fetcher, StealthyFetcher  # type: ignore[import-untyped]
 from datetime import datetime
+from typing import Any, Dict, List, Tuple
 import logging
 import time
 import xml.etree.ElementTree as ET
@@ -237,10 +238,10 @@ class NewsScraperAgent:
             return []
 
         ns = {"atom": "http://www.w3.org/2005/Atom"}
-        items = root.findall(".//item") or root.findall(".//atom:entry", ns)
+        items: list[Any] = root.findall(".//item") or root.findall(".//atom:entry", ns)
 
-        results = []
-        for item in items[:15]:
+        results: List[Dict[str, str]] = []
+        for item in list(items)[:15]:  # type: ignore[index]
             title_el = item.find("title") or item.find("atom:title", ns)
             link_el  = item.find("link")  or item.find("atom:link", ns)
 
@@ -333,8 +334,8 @@ class NewsScraperAgent:
         Scrapes all configured sources.
         Returns: (results: list[dict], trace: list[dict])
         """
-        results = []
-        trace = []
+        results: List[Dict[str, Any]] = []
+        trace: List[Dict[str, Any]] = []
 
         trace.append({
             "step": f"Initializing News Scraper Agent — {len(self.sources)} sources configured.",
@@ -343,8 +344,9 @@ class NewsScraperAgent:
 
         for source in self.sources:
             try:
+                method_str: str = str(source['method'])
                 trace.append({
-                    "step": f"[{source['category']}] Scraping {source['name']} via {source['method'].upper()}...",
+                    "step": f"[{source['category']}] Scraping {source['name']} via {method_str.upper()}...",
                     "timestamp": datetime.now().replace(microsecond=0)
                 })
 
@@ -360,7 +362,7 @@ class NewsScraperAgent:
                     # Security: Sanitize against basic prompt injections and bloated HTML
                     clean_title = html.unescape(raw_title)
                     clean_title = re.sub(r'<[^>]+>', '', clean_title) # Strip HTML tags
-                    clean_title = clean_title.strip()[:500] # Truncate absurdly long text
+                    clean_title = str(clean_title.strip())[:500] # Truncate absurdly long text  # type: ignore[index]
                     
                     if not clean_title: continue
                     
@@ -396,12 +398,12 @@ class NewsScraperAgent:
         })
         return results, trace
 
-    def get_sources_summary(self) -> dict:
+    def get_sources_summary(self) -> Dict[str, Any]:
         """Returns a summary of configured sources grouped by category."""
-        summary = {}
+        summary: Dict[str, list[Any]] = {}
         for s in self.sources:
             cat = s["category"]
-            summary.setdefault(cat, []).append({
+            summary.setdefault(cat, []).append({  # type: ignore[call-overload]
                 "name": s["name"],
                 "url": s["url"],
                 "method": s["method"],

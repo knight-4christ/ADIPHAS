@@ -3,6 +3,10 @@
     "."
   ],
   "search_path": [
-    "myenv/Lib/site-packages"
+    "myenv/Lib/site-packages",
+    "."
+  ],
+  "exclude": [
+    "myenv/.*"
   ]
 }

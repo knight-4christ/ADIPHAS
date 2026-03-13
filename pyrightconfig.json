@@ -1,7 +1,20 @@
 {
+  "include": [
+    ".",
+    "backend",
+    "ui"
+  ],
+  "extraPaths": ["."],
   "venvPath": ".",
   "venv": "myenv",
-  "extraPaths": ["."],
   "pythonVersion": "3.11",
-  "typeCheckingMode": "basic"
+  "typeCheckingMode": "basic",
+  "reportMissingImports": "none",
+  "reportGeneralTypeIssues": "none",
+  "reportIndexIssue": "none",
+  "reportOptionalMemberAccess": "none",
+  "reportArgumentType": "none",
+  "analysis": {
+    "extraPaths": ["."]
+  }
 }

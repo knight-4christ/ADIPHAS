@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
 class AdvisoryEngine:
     """
@@ -9,7 +9,7 @@ class AdvisoryEngine:
 
     def __init__(self, gemini_model=None):
         # Specific Keyword Dictionaries
-        self.DISEASE_SIGNATURES = {
+        self.DISEASE_SIGNATURES: Dict[str, Dict[str, Any]] = {
             "Lassa Fever": {"keywords": ["fever", "bleeding", "rat", "mastomys", "headache"], "threshold": 2, "critical": ["bleeding"]},
             "Cholera": {"keywords": ["diarrhea", "vomiting", "rice-water", "dehydration"], "threshold": 2, "critical": ["rice-water"]},
             "Malaria": {"keywords": ["fever", "chills", "sweating", "headache"], "threshold": 2, "critical": []}
@@ -37,7 +37,7 @@ class AdvisoryEngine:
         2. Public Health Action (e.g., "Report to LGA surveillance officer if symptoms persist").
         """
         try:
-            from backend.core.model_config import smart_generate
+            from backend.core.model_config import smart_generate  # type: ignore[import-untyped]
             text, model_used = smart_generate(self.gemini_model, prompt, context="SymptomCheck")
             return text or "AI clinical deep-dive currently unavailable."
         except Exception:
@@ -53,8 +53,8 @@ class AdvisoryEngine:
         symptoms_lower = [s.lower() for s in symptoms]
         
         # 1. CORE SKELETON (Rule-Based Guardrails)
-        detected_risks = []
-        result = {}
+        detected_risks: List[Dict[str, str]] = []
+        result: Dict[str, Any] = {}
         
         # Specific High-Priority Check (Lassa)
         if "fever" in symptoms_lower and "bleeding" in symptoms_lower:
@@ -68,10 +68,13 @@ class AdvisoryEngine:
         else:
             # General Signature Matching
             for disease, sig in self.DISEASE_SIGNATURES.items():
-                match_count = sum(1 for k in sig["keywords"] if any(k in s for s in symptoms_lower))
-                critical_hit = any(c in symptoms_lower for c in sig["critical"])
+                keywords: List[str] = sig["keywords"]
+                critical_list: List[str] = sig["critical"]
+                threshold: int = sig["threshold"]
+                match_count = sum(1 for k in keywords if any(k in s for s in symptoms_lower))
+                critical_hit = any(c in symptoms_lower for c in critical_list)
                 
-                if critical_hit or match_count >= sig["threshold"]:
+                if critical_hit or match_count >= threshold:
                     risk = "High" if critical_hit else "Moderate"
                     detected_risks.append({"disease": disease, "risk": risk})
                     trace.append({"step": f"Matched {disease} pattern ({match_count} keywords).", "timestamp": datetime.now().replace(microsecond=0)})

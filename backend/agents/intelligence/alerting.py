@@ -1,6 +1,7 @@
-import numpy as np
+import numpy as np  # type: ignore[import-untyped]
 import math
 from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
 
 class AlertingEngine:
     """
@@ -18,7 +19,7 @@ class AlertingEngine:
 If anomaly: emergency posture. If flat/no anomaly: routine surveillance.
 Provide: 1) 1-sentence interpretation of the math. 2) Public Health Action Plan."""
         try:
-            from backend.core.model_config import smart_generate
+            from backend.core.model_config import smart_generate  # type: ignore[import-untyped]
             text, model_used = smart_generate(self.gemini_model, prompt, context="ForecastNarrative")
             return text or "Narrative generation currently unavailable."
         except Exception:
@@ -32,10 +33,10 @@ Provide: 1) 1-sentence interpretation of the math. 2) Public Health Action Plan.
         actual = np.array(actual)
         predicted = np.array(predicted)
         
-        mae = np.mean(np.abs(actual - predicted))
-        rmse = math.sqrt(np.mean((actual - predicted)**2))
+        mae_val: float = float(np.mean(np.abs(actual - predicted)))
+        rmse_val: float = math.sqrt(float(np.mean((actual - predicted)**2)))
         
-        return round(float(mae), 4), round(float(rmse), 4)
+        return round(mae_val, 4), round(rmse_val, 4)  # type: ignore[call-overload]
 
     def detect_anomalies(self, lga_code, disease, historical_counts=None):
         """

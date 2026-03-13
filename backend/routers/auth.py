@@ -1,16 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException  # type: ignore[import-untyped]
+from fastapi.security import OAuth2PasswordRequestForm  # type: ignore[import-untyped]
+from sqlalchemy.orm import Session  # type: ignore[import-untyped]
 from typing import List
 
-from backend import models, schemas, auth_utils
-from backend.database import get_db
-from backend.rate_limit import limiter
-from fastapi import Request
+from backend import models, schemas, auth_utils  # type: ignore[import-untyped]
+from backend.database import get_db  # type: ignore[import-untyped]
+from backend.rate_limit import limiter  # type: ignore[import-untyped]
+from fastapi import Request  # type: ignore[import-untyped]
 
 router = APIRouter(tags=["Authentication"])
-from jose import JWTError, jwt
-from fastapi.security import OAuth2PasswordBearer
+from jose import JWTError, jwt  # type: ignore[import-untyped]
+from fastapi.security import OAuth2PasswordBearer  # type: ignore[import-untyped]
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):

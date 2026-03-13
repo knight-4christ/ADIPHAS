@@ -1,4 +1,4 @@
-import requests
+import requests  # type: ignore[import-untyped]
 import os
 
 # Default to localhost for local dev

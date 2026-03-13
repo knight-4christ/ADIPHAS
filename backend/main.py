@@ -1,32 +1,32 @@
-from fastapi import FastAPI, Depends, HTTPException
-from fastapi.responses import RedirectResponse
-from sqlalchemy.orm import Session
-from . import models, database, schemas, auth_utils
-from .database import engine
+from fastapi import FastAPI, Depends, HTTPException  # type: ignore[import-untyped]
+from fastapi.responses import RedirectResponse  # type: ignore[import-untyped]
+from sqlalchemy.orm import Session  # type: ignore[import-untyped]
+from backend import models, database, schemas, auth_utils  # type: ignore[import-untyped]
+from backend.database import engine  # type: ignore[import-untyped]
 import sys
 import os
 
 # Ensure project root is in path for 'backend' module imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from .auth_utils import get_password_hash
+from backend.auth_utils import get_password_hash  # type: ignore[import-untyped]
 from datetime import datetime, timedelta
-from dotenv import load_dotenv
+from dotenv import load_dotenv  # type: ignore[import-untyped]
 load_dotenv()
 
 # Import Core Engine
-from backend.core.advisory_engine import AdvisoryEngine
-from backend.core.vector_store import get_vector_manager
-from backend.dependencies import (
+from backend.core.advisory_engine import AdvisoryEngine  # type: ignore[import-untyped]
+from backend.core.vector_store import get_vector_manager  # type: ignore[import-untyped]
+from backend.dependencies import (  # type: ignore[import-untyped]
     gemini_model, nlp_agent, logger, system_activities
 )
-from fastapi.middleware.cors import CORSMiddleware
-from apscheduler.schedulers.background import BackgroundScheduler
+from fastapi.middleware.cors import CORSMiddleware  # type: ignore[import-untyped]
+from apscheduler.schedulers.background import BackgroundScheduler  # type: ignore[import-untyped]
 import logging
-from google import genai
-from slowapi import _rate_limit_exceeded_handler
-from slowapi.errors import RateLimitExceeded
-from backend.rate_limit import limiter
+from google import genai  # type: ignore[import-untyped]
+from slowapi import _rate_limit_exceeded_handler  # type: ignore[import-untyped]
+from slowapi.errors import RateLimitExceeded  # type: ignore[import-untyped]
+from backend.rate_limit import limiter  # type: ignore[import-untyped]
 
 
 
@@ -48,7 +48,7 @@ app.add_middleware(
 # Init Core Engine with Gemini
 advisory_engine = AdvisoryEngine(gemini_model=gemini_model)
 # --- Routers Configuration ---
-from backend.routers import advisory, auth, idsr, ebs, system
+from backend.routers import advisory, auth, idsr, ebs, system  # type: ignore[import-untyped]
 
 app.include_router(advisory.router)
 app.include_router(auth.router)
@@ -71,7 +71,7 @@ def get_db():
 # Auth logic moved to routers/auth.py
 
 # --- Autonomous Monitoring Job ---
-from backend.scheduler import start_scheduler, startup_insight_cache
+from backend.scheduler import start_scheduler, startup_insight_cache  # type: ignore[import-untyped]
 
 @app.on_event("startup")
 async def startup_event():
@@ -118,7 +118,7 @@ def healthcheck():
 @app.get("/system/model-status")
 def get_model_status():
     """Returns the current Gemini model fallback status."""
-    from backend.core.model_config import get_model_status
+    from backend.core.model_config import get_model_status  # type: ignore[import-untyped]
     return get_model_status()
 
 @app.get("/system/startup-insight")
@@ -129,7 +129,7 @@ def get_startup_insight():
 @app.get("/system/token-usage")
 def get_token_usage():
     """Returns the running Gemini token usage for this server session."""
-    from backend.core.token_tracker import get_session_totals
+    from backend.core.token_tracker import get_session_totals  # type: ignore[import-untyped]
     return get_session_totals()
 
 @app.get("/system/briefing")

@@ -2,13 +2,14 @@ import logging
 import re
 import json
 from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
 import os
 import time
 
 logger = logging.getLogger(__name__)
 
 try:
-    import spacy
+    import spacy  # type: ignore[import-untyped]
 except Exception as e:
     spacy = None
     logger.warning(f"spaCy library not found or failed to load (DLL error): {e}. NLP will run in keyword-only mode.")
@@ -62,7 +63,7 @@ Baseline: diseases={baseline_entities.get('diseases')}, locations={baseline_enti
 Refine baseline. Return JSON: {{"diseases":[], "locations":[], "severity_score":0.0-1.0, "intelligence_summary":"", "public_health_advisory":"", "category":"Infectious/Environmental/Other", "policy_alert":bool}}"""
         # 3. Execution via Gemini
         try:
-            from backend.core.model_config import smart_generate
+            from backend.core.model_config import smart_generate  # type: ignore[import-untyped]
             raw_text, model_used = smart_generate(self.gemini_model, prompt, context="NLP_EntityExtraction")
             
             if not raw_text:
@@ -94,7 +95,7 @@ Refine baseline. Return JSON: {{"diseases":[], "locations":[], "severity_score":
 Data: {json.dumps(payload)}
 Return JSON array: [{{"id":int, "diseases":[], "locations":[], "severity_score":0.0-1.0, "intelligence_summary":"", "public_health_advisory":"", "category":"Infectious/Environmental/Other", "policy_alert":bool}}]"""
         try:
-            from backend.core.model_config import smart_generate
+            from backend.core.model_config import smart_generate  # type: ignore[import-untyped]
             raw_text, model_used = smart_generate(self.gemini_model, prompt, context="NLP_BatchExtraction")
             
             if not raw_text: return None
@@ -111,7 +112,7 @@ Return JSON array: [{{"id":int, "diseases":[], "locations":[], "severity_score":
         trace = []
         trace.append({"step": "Initializing NLP Extraction...", "timestamp": datetime.now().replace(microsecond=0)})
         
-        entities = {
+        entities: Dict[str, Any] = {
             "diseases": [],
             "locations": [],
             "severity_score": 0.1
@@ -119,7 +120,7 @@ Return JSON array: [{{"id":int, "diseases":[], "locations":[], "severity_score":
 
         # 1. spaCy NER
         if self.nlp:
-            doc = self.nlp(text)
+            doc = self.nlp(text)  # type: ignore[misc]
             for ent in doc.ents:
                 if ent.label_ in ["GPE", "LOC"]:
                     # Case-insensitive check against Lagos Registry
@@ -150,7 +151,7 @@ Return JSON array: [{{"id":int, "diseases":[], "locations":[], "severity_score":
             entities["severity_score"] += 0.4
             trace.append({"step": "Urgency signals detected."})
 
-        entities["severity_score"] = min(1.0, entities["severity_score"])
+        entities["severity_score"] = min(1.0, float(entities["severity_score"]))
         trace.append({"step": "Baseline math/rule extraction complete.", "timestamp": datetime.now().replace(microsecond=0)})
         
         trace.append({"step": "Extraction cycle complete.", "timestamp": datetime.now().replace(microsecond=0)})

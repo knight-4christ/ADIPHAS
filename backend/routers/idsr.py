@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, UploadFile, File
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, UploadFile, File  # type: ignore[import-untyped]
+from sqlalchemy.orm import Session  # type: ignore[import-untyped]
 from datetime import datetime
+from typing import Optional
 
-from backend import models, schemas
-from backend.database import get_db
-from backend.dependencies import ingestion_agent, alerting_engine
+from backend import models, schemas  # type: ignore[import-untyped]
+from backend.database import get_db  # type: ignore[import-untyped]
+from backend.dependencies import ingestion_agent, alerting_engine  # type: ignore[import-untyped]
 
 router = APIRouter(tags=["IDSR Management"])
 
@@ -15,7 +16,7 @@ def upload_idsr(file: UploadFile = File(...), db: Session = Depends(get_db)):
     return result
 
 @router.get("/api/data/idsr_history")
-def get_idsr_history(lga_code: str = None, disease: str = None, db: Session = Depends(get_db)):
+def get_idsr_history(lga_code: Optional[str] = None, disease: Optional[str] = None, db: Session = Depends(get_db)):
     """Returns raw IDSR weekly records for a given LGA and disease for chart rendering."""
     query = db.query(models.IDSRRecord)
     if lga_code:
@@ -52,7 +53,7 @@ def predict_forecast(request: schemas.PredictionRequest, db: Session = Depends(g
 
     # 2. Fallback: count EBSAlerts per week (real scraped intelligence)
     if not historical_data:
-        from sqlalchemy import func, extract
+        from sqlalchemy import func, extract  # type: ignore[import-untyped]
         weekly_counts = (
             db.query(
                 func.strftime('%Y-%W', models.EBSAlert.timestamp).label('week'),

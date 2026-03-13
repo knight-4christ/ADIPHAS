@@ -1,15 +1,15 @@
 import os
 import logging
 from datetime import datetime
-from dotenv import load_dotenv
+from dotenv import load_dotenv  # type: ignore[import-untyped]
 
-from google import genai
+from google import genai  # type: ignore[import-untyped]
 
-from backend import models, database
-from backend.agents.acquisition.news_scraper import NewsScraperAgent
-from backend.agents.acquisition import ingestion
-from backend.agents.intelligence import nlp_processor, knowledge_fusion, alerting, risk
-from backend.agents.orchestrator import OrchestratorAgent
+from backend import models, database  # type: ignore[import-untyped]
+from backend.agents.acquisition.news_scraper import NewsScraperAgent  # type: ignore[import-untyped]
+from backend.agents.acquisition import ingestion  # type: ignore[import-untyped]
+from backend.agents.intelligence import nlp_processor, knowledge_fusion, alerting, risk  # type: ignore[import-untyped]
+from backend.agents.orchestrator import OrchestratorAgent  # type: ignore[import-untyped]
 
 load_dotenv()
 

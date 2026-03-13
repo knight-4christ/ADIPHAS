@@ -1,12 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException  # type: ignore[import-untyped]
+from sqlalchemy.orm import Session  # type: ignore[import-untyped]
 from datetime import datetime, timedelta
-from typing import List
+from typing import Any, Dict, List, Optional
 import time
 
-from backend import models, schemas
-from backend.database import get_db
-from backend.dependencies import log_activity, news_agent, fusion_agent, nlp_agent
+from backend import models, schemas  # type: ignore[import-untyped]
+from backend.database import get_db  # type: ignore[import-untyped]
+from backend.dependencies import log_activity, news_agent, fusion_agent, nlp_agent  # type: ignore[import-untyped]
 import json
 
 router = APIRouter(tags=["System & Monitoring"])
@@ -91,7 +91,7 @@ def get_system_metrics(db: Session = Depends(get_db)):
     if _cached_system_metrics and (current_time - _cached_system_metrics_time) < 5.0:
         return _cached_system_metrics
 
-    from sqlalchemy import func, cast, Date
+    from sqlalchemy import func, cast, Date  # type: ignore[import-untyped]
     today = datetime.now().date()
     
     # Count today's activities by agent
@@ -125,7 +125,7 @@ def get_system_metrics(db: Session = Depends(get_db)):
             total_scraped_today += int(m.group(1))
             sources_chunk = m.group(2)
             if sources_chunk != "None":
-                for src in map(str.strip, sources_chunk.split(',')):
+                for src in list(map(str.strip, sources_chunk.split(','))):  # type: ignore[arg-type]
                     all_scrape_sources.add(src)
     
     # Articles processed/skipped from IntelligenceEngine
@@ -197,7 +197,7 @@ def get_evaluation_metrics(db: Session = Depends(get_db)):
     """Returns aggregate NLP performance metrics from evaluation samples."""
     samples = db.query(models.EvaluationSample).all()
     f1_scores = [s.f1_score for s in samples if s.f1_score is not None]
-    avg_f1 = round(sum(f1_scores) / len(f1_scores), 4) if f1_scores else 0.0
+    avg_f1 = round(float(sum(f1_scores)) / len(f1_scores), 4) if f1_scores else 0.0  # type: ignore[call-overload]
     return {"total_samples": len(samples), "avg_f1": avg_f1}
 
 @router.get("/api/evaluation/samples")
@@ -240,11 +240,11 @@ def submit_evaluation(payload: dict, db: Session = Depends(get_db)):
             return 0.0
         precision = tp / len(act_set) if act_set else 0.0
         recall = tp / len(exp_set) if exp_set else 0.0
-        return round(2 * precision * recall / (precision + recall), 4) if (precision + recall) > 0 else 0.0
+        return round(float(2 * precision * recall / (precision + recall)), 4) if (precision + recall) > 0 else 0.0  # type: ignore[call-overload]
 
     disease_f1 = compute_f1(expected.get("diseases", []), actual.get("diseases", []))
     location_f1 = compute_f1(expected.get("locations", []), actual.get("locations", []))
-    avg_f1 = round((disease_f1 + location_f1) / 2, 4)
+    avg_f1 = round(float(disease_f1 + location_f1) / 2, 4)  # type: ignore[call-overload]
 
     sample = models.EvaluationSample(
         raw_text=raw_text,

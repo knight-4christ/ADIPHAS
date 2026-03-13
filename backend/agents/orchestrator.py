@@ -2,10 +2,11 @@ import logging
 import json
 import os
 from datetime import datetime, timedelta
-from sqlalchemy.orm import Session
-from backend import models, database
-from backend.agents.intelligence.alerting import AlertingEngine
-from backend.agents.intelligence.risk import RiskEngine
+from typing import Any, Dict, List, Optional
+from sqlalchemy.orm import Session  # type: ignore[import-untyped]
+from backend import models, database  # type: ignore[import-untyped]
+from backend.agents.intelligence.alerting import AlertingEngine  # type: ignore[import-untyped]
+from backend.agents.intelligence.risk import RiskEngine  # type: ignore[import-untyped]
 
 logger = logging.getLogger(__name__)
 
@@ -78,9 +79,9 @@ class OrchestratorAgent:
             "epidemic health emergency Nigeria today",
         ]
         
-        all_results = []
+        all_results: List[str] = []
         try:
-            from langchain_community.tools.tavily_search import TavilySearchResults
+            from langchain_community.tools.tavily_search import TavilySearchResults  # type: ignore[import-untyped]
             web_search = TavilySearchResults(api_key=tavily_key, max_results=3)
             
             for query in queries:
@@ -90,9 +91,9 @@ class OrchestratorAgent:
                         for r in results:
                             content = r.get("content") or r.get("snippet") or str(r)
                             url = r.get("url", "")
-                            all_results.append(f"- {content[:200]} ({url})")
+                            all_results.append(f"- {str(content)[:200]} ({url})")  # type: ignore[index]
                     elif isinstance(results, str):
-                        all_results.append(f"- {results[:300]}")
+                        all_results.append(f"- {results[:300]}")  # type: ignore[index]
                 except Exception as e:
                     logger.warning(f"Tavily query failed for '{query}': {e}")
         except ImportError:
@@ -104,13 +105,13 @@ class OrchestratorAgent:
             return
         
         # Combine results into a structured intelligence snapshot
-        web_intel = "\n".join(all_results[:9])  # Cap at 9 items to control size
+        web_intel = "\n".join(list(all_results)[:9])  # Cap at 9 items to control size  # type: ignore[index]
         
         # If Gemini is available, summarize; otherwise store raw
         content = web_intel
         if self.gemini_model:
             try:
-                from backend.core.model_config import smart_generate
+                from backend.core.model_config import smart_generate  # type: ignore[import-untyped]
                 prompt = f"""Summarize these real-time disease intelligence signals for Lagos/Nigeria (3-5 bullet points, Markdown):
 {web_intel}"""
                 text, _ = smart_generate(self.gemini_model, prompt, context="RealtimeIntel")
@@ -157,7 +158,7 @@ Live Web Intelligence:
 Include: 1) Current Landscape 2) Critical Hotspots 3) Recommendation"""
         
         try:
-            from backend.core.model_config import smart_generate
+            from backend.core.model_config import smart_generate  # type: ignore[import-untyped]
             text, model_used = smart_generate(self.gemini_model, prompt, context="BriefingAgent")
             
             if text:

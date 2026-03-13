@@ -15,7 +15,7 @@ class RiskEngine:
         prompt = f"""Risk score={score:.1f} ({category}). Traits: Genotype={user_traits.get('genotype')}, Blood={user_traits.get('blood_group')}. Local alerts: {', '.join([f'{a.disease} in {a.location_text}' for a in active_alerts[:3]])}.
 1-sentence preventative action considering biological vulnerability and most critical precaution."""
         try:
-            from backend.core.model_config import smart_generate
+            from backend.core.model_config import smart_generate  # type: ignore[import-untyped]
             text, model_used = smart_generate(self.gemini_model, prompt, context="RiskSummary")
             return text or "AI situational summary currently unavailable."
         except Exception:

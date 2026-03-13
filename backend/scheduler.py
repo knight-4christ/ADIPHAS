@@ -2,19 +2,20 @@ import logging
 import threading
 import time
 from datetime import datetime
-from apscheduler.schedulers.background import BackgroundScheduler
-from sqlalchemy import text
+from typing import Any, Dict, List, Optional
+from apscheduler.schedulers.background import BackgroundScheduler  # type: ignore[import-untyped]
+from sqlalchemy import text  # type: ignore[import-untyped]
 
-from backend import models, database
-from backend.dependencies import (
+from backend import models, database  # type: ignore[import-untyped]
+from backend.dependencies import (  # type: ignore[import-untyped]
     log_activity, news_agent, nlp_agent, fusion_agent, orchestrator, gemini_model
 )
-from backend.core.vector_store import get_vector_manager
+from backend.core.vector_store import get_vector_manager  # type: ignore[import-untyped]
 
 logger = logging.getLogger(__name__)
 
 # Global startup insight cache (accessed by routers)
-startup_insight_cache = {"insight": None, "generated_at": None}
+startup_insight_cache: Dict[str, Any] = {"insight": None, "generated_at": None}
 
 def autonomous_monitoring_job():
     """
@@ -68,7 +69,7 @@ def autonomous_monitoring_job():
         new_count = len(headlines)
         if new_count > batch_limit:
             log_activity("IntelligenceEngine", f"Batching: Processing top {batch_limit} out of {new_count} new articles.")
-            headlines = headlines[:batch_limit]
+            headlines = list(headlines)[:batch_limit]
         
         # Group reports for fusion (Now LOCAL and INSTANT via Batching)
         pending_reports = []
@@ -138,7 +139,7 @@ def autonomous_monitoring_job():
                         risk_level="Low"
                     )
                     db.add(alert)
-                    saved_raw += 1
+                    saved_raw: int = saved_raw + 1
             if saved_raw:
                 log_activity("AlertingEngine", f"Saved {saved_raw} new raw disease signals to EBS database.")
         
@@ -208,12 +209,12 @@ def _generate_startup_insight():
                 rag_context = ""
                 
                 if rag_response and "results" in rag_response:
-                    rag_context = "\n".join([f"- {r.get('content', '')}" for r in rag_response["results"] if isinstance(r, dict)][:3])
+                    rag_context = "\n".join([f"- {r.get('content', '')}" for r in list(rag_response["results"])[:3] if isinstance(r, dict)])
 
                 alert_summary = "\n".join([f"- {a.disease} in {a.location_text} ({a.risk_level})" for a in recent_alerts[:5]])
                 
                 prompt = f"""3-sentence startup briefing. Alerts:\n{alert_summary}\nContext:\n{rag_context}\nPatterns? Concerns? Monitor?"""
-                from backend.core.model_config import smart_generate
+                from backend.core.model_config import smart_generate  # type: ignore[import-untyped]
                 text, model_used = smart_generate(gemini_model, prompt, context="StartupInsight")
                 
                 if text:

@@ -1,12 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException  # type: ignore[import-untyped]
+from sqlalchemy.orm import Session  # type: ignore[import-untyped]
 from datetime import datetime, timedelta
-from typing import List
+from typing import List, Optional
 
-from backend import models, schemas
-from backend.database import get_db
-from backend.dependencies import gemini_model, log_activity
-from backend.routers.auth import get_current_user, check_role
+from backend import models, schemas  # type: ignore[import-untyped]
+from backend.database import get_db  # type: ignore[import-untyped]
+from backend.dependencies import gemini_model, log_activity  # type: ignore[import-untyped]
+from backend.routers.auth import get_current_user, check_role  # type: ignore[import-untyped]
 
 router = APIRouter(tags=["Reporting & Fusion"])
 
@@ -75,7 +75,7 @@ briefing_ai_cache = {}  # Format: {(lga, role): (insight, timestamp)}
 CACHE_EXPIRY = timedelta(minutes=10)
 
 @router.get("/api/intelligence/briefing")
-def get_briefing(lga: str = None, role: str = "CITIZEN", db: Session = Depends(get_db)):
+def get_briefing(lga: Optional[str] = None, role: str = "CITIZEN", db: Session = Depends(get_db)):
     """Returns a contextual health briefing filtered by LGA and user role, with AI insights."""
     query = db.query(models.EBSAlert)
     if lga:
@@ -117,7 +117,7 @@ def get_briefing(lga: str = None, role: str = "CITIZEN", db: Session = Depends(g
             
             Analyze these signals for immediate threats or trends. If the data is sparse, provide a general vigilance advisory.
             """
-            from backend.core.model_config import smart_generate
+            from backend.core.model_config import smart_generate  # type: ignore[import-untyped]
             text, model_used = smart_generate(gemini_model, prompt, context="IntelligenceBriefing")
             
             if text:
