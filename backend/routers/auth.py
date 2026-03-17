@@ -35,11 +35,11 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
 def check_role(role: str):
     def role_checker(user: models.User = Depends(get_current_user)):
         # Role hierarchy: ADMIN > EXPERT > CITIZEN
-        if user.role == "ADMIN":
-            return user
-        if role == "EXPERT" and user.role == "EXPERT":
-            return user
-        if user.role == role:
+        role_levels = {"CITIZEN": 1, "EXPERT": 2, "ADMIN": 3}
+        user_level = role_levels.get(user.role, 0)
+        required_level = role_levels.get(role, 99)
+        
+        if user_level >= required_level:
             return user
         raise HTTPException(status_code=403, detail="Operation not permitted")
     return role_checker
@@ -50,8 +50,10 @@ def read_users_me(current_user: models.User = Depends(get_current_user)):
 
 @router.put("/api/users/profile", response_model=schemas.UserOut)
 def update_profile(profile_update: schemas.UserBase, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    # Protect sensitive fields from mass assignment
+    protected_fields = {"role", "impact_score", "contributions", "username"}
     for var, value in vars(profile_update).items():
-        if value is not None:
+        if value is not None and var not in protected_fields:
             setattr(current_user, var, value)
     db.commit()
     db.refresh(current_user)
@@ -80,13 +82,18 @@ def register(request: Request, user: schemas.UserCreate, db: Session = Depends(g
     db_user = db.query(models.User).filter(models.User.username == user.username).first()
     if db_user:
         raise HTTPException(status_code=400, detail="Username already registered")
+        
+    if user.email:
+        db_email = db.query(models.User).filter(models.User.email == user.email).first()
+        if db_email:
+            raise HTTPException(status_code=400, detail="Email already registered")
     
     hashed_pwd = auth_utils.get_password_hash(user.password)
     new_user = models.User(
         username=user.username,
         email=user.email,
         full_name=user.full_name,
-        role=user.role,
+        role="CITIZEN",  # Force default role, prevent client privilege escalation
         location_lga=user.location_lga,
         genotype=user.genotype,
         blood_group=user.blood_group,

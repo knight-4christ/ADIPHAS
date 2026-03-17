@@ -1,3 +1,5 @@
+import backend.logging_config  # noqa: F401 — must be first to configure logging  # type: ignore[import-untyped]
+
 from fastapi import FastAPI, Depends, HTTPException  # type: ignore[import-untyped]
 from fastapi.responses import RedirectResponse  # type: ignore[import-untyped]
 from sqlalchemy.orm import Session  # type: ignore[import-untyped]
@@ -22,7 +24,6 @@ from backend.dependencies import (  # type: ignore[import-untyped]
 )
 from fastapi.middleware.cors import CORSMiddleware  # type: ignore[import-untyped]
 from apscheduler.schedulers.background import BackgroundScheduler  # type: ignore[import-untyped]
-import logging
 from google import genai  # type: ignore[import-untyped]
 from slowapi import _rate_limit_exceeded_handler  # type: ignore[import-untyped]
 from slowapi.errors import RateLimitExceeded  # type: ignore[import-untyped]

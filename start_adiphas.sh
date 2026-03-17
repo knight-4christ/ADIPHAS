@@ -38,7 +38,7 @@ mkdir -p logs
 
 # Start Backend as a background process
 echo -e "\033[0;33m[3/4] Starting Backend API on port 8000...\033[0m"
-python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 2> logs/backend_stderr.log &
+python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 &
 BACKEND_PID=$!
 
 # Wait for backend to finish cold-starting
@@ -57,7 +57,7 @@ done
 
 if [ "$healthy" = false ]; then
     echo -e "\033[0;31m[WARNING] Backend did not respond to healthcheck within 30s.\033[0m"
-    echo -e "\033[0;31m      Check: logs/adiphas_agent.log and logs/backend_stderr.log\033[0m"
+    echo -e "\033[0;31m      Check: logs/adiphas.log for details\033[0m"
 fi
 
 # Start Streamlit UI
@@ -83,8 +83,8 @@ elif command -v open &> /dev/null; then
 fi
 
 echo -e "\033[0;33m--- Live Agent Log Stream ---\033[0m"
-touch logs/adiphas_agent.log
-tail -f logs/adiphas_agent.log
+touch logs/adiphas.log
+tail -f logs/adiphas.log
 
 # Cleanup on exit
 trap "kill $BACKEND_PID $UI_PID 2>/dev/null; exit 0" SIGINT SIGTERM

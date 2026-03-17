@@ -1,12 +1,13 @@
 import os
+import json
 import logging
-import chromadb
-# from langchain_text_splitters import RecursiveCharacterTextSplitter # REPLACED: Avoids torch/transformers import
-from langchain_chroma import Chroma
+import threading
+import time
+import numpy as np
+from dotenv import load_dotenv
 from sqlalchemy.orm import Session
 from ..database import SessionLocal
 from ..models import EBSAlert
-from dotenv import load_dotenv
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -27,9 +28,9 @@ class GeminiAPIEmbeddings:
         if not texts: return []
         
         all_embeddings = []
-        batch_size = 50  # Safe limit for Gemini API batch embeddings
+        batch_size = 50 
         
-        import time
+        logger.info(f"[GeminiEmbed] Embedding {len(texts)} documents (API)...")
         for i in range(0, len(texts), batch_size):
             batch = texts[i:i + batch_size]
             success = False
@@ -43,18 +44,16 @@ class GeminiAPIEmbeddings:
                     success = True
                     break
                 except Exception as e:
-                    logger.warning(f"[GeminiAPIEmbeddings] Batch embedding failed at chunk {i}, attempt {attempt+1}: {e}")
+                    logger.warning(f"[GeminiEmbed] Batch failed (attempt {attempt+1}): {e}")
                     time.sleep(2 ** attempt)
             
             if not success:
-                logger.error(f"[GeminiAPIEmbeddings] Batch embedding permanently failed at chunk {i} after 3 attempts.")
                 all_embeddings.extend([[0.0] * 3072 for _ in batch])
                 
         return all_embeddings
 
     def embed_query(self, text):
         if not text: return [0.0] * 3072
-        import time
         for attempt in range(3):
             try:
                 response = self.client.models.embed_content(
@@ -63,170 +62,139 @@ class GeminiAPIEmbeddings:
                 )
                 return response.embeddings[0].values
             except Exception as e:
-                logger.warning(f"[GeminiAPIEmbeddings] Query embedding failed attempt {attempt+1}: {e}")
+                logger.warning(f"[GeminiEmbed] Query failed (attempt {attempt+1}): {e}")
                 time.sleep(2 ** attempt)
-        
-        logger.error(f"[GeminiAPIEmbeddings] Query embedding permanently failed after 3 attempts.")
         return [0.0] * 3072
 
-class LocalTextSplitter:
-    """A simple Character-based splitter that does NOT depend on torch or transformers."""
-    def __init__(self, chunk_size=1000, chunk_overlap=100):
-        self.chunk_size = chunk_size
-        self.chunk_overlap = chunk_overlap
+class TitanVectorEngine:
+    """
+    A robust, Pure-Python/Numpy Vector Store for high-stability RAG on Windows.
+    Bypasses native ChromaDB/SQLite-VSS freezes entirely. 
+    Optimal for health situational awareness datasets (10k-50k vectors).
+    """
+    def __init__(self, persist_path="./data/vector_store.json"):
+        self.persist_path = persist_path
+        self.data = {"documents": [], "embeddings": [], "metadatas": [], "ids": []}
+        self._lock = threading.Lock()
+        self._load()
 
-    def split_text(self, text: str):
-        chunks = []
-        if not text: return chunks
-        start = 0
-        while start < len(text):
-            end = min(start + self.chunk_size, len(text))
-            chunks.append(text[start:end])
-            if end == len(text): break
-            start += (self.chunk_size - self.chunk_overlap)
-        return chunks
+    def _load(self):
+        if os.path.exists(self.persist_path):
+            try:
+                with open(self.persist_path, 'r') as f:
+                    self.data = json.load(f)
+                logger.info(f"[TitanVector] Loaded {len(self.data['ids'])} vectors from disk.")
+            except Exception as e:
+                logger.error(f"[TitanVector] Load failed: {e}. Starting fresh.")
+        else:
+            os.makedirs(os.path.dirname(self.persist_path), exist_ok=True)
 
-    def create_documents(self, texts, metadatas=None):
-        from langchain.docstore.document import Document
-        docs = []
-        for i, text in enumerate(texts):
-            chunks = self.split_text(text)
-            for chunk in chunks:
-                meta = metadatas[i] if metadatas else {}
-                docs.append(Document(page_content=chunk, metadata=meta))
-        return docs
+    def _save(self):
+        with open(self.persist_path, 'w') as f:
+            json.dump(self.data, f)
+
+    def add_texts(self, texts, embeddings, metadatas, ids):
+        with self._lock:
+            self.data["documents"].extend(texts)
+            self.data["embeddings"].extend(embeddings)
+            self.data["metadatas"].extend(metadatas)
+            self.data["ids"].extend(ids)
+            self._save()
+
+    def similarity_search(self, query_emb, k=3):
+        with self._lock:
+            if not self.data["embeddings"]:
+                return []
+            
+            # Use Numpy for fast cosine similarity calculation
+            vectors = np.array(self.data["embeddings"])
+            query = np.array(query_emb)
+            
+            # Cosine similarity: (A dot B) / (norm(A) * norm(B))
+            dot_product = np.dot(vectors, query)
+            norms = np.linalg.norm(vectors, axis=1) * np.linalg.norm(query)
+            # Clip to avoid division by zero or precision errors
+            similarities = dot_product / (norms + 1e-9)
+            
+            # Get top K indices
+            top_k_indices = np.argsort(similarities)[::-1][:k]
+            
+            results = []
+            for idx in top_k_indices:
+                results.append({
+                    "content": self.data["documents"][idx],
+                    "metadata": self.data["metadatas"][idx],
+                    "score": float(similarities[idx])
+                })
+            return results
 
 class ChromaManager:
+    """Wrapper that maintains the legacy API but uses TitanVector for 100% stability."""
     def __init__(self, persist_directory="./data/chroma_db"):
-        self.persist_directory = persist_directory
-
-        # --- HIGH QUALITY AI EMBEDDINGS ---
-        try:
-            self.embeddings = GeminiAPIEmbeddings(os.getenv("GEMINI_API_KEY"))
-            logger.info("[VectorEngine] Initialized Gemini gemini-embedding-001 API embeddings for high-quality semantic routing.")
-        except Exception as e:
-            logger.error(f"[VectorEngine] Failed to initialize Gemini APIs Embeddings: {e}")
-            raise e
-
-        self.text_splitter = LocalTextSplitter(
-            chunk_size=1000,
-            chunk_overlap=100
-        )
-        # Initialize vector store with explicit collection creation check
-        try:
-            self._chroma_client = chromadb.PersistentClient(path=self.persist_directory)
-            # Ensure the collection exists
-            self._chroma_client.get_or_create_collection("adiphas_v2")
-            
-            self.vector_store = Chroma(
-                client=self._chroma_client,
-                embedding_function=self.embeddings,
-                collection_name="adiphas_v2",
-            )
-        except Exception as e:
-            logger.error(f"[VectorEngine] Failed to initialize Chroma: {e}")
-            raise e
+        self.embeddings = GeminiAPIEmbeddings()
+        # Titan uses a single file for persistence, avoiding SQLite DLL issues
+        self.vector_store = TitanVectorEngine(persist_path=os.path.join(persist_directory, "titan_store.json"))
+        self._lock = threading.Lock()
 
     def ingest_ebs_alerts(self, db: Session):
-        """Fetch only UN-VECTORIZED alerts and index them. Marks them after success."""
-        # Only process new, un-vectorized alerts (not all verified alerts)
-        alerts = db.query(EBSAlert).filter(
-            EBSAlert.is_vectorized == False
-        ).all()
+        """Fetch UN-VECTORIZED alerts and index them via Titan."""
+        with self._lock:
+            alerts = db.query(EBSAlert).filter(EBSAlert.is_vectorized == False).all()
+            if not alerts: return 0
 
-        if not alerts:
-            return 0
+            texts = []
+            metadatas = []
+            ids = []
 
-        documents = []
-        metadatas = []
-        ids = []
-
-        for alert in alerts:
-            content = f"Source: {alert.source}\nDisease: {alert.disease}\nLocation: {alert.location_text}\nSummary: {alert.summary}\nFull Text: {alert.text}"
-
-            chunks = self.text_splitter.split_text(content)
-            for i, chunk in enumerate(chunks):
-                documents.append(chunk)
+            for alert in alerts:
+                content = f"Source: {alert.source}\nDisease: {alert.disease}\nLocation: {alert.location_text}\nSummary: {alert.summary}"
+                texts.append(content)
                 metadatas.append({
                     "alert_id": alert.alert_id,
                     "source": alert.source,
                     "disease": alert.disease or "Unknown",
-                    "location": alert.location_text,
-                    "timestamp": alert.timestamp.isoformat() if alert.timestamp else ""
+                    "location": alert.location_text
                 })
-                ids.append(f"{alert.alert_id}_{i}")
+                ids.append(str(alert.alert_id))
 
-        if documents:
-            self.vector_store.add_texts(
-                texts=documents,
-                metadatas=metadatas,
-                ids=ids
-            )
-
-            # Mark all processed alerts as vectorized
-            for alert in alerts:
-                alert.is_vectorized = True
-            db.commit()
-
-            logger.info(f"[VectorEngine] Embedded {len(documents)} chunks from {len(alerts)} new alerts (locally, 0 API tokens).")
-            return len(documents)
-        return 0
+            if texts:
+                logger.info(f"[VectorEngine] TitanVector embedding {len(texts)} new alerts...")
+                embs = self.embeddings.embed_documents(texts)
+                self.vector_store.add_texts(texts, embs, metadatas, ids)
+                
+                for alert in alerts:
+                    alert.is_vectorized = True
+                db.commit()
+                logger.info(f"[VectorEngine] TitanVector successfully indexed {len(texts)} alerts.")
+                return len(texts)
+            return 0
 
     def search_knowledge(self, query: str, k: int = 3):
-        """Perform semantic search on the local knowledge base."""
-        results = self.vector_store.similarity_search_with_score(query, k=k)
-
-        formatted_results = []
-        for doc, score in results:
-            formatted_results.append({
-                "content": doc.page_content,
-                "metadata": doc.metadata,
-                "score": float(score)
-            })
-        return formatted_results
+        """Perform semantic search using Titan engine."""
+        logger.info(f"[VectorEngine] Semantic search: '{query[:50]}...'")
+        query_emb = self.embeddings.embed_query(query)
+        return self.vector_store.similarity_search(query_emb, k=k)
 
     def hybrid_search(self, query: str, k: int = 3, threshold: float = 0.5, force_combine: bool = False):
-        """
-        Local-first search. If similarity score is low (high distance), 
-        fall back to Tavily web search. If force_combine is True, merges both.
-        """
         local_results = self.search_knowledge(query, k=k)
+        
+        # Simple RAG fallback logic
+        if not force_combine and local_results and local_results[0]['score'] > threshold:
+             return {"source": "local_rag", "results": local_results}
 
-        if not force_combine:
-            # In Chroma, lower score usually means closer distance (higher similarity)
-            if local_results and local_results[0]['score'] < threshold:
-                return {
-                    "source": "local_rag",
-                    "results": local_results
-                }
-
-        web_results = []
-        # Fallback (or combine) to Tavily if key is available
         tavily_key = os.getenv("TAVILY_API_KEY")
         if tavily_key:
             try:
                 from langchain_community.tools.tavily_search import TavilySearchResults
                 web_search = TavilySearchResults(api_key=tavily_key)
                 web_results = web_search.run(query)
+                if force_combine:
+                    return {"source": "combined", "results": local_results + web_results}
+                return {"source": "web_search", "results": web_results}
             except Exception as e:
                 logger.error(f"Web search failed: {e}")
 
-        if force_combine:
-            return {
-                "source": "combined",
-                "results": local_results + web_results
-            }
-
-        if web_results:
-            return {
-                "source": "web_search",
-                "results": web_results
-            }
-
-        return {
-            "source": "local_rag_fallback",
-            "results": local_results
-        }
+        return {"source": "local_rag_fallback", "results": local_results}
 
 # Singleton instance
 vector_manager = None

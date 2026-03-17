@@ -3,7 +3,7 @@ import threading
 import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional
-from apscheduler.schedulers.asyncio import AsyncIOScheduler  # type: ignore[import-untyped]
+from apscheduler.schedulers.background import BackgroundScheduler  # type: ignore[import-untyped]
 from sqlalchemy import text  # type: ignore[import-untyped]
 import asyncio
 
@@ -259,10 +259,10 @@ def _generate_startup_insight():
 
 async def start_scheduler():
     """Initializes and starts the background scheduler and deferred startup tasks."""
-    scheduler = AsyncIOScheduler()  # type: ignore[no-any-return, call-overload]
-    scheduler.add_job(lambda: asyncio.create_task(asyncio.to_thread(autonomous_monitoring_job)), 'interval', minutes=15)  # type: ignore[arg-type]
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(autonomous_monitoring_job, 'interval', minutes=15)
     scheduler.start()
-    logger.info("Background Scheduler (AsyncIO) started.")
+    logger.info("Background Scheduler started.")
     
     # Self-healing database sweep
     db = database.SessionLocal()
@@ -283,6 +283,23 @@ async def start_scheduler():
     finally:
         db.close()
         
-    # Schedule the initial runs on the asyncio event loop thread pool
-    asyncio.create_task(asyncio.to_thread(_generate_startup_insight))  # type: ignore[arg-type]
-    asyncio.create_task(asyncio.to_thread(autonomous_monitoring_job))  # type: ignore[arg-type]
+    # Schedule the initial runs on the background scheduler's thread pool
+    # We stagger them to avoid concurrent lock contention on the vector store at cold-start
+    import threading
+    threading.Thread(target=_generate_startup_insight, daemon=True, name="StartupInsight").start()
+    
+    def delayed_monitoring():
+        logger.info("[Scheduler] Monitoring cycle deferred for 60s to allow StartupInsight to clear...")
+        time.sleep(60) # Wait for StartupInsight to clear initial RAG check
+        
+        # Periodic liveness trace
+        def liveness_heartbeat():
+            while True:
+                logger.info(f"[Liveness] Scheduler threads active at {datetime.now().replace(microsecond=0)}")
+                time.sleep(300) # Every 5 mins
+        
+        threading.Thread(target=liveness_heartbeat, daemon=True, name="LivenessMonitor").start()
+        
+        autonomous_monitoring_job()
+        
+    threading.Thread(target=delayed_monitoring, daemon=True, name="MonitoringCycle").start()

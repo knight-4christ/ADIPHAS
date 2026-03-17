@@ -1,5 +1,6 @@
-from scrapling.fetchers import Fetcher, StealthyFetcher  # type: ignore[import-untyped]
+from bs4 import BeautifulSoup  # type: ignore[import-untyped,import-not-found]
 from datetime import datetime
+import httpx  # type: ignore[import-untyped,import-not-found]
 from typing import Any, Dict, List, Tuple
 import logging
 import time
@@ -47,6 +48,7 @@ SOURCES = [
         "priority": 1,
         "keywords": [],
     },
+    
     # ── II. Lagos State (priority 1) ───────────────────────────────────────
     {
         "name": "Lagos MoH",
@@ -203,8 +205,6 @@ class NewsScraperAgent:
         self.sources = sorted(SOURCES, key=lambda s: s["priority"])
         self.politeness_delay = 3  # seconds between requests
         
-        # Scrapling handles impersonation automatically, but we can set defaults if desired
-        StealthyFetcher.adaptive = True # Enable adaptive parsing by default for all instances
 
         self.intelligence_keywords = [
             "cholera", "lassa", "mpox", "monkeypox", "yellow fever", 
@@ -221,11 +221,14 @@ class NewsScraperAgent:
         return any(kw.lower() in text_lower for kw in keywords)
 
     def _scrape_rss(self, source: dict) -> list:
-        """Parse an RSS/Atom feed using scrapling Fetcher (faster/stealthier requests)."""
+        """Parse an RSS/Atom feed using httpx."""
         try:
-            # Use Fetcher for raw XML requests (stealthier than requests.get)
-            page = Fetcher.get(source["url"], timeout=30)
-            content_str = page.text.strip()
+            # RSS Feeds typically don't block basic HTTP clients
+            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+            with httpx.Client(timeout=30, verify=False, follow_redirects=True) as client:
+                res = client.get(source["url"], headers=headers)
+                res.raise_for_status()
+                content_str = res.text.strip()
             
             if "</rss>" in content_str:
                 content_str = content_str[:content_str.find("</rss>") + 6]
@@ -256,70 +259,112 @@ class NewsScraperAgent:
         return results
 
     def _scrape_html(self, source: dict) -> list:
-        """Scrape HTML using a tiered strategy:
-        1. Fast: scrapling.Fetcher (HTTP with browser TLS fingerprint) — instant.
-        2. Fallback: scrapling.StealthyFetcher (full headless browser) — for blocked sites.
+        """Scrape HTML using robust httpx.
+        Sites that block or time out are skipped to prevent backend hangs.
         """
         page = None
         try:
-            # Tier 1: Fast HTTP fetcher with browser impersonation (no browser overhead)
-            page = Fetcher.get(source["url"], impersonate="chrome", timeout=30)
-            if not page or page.status == 0:
-                raise ConnectionError("Empty response from fast fetcher")
-        except Exception as fast_err:
-            logger.warning(f"[Scrapling] Fast fetcher failed for {source['name']} ({fast_err}). Escalating to StealthyFetcher...")
-            try:
-                # Tier 2: Full headless browser — only launched when site is truly blocking
-                page = StealthyFetcher.fetch(source["url"], headless=True, timeout=60000)
-            except Exception as stealth_err:
-                logger.error(f"[Scrapling] StealthyFetcher also failed for {source['name']}: {stealth_err}")
-                raise stealth_err
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "AcceptLanguage": "en-US,en;q=0.9",
+            }
+            with httpx.Client(timeout=20, verify=False, follow_redirects=True) as client:
+                res = client.get(source["url"], headers=headers)
+                res.raise_for_status()
+                # Parse the HTML with native BeautifulSoup
+                page = BeautifulSoup(res.text, "lxml")
+                
+        except Exception as err:
+            logger.warning(f"[Scraper] Failed to fetch {source['name']}: {err}")
+            return []
 
         extracted = []
         name = source["name"]
 
         if name == "Punch Health":
-            for item in page.css('h2 a, h3 a')[:15]:
-                text = item.css('::text').get()
-                url = item.attrib.get('href')
+            for item in page.select('h2 a, h3 a')[:15]:
+                text = item.get_text(strip=True)
+                url = item.get('href')
                 if text and url:
-                    extracted.append({"title": text.strip(), "url": url})
+                    extracted.append({"title": text, "url": url})
 
         elif name == "Vanguard News":
-            for item in page.css('article h2 a, article h3 a')[:10]:
-                text = item.css('::text').get()
-                url = item.attrib.get('href')
+            for item in page.select('article h2 a, article h3 a')[:10]:
+                text = item.get_text(strip=True)
+                url = item.get('href')
                 if text and url:
-                    extracted.append({"title": text.strip(), "url": url})
+                    extracted.append({"title": text, "url": url})
 
         elif name == "NCDC":
-            for item in page.css('li a')[:20]:
-                text = item.css('::text').get()
-                url = item.attrib.get('href')
-                if text and len(text.split()) > 3 and url:
-                    if not url.startswith("http"):
+            for item in page.select('li a')[:20]:
+                text = item.get_text(strip=True)
+                url = item.get('href')
+                if text and url and "news" in url.lower():
+                    if url.startswith('/'):
                         url = "https://ncdc.gov.ng" + url
-                    extracted.append({"title": text.strip(), "url": url})
+                    extracted.append({"title": text, "url": url})
+
+        elif name == "FMoH":
+            for item in page.select('article h2 a, .entry-title a')[:10]:
+                text = item.get_text(strip=True)
+                url = item.get('href')
+                if text and url:
+                    extracted.append({"title": text, "url": url})
+                    
+        elif name == "NAFDAC":
+            for item in page.select('.elementor-post__title a, article h3 a')[:20]:
+                text = item.get_text(strip=True)
+                url = item.get('href')
+                if text and url:
+                    extracted.append({"title": text, "url": url})
+                    
+        elif name == "Lagos MoH":
+            for item in page.select('.entry-title a, h2.title a')[:20]:
+                text = item.get_text(strip=True)
+                url = item.get('href')
+                if text and url:
+                    extracted.append({"title": text, "url": url})
+                    
+        elif name == "HEFAMAA":
+            for item in page.select('.entry-title a, article a')[:15]:
+                text = item.get_text(strip=True)
+                url = item.get('href')
+                if text and url and len(text) > 10:
+                    extracted.append({"title": text, "url": url})
+                    
+        elif name == "LASUTH":
+            for item in page.select('.post-title a, h3 a')[:15]:
+                text = item.get_text(strip=True)
+                url = item.get('href')
+                if text and url:
+                    extracted.append({"title": text, "url": url})
+                    
+        elif name == "GH Ikorodu":
+            for item in page.select('.elementor-post__title a, h3 a')[:15]:
+                text = item.get_text(strip=True)
+                url = item.get('href')
+                if text and url:
+                    extracted.append({"title": text, "url": url})
 
         elif name == "WHO Nigeria":
-            for item in page.css('.views-row a')[:10]:
-                text = item.css('::text').get()
-                url = item.attrib.get('href')
+            for item in page.select('.views-row a')[:10]:
+                text = item.get_text(strip=True)
+                url = item.get('href')
                 if text and url:
                     if not url.startswith("http"):
                         url = "https://www.afro.who.int" + url
-                    extracted.append({"title": text.strip(), "url": url})
+                    extracted.append({"title": text, "url": url})
 
         # Generic fallback: works for all other sites
         if not extracted:
-            for item in page.css('h1 a, h2 a, h3 a')[:20]:
-                text = item.css('::text').get()
-                url = item.attrib.get('href')
+            for item in page.select('h1 a, h2 a, h3 a')[:20]:
+                text = item.get_text(strip=True)
+                url = item.get('href')
                 if text and url:
                     if not url.startswith("http"):
                         base = source["url"].rstrip("/")
                         url = base + "/" + url.lstrip("/")
-                    extracted.append({"title": text.strip(), "url": url})
+                    extracted.append({"title": text, "url": url})
 
         # Apply keyword filter
         if source.get("keywords"):
