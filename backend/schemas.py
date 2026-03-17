@@ -21,7 +21,7 @@ class EBSAlertCreate(BaseModel):
     disease: Optional[str] = None
     location_lat: Optional[float] = None
     location_lon: Optional[float] = None
-    collected_by: str
+    collected_by: Optional[str] = None
     summary: Optional[str] = None
     ai_powered: Optional[bool] = False
     policy_alert: Optional[bool] = False

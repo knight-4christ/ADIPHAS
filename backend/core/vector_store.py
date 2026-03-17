@@ -34,7 +34,7 @@ class GeminiAPIEmbeddings:
         for i in range(0, len(texts), batch_size):
             batch = texts[i:i + batch_size]
             success = False
-            for attempt in range(3):
+            for attempt in range(2): # Reduced retries for faster fallback
                 try:
                     response = self.client.models.embed_content(
                         model=self.model_name,
@@ -45,16 +45,24 @@ class GeminiAPIEmbeddings:
                     break
                 except Exception as e:
                     logger.warning(f"[GeminiEmbed] Batch failed (attempt {attempt+1}): {e}")
-                    time.sleep(2 ** attempt)
+                    time.sleep(1)
             
             if not success:
-                all_embeddings.extend([[0.0] * 3072 for _ in batch])
+                # Ultimate Fallback Header
+                from .model_config import _embed_via_openrouter
+                logger.warning(f"[GeminiEmbed] Triggering OpenRouter Fallback for batch...")
+                or_embs = _embed_via_openrouter(batch)
+                if or_embs:
+                    all_embeddings.extend(or_embs)
+                else:
+                    logger.error(f"[GeminiEmbed] EVERY embedding path exhausted. Zero-padding.")
+                    all_embeddings.extend([[0.0] * 3072 for _ in batch])
                 
         return all_embeddings
 
     def embed_query(self, text):
         if not text: return [0.0] * 3072
-        for attempt in range(3):
+        for attempt in range(2):
             try:
                 response = self.client.models.embed_content(
                     model=self.model_name,
@@ -63,7 +71,14 @@ class GeminiAPIEmbeddings:
                 return response.embeddings[0].values
             except Exception as e:
                 logger.warning(f"[GeminiEmbed] Query failed (attempt {attempt+1}): {e}")
-                time.sleep(2 ** attempt)
+                time.sleep(1)
+        
+        # OpenRouter fallback for single query
+        from .model_config import _embed_via_openrouter
+        or_embs = _embed_via_openrouter(text)
+        if or_embs and len(or_embs) > 0:
+            return or_embs[0]
+            
         return [0.0] * 3072
 
 class TitanVectorEngine:

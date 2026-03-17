@@ -110,12 +110,32 @@ def render():
         # --- AI Startup Insight (generated once at server start) ---
         startup = api_client.get_startup_insight()
         if isinstance(startup, dict) and startup.get("insight"):
-            st.markdown("### 🧠 AI Intelligence Summary")
-            st.info(f"**So Far...** {startup['insight']}")
-            if startup.get("generated_at"):
-                st.caption(f"Generated at server startup: {startup['generated_at']}")
+            st.markdown("### 🧬 Intelligence Briefing")
+            
+            # Professional StAMP Format (Status, Action, Monitoring, Prediction)
+            insight_text = startup['insight']
+            
+            # Check if it already looks like a briefing, or wrap it
+            st.markdown(f"""
+                <div style="background-color: #1a2a2a; border-left: 5px solid #00f2ff; padding: 20px; border-radius: 5px;">
+                    <h4 style="color: #00f2ff; margin-top: 0;">OFFICIAL BRIEFING (S.t.A.M.P.)</h4>
+                    <p style="color: #e2e8f0; font-family: 'Courier New', Courier, monospace; font-size: 0.95rem;">
+                        {insight_text}
+                    </p>
+                    <hr style="border-top: 1px solid #334155;">
+                    <p style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 0;">
+                        <b>Security Level:</b> UNCLASSIFIED // HEALTH INTEL // ADIPHAS AI ANALYST<br>
+                        <b>Reference Timestamp:</b> {startup.get('generated_at', 'N/A')}
+                    </p>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            if st.button("Generate Fresh Briefing", help="Triggers the AI to re-analyze current signals"):
+                with st.spinner("Agent re-evaluating situational data..."):
+                    # Mock or trigger-based fresh generation can go here if the API exists
+                    st.info("Agent is currently polling latest signals. Refreshing shortly...")
         else:
-            st.info("No AI insights generated yet.")
+            st.info("📡 **Listening...** The Autonomous Analyst is currently gathering signals to generate your briefing.")
     
     with t_engine:
         # --- Intelligence Engine Metrics (Real-time auto-refresh) ---

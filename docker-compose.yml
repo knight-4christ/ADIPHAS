@@ -11,6 +11,9 @@ services:
       - ./backend:/app/app
     environment:
       DATABASE_URL: postgresql://user:password@db:5432/adis_phas
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      TAVILY_API_KEY: ${TAVILY_API_KEY}
     depends_on:
       db:
         condition: service_healthy
