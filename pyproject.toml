@@ -1,0 +1,13 @@
+[tool.pyright]
+include = ["backend"]
+extraPaths = ["./backend"]
+venvPath = "."
+venv = "myenv"
+pythonVersion = "3.13"
+reportMissingImports = "none"
+typeCheckingMode = "off"
+
+[tool.pyre]
+source_directories = ["backend"]
+search_path = ["myenv/Lib/site-packages", "."]
+exclude = ["myenv/.*"]

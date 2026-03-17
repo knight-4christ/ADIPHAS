@@ -156,7 +156,7 @@ def autonomous_monitoring_job():
             vm = get_vector_manager()
             new_docs = vm.ingest_ebs_alerts(db)
             if new_docs:
-                log_activity("VectorEngine", f"Ingested {new_docs} text chunks into ChromaDB.")
+                log_activity("VectorEngine", f"Ingested {new_docs} text chunks into TitanVector.")
         except Exception as e:
             logger.error(f"Vector ingestion failed: {e}")
             

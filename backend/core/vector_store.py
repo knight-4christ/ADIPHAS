@@ -171,8 +171,8 @@ class ChromaManager:
 
     def search_knowledge(self, query: str, k: int = 3):
         """Perform semantic search using Titan engine."""
-        logger.info(f"[VectorEngine] Semantic search: '{query[:50]}...'")
-        query_emb = self.embeddings.embed_query(query)
+        logger.info(f"[VectorEngine] Semantic search initiated.")
+        query_emb = self.embeddings.embed_query(str(query))
         return self.vector_store.similarity_search(query_emb, k=k)
 
     def hybrid_search(self, query: str, k: int = 3, threshold: float = 0.5, force_combine: bool = False):

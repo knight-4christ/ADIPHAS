@@ -32,7 +32,7 @@ def check_wellness(payload: dict):
 @limiter.limit("10/minute") # Rate limit added
 def advisory_search(request: Request, query: str, k: int = Query(3)):
     """
-    Hybrid RAG Search: ChromaDB first, then Tavily.
+    Hybrid RAG Search: Vector Store first, then Tavily.
     """
     vm = get_vector_manager()
     result = vm.hybrid_search(query, k=k)

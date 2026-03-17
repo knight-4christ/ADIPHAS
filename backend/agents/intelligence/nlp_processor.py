@@ -191,17 +191,24 @@ Return JSON array: [{{"id":int, "diseases":[], "locations":[], "severity_score":
                 for g_res in gemini_results:
                     idx = g_res.get('id')
                     if idx is not None and 0 <= idx < len(results):
-                        # Merge Gemini intelligence into the result
+                        # Merge Gemini intelligence into the result if available
                         results[idx].update({
                             "diseases": [str(d) for d in g_res.get("diseases", []) if str(d).strip()],
                             "locations": [str(l) for l in g_res.get("locations", []) if str(l).strip()],
                             "severity_score": float(g_res.get("severity_score", results[idx].get("severity_score"))),
-                            "ai_summary": g_res.get("intelligence_summary"),
-                            "public_health_advisory": g_res.get("public_health_advisory"),
-                            "category": g_res.get("category", "General"),
+                            "ai_summary": g_res.get("intelligence_summary") or f"Automatically detected {results[idx].get('diseases')} signal in {results[idx].get('locations')}.",
+                            "public_health_advisory": g_res.get("public_health_advisory") or "Standard health protocol advised. Monitoring for further updates.",
+                            "category": g_res.get("category", "General Intelligence"),
                             "policy_alert": g_res.get("policy_alert", False)
                         })
+                        results[idx]["ai_powered"] = True
                         traces[idx].append({"step": "Gemini deep batch analysis applied."})
+            
+            # Post-Gemini cleanup: Ensure even skipped/failed alerts have a basic summary for the vector store
+            for res in results:
+                if not res.get("ai_summary"):
+                    res["ai_summary"] = f"Baseline detection: {res.get('diseases')} in {res.get('locations')}."
+                    res["ai_powered"] = False
                         
         # 3. Zip back together
         return list(zip(results, traces))
