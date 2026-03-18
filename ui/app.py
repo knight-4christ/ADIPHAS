@@ -9,7 +9,8 @@ load_dotenv()  # Loads .env for UI process (e.g. GEMINI_API_KEY for chat)
 from modules import (
     auth, home, local_feed, idsr_analytics, 
     ebs_alerts, health_map, personal_alerts, 
-    health_profile, admin, chat, evaluation
+    health_profile, admin, chat, evaluation,
+    situational_awareness
 )
 
 # --- GLOBAL DATA FETCH (Cached at Top Level) ---
@@ -291,7 +292,7 @@ def main():
 
     # Module Router (Using startswith because labels now have counts)
     if choice == "Command Centre":
-        home.render()
+        situational_awareness.render()
         
     elif choice.startswith("Local Health Feed"):
         local_feed.render()

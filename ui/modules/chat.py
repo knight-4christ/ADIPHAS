@@ -2,37 +2,7 @@ import streamlit as st
 import os
 import uuid
 import api_client
-from google import genai
 from datetime import datetime
-
-# Initialize Gemini once per session
-@st.cache_resource
-def get_gemini():
-    key = os.getenv("GEMINI_API_KEY")
-    if not key:
-        return None
-    try:
-        client = genai.Client(api_key=key)
-        
-        system_instruction=(
-            "You are ADIPHAS Assistant, a public health advisory AI for Lagos, Nigeria. "
-            "Your role is to provide evidence-based guidance on disease surveillance, "
-            "outbreak prevention, and personal health protection. You are trained on NCDC, "
-            "WHO, and Lagos State Ministry of Health guidelines. Always recommend seeking "
-            "professional care for medical emergencies. Keep responses concise and clear."
-        )
-        
-        return client, system_instruction
-    except Exception as e:
-        return None
-
-def init_chat_session(client, system_instruction, model):
-    return client.chats.create(
-        model=model,
-        config=genai.types.GenerateContentConfig(
-            system_instruction=system_instruction,
-        )
-    )
 
 def render(is_overlay=False):
     if not is_overlay:
@@ -40,17 +10,14 @@ def render(is_overlay=False):
     
     # 1. State Management (Conversations)
     if "chat_threads" not in st.session_state:
-        # dict of thread_id -> {"name": str, "messages": list, "model": str, "session": object}
         st.session_state.chat_threads = {}
     if "active_thread_id" not in st.session_state:
         st.session_state.active_thread_id = None
         
-    result = get_gemini()
-    if not result:
-        st.warning("Gemini API key not configured or initialization failed. Chat is offline.")
+    # Check Auth (Required for backend chat)
+    if not st.session_state.get("authenticated"):
+        st.warning("🔐 Please login to access the bio-aware Advisory Chat.")
         return
-        
-    client, system_instruction = result
 
     # 2. Main Chat Panel - Consolidated Header
     header_col1, header_col2, header_col3 = st.columns([2, 1, 1])
@@ -79,8 +46,8 @@ def render(is_overlay=False):
 
     with header_col2:
         selected_model = st.selectbox(
-            "AI Model",
-            ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-2.5-pro"],
+            "AI Mode",
+            ["Balanced (Gemini)", "Deep Reasoning (Hunter/Step)", "Resilient (Universal Fallback)"],
             index=0,
             label_visibility="collapsed"
         )
@@ -89,10 +56,9 @@ def render(is_overlay=False):
         if st.button("➕ New Chat", use_container_width=True):
             new_id = str(uuid.uuid4())[:8]
             st.session_state.chat_threads[new_id] = {
-                "name": f"New Chat {len(st.session_state.chat_threads)+1}",
+                "name": f"Chat {len(st.session_state.chat_threads)+1}",
                 "messages": [],
-                "model": selected_model,
-                "session": init_chat_session(client, system_instruction, selected_model),
+                "mode": selected_model,
                 "timestamp": datetime.now()
             }
             st.session_state.active_thread_id = new_id
@@ -104,8 +70,7 @@ def render(is_overlay=False):
         st.session_state.chat_threads[new_id] = {
             "name": "Quick Assistant",
             "messages": [],
-            "model": "gemini-2.0-flash",
-            "session": init_chat_session(client, system_instruction, "gemini-2.0-flash"),
+            "mode": "Balanced (Gemini)",
             "timestamp": datetime.now()
         }
         st.session_state.active_thread_id = new_id
@@ -126,7 +91,7 @@ def render(is_overlay=False):
     # Thread Actions (Rename/Delete)
     t_act1, t_act2, t_act3 = st.columns([3, 1, 1])
     with t_act1:
-        st.caption(f"🧵 Engine: `{active_thread['model']}` | Created: {active_thread['timestamp'].strftime('%H:%M')}")
+        st.caption(f"🧵 Mode: `{active_thread['mode']}` | Created: {active_thread['timestamp'].strftime('%H:%M')}")
     with t_act3:
         if st.button("🗑️ Delete", type="secondary", use_container_width=True):
             del st.session_state.chat_threads[st.session_state.active_thread_id]
@@ -170,16 +135,22 @@ def render(is_overlay=False):
                         context_str += "\nUse the above context to inform your response if relevant. Refine your advice based on these real-time signals."
 
                 try:
-                    # Inject context into the prompt
-                    full_prompt = user_input + context_str
-                    response = active_thread["session"].send_message(full_prompt)
-                    reply = response.text
-                except Exception as e:
-                    error_str = str(e).lower()
-                    if "429" in error_str or "quota" in error_str or "exhausted" in error_str:
-                        reply = "⚠️ API quota reached for this model. Please try selecting a different model from the header for a New Conversation."
+                    # Determine reasoning mode
+                    enable_reasoning = (active_thread["mode"] == "Deep Reasoning (Hunter/Step)")
+                    
+                    # Use backend-orchestrated chat
+                    chat_res = api_client.advisory_chat(
+                        active_thread["messages"], 
+                        st.session_state.token, 
+                        enable_reasoning=enable_reasoning
+                    )
+                    
+                    if chat_res and not chat_res.get("error"):
+                        reply = chat_res.get("reply", "⚠️ AI connection interrupted.")
                     else:
-                        reply = "⚠️ AI temporarily unavailable. Please try again later."
+                        reply = f"⚠️ Backend Error: {chat_res.get('detail', 'Unknown error')}"
+                except Exception as e:
+                    reply = f"⚠️ Chat system error: {str(e)}"
             st.markdown(reply)
             if context_str:
                 with st.expander("📚 Sources Used (RAG)"):

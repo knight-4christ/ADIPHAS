@@ -130,11 +130,14 @@ def render():
         size="Value",
         size_max=45,
         zoom=9.5,
-        height=600,
-        mapbox_style="carto-darkmatter"
+        height=650,
+        mapbox_style="carto-positron" # Light/White style
     )
-    fig.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
-    st.plotly_chart(fig, width='stretch')
+    fig.update_layout(
+        margin={"r": 0, "t": 0, "l": 0, "b": 0},
+        dragmode='pan'
+    )
+    st.plotly_chart(fig, use_container_width=True)
 
     if live_data:
         st.success(f"✅ Map rendered from **{len(alerts)} live EBS signals** across {len(map_data)} LGAs.")

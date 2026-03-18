@@ -77,6 +77,9 @@ from backend.scheduler import start_scheduler, startup_insight_cache  # type: ig
 @app.on_event("startup")
 async def startup_event():
     """Immediately kick off first monitoring cycle and warm up agents on startup."""
+    from backend.core.model_config import get_model_status_log
+    logger.info(get_model_status_log())
+    
     logger.info("ADIPHAS startup — running initial monitoring cycle and data normalization...")
     
     # Start the background scheduling loop & initial insight generation

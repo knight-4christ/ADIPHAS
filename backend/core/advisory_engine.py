@@ -16,25 +16,69 @@ class AdvisoryEngine:
         }
         self.gemini_model = gemini_model
 
-    def analyze_with_ai(self, symptoms: list, duration_days: int, context_str: str = "") -> Optional[str]:
+    def chat_with_ai(self, messages: list, user_metadata: dict = None, enable_reasoning: bool = False) -> str:
+        """
+        Conversational entry point for the Advisory Chat.
+        Injects user biodata into the first message or system prompt.
+        """
+        bio_block = ""
+        if user_metadata:
+            bio_block = f"\n\n[USER BIOLOGICAL PROFILE]\n- Genotype: {user_metadata.get('genotype', 'N/A')}\n- Blood Group: {user_metadata.get('blood_group', 'N/A')}\n- Known Conditions: {user_metadata.get('health_conditions', 'None')}\n"
+
+        # Construct a conversational prompt from history
+        history_str = ""
+        for msg in messages:
+            role = "Assistant" if msg.get("role") == "assistant" else "User"
+            history_str += f"{role}: {msg.get('content')}\n"
+
+        full_prompt = f"""
+        Act as the ADIPHAS Health Advisory Agent. 
+        Context: You are helping a resident of Lagos, Nigeria.
+        {bio_block}
+        
+        Recent Conversation:
+        {history_str}
+        
+        Provide the next response following the guidelines of NCDC and WHO. 
+        Be professional, concise, and prioritize safety.
+        """
+        try:
+            from backend.core.model_config import smart_generate  # type: ignore[import-untyped]
+            reply, model_used = smart_generate(
+                self.gemini_model, 
+                full_prompt, 
+                enable_reasoning=enable_reasoning
+            )
+            return reply or "AI chat currently unavailable."
+        except Exception:
+            return "AI chat currently unavailable."
+
+    def analyze_with_ai(self, symptoms: list, duration_days: int, context_str: str = "", user_metadata: dict = None) -> Optional[str]:
         """
         Uses Gemini to provide a deep clinical analysis of symptoms.
-        Optionally enriched with RAG context from local DB + Tavily.
+        Optionally enriched with RAG context and User Biodata (Genotype/Blood Group).
         """
         if not self.gemini_model:
             return None
 
         context_block = f"\n\nVerified Intelligence Context:\n{context_str}" if context_str else ""
+        
+        bio_block = ""
+        if user_metadata:
+            bio_block = f"\n\nUser Biological Profile:\n- Genotype: {user_metadata.get('genotype', 'N/A')}\n- Blood Group: {user_metadata.get('blood_group', 'N/A')}\n- Known Conditions: {user_metadata.get('health_conditions', 'None')}"
             
         prompt = f"""
         Act as a Senior Clinical Epidemiologist and Medical Consultant in Nigeria.
         Condition: Patient reports {', '.join(symptoms)} over {duration_days} days.
+        {bio_block}
         {context_block}
         
         Provide a concise (2 sentence) actionable advisory. 
         Focus on: 
         1. Specific Clinical Protocol (e.g., "Initiate ORS and isolate", "Perform RDT for Malaria").
         2. Public Health Action (e.g., "Report to LGA surveillance officer if symptoms persist").
+        
+        IMPORTANT: Use the provided Biological Profile (Genotype/Blood Group) to tailor the advice (e.g., implications for malaria or sickle-cell risks).
         """
         try:
             from backend.core.model_config import smart_generate  # type: ignore[import-untyped]
@@ -43,7 +87,7 @@ class AdvisoryEngine:
         except Exception:
             return "AI clinical deep-dive currently unavailable."
 
-    def analyze_symptoms(self, symptoms: list, duration_days: int) -> dict:
+    def analyze_symptoms(self, symptoms: list, duration_days: int, user_metadata: dict = None) -> dict:
         """
         Analyzes user input symptoms using a hybrid (Rule + AI) approach.
         """
@@ -97,7 +141,7 @@ class AdvisoryEngine:
         
         # 2. AI AUGMENTATION (The "Heavy Lifting")
         if self.gemini_model:
-            ai_insight = self.analyze_with_ai(symptoms, duration_days)
+            ai_insight = self.analyze_with_ai(symptoms, duration_days, user_metadata=user_metadata)
             if ai_insight:
                 result["ai_clinical_insight"] = ai_insight
                 trace.append({"step": "AI Clinical deep-dive generated.", "timestamp": datetime.now().replace(microsecond=0)})

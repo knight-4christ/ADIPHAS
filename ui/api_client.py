@@ -129,6 +129,15 @@ def advisory_search(query, k=3):
     """Performs a Hybrid RAG search (Chroma + Tavily) via the backend."""
     return _safe_request("GET", f"{API_URL}/api/advisory/search", params={"query": query, "k": k})
 
+def advisory_chat(messages, token, enable_reasoning=False):
+    """Sends chat history to the backend for bio-aware clinical reasoning."""
+    headers = {"Authorization": f"Bearer {token}"}
+    payload = {
+        "messages": messages,
+        "enable_reasoning": enable_reasoning
+    }
+    return _safe_request("POST", f"{API_URL}/api/advisory/chat", json=payload, headers=headers)
+
 def get_intelligence_sources():
     """Returns the dictionary of monitored sources and their weights from the backend."""
     return _safe_request("GET", f"{API_URL}/api/intelligence/sources")

@@ -137,6 +137,25 @@ def _embed_via_openrouter(text_or_list: str | list[str]) -> list[list[float]] | 
         return None
 
 
+def get_model_status_log() -> str:
+    """Returns a formatted summary of the active AI model chain and fallbacks for startup logging."""
+    native_chain = " -> ".join(MODEL_CHAIN)
+    or_chain = " -> ".join(OPENROUTER_CHAIN)
+    
+    status = [
+        "\n" + "="*50,
+        "ADIPHAS INTELLIGENCE: AI MODEL STATUS",
+        "="*50,
+        f"Primary Native Chain: {native_chain}",
+        f"Verified Fallback (OR): {or_chain}",
+        f"Active Model index: {_state.current_index} ({get_current_model()})",
+        f"OpenRouter Fallback: {'ENABLED' if OPENROUTER_API_KEY else 'DISABLED (Check .env)'}",
+        f"Total Fallback Switches: {_state.switch_count}",
+        "="*50 + "\n"
+    ]
+    return "\n".join(status)
+
+
 def smart_generate(gemini_client, prompt: str, context: str = "", enable_reasoning: bool = False):
     """
     Calls Gemini with automatic model fallback on 429 errors.
@@ -148,8 +167,7 @@ def smart_generate(gemini_client, prompt: str, context: str = "", enable_reasoni
     for _ in range(attempts):
         model = get_current_model()
         try:
-            # Native Gemini Flash supports some reasoning-like behaviors by default, 
-            # but we pass prompt as is.
+            # Native Gemini Flash supports some reasoning-like behaviors by default
             response = gemini_client.models.generate_content(
                 model=model,
                 contents=prompt
@@ -161,21 +179,25 @@ def smart_generate(gemini_client, prompt: str, context: str = "", enable_reasoni
             
         except Exception as e:
             error_str = str(e)
-            if any(code in error_str for code in ["429", "RESOURCE_EXHAUSTED", "404", "NOT_FOUND"]):
-                logger.warning(f"[Gemini] {model} failed (Quota/404) for {context}. Switching model...")
+            # Universal error catching for fallback
+            if any(code in error_str for code in ["429", "RESOURCE_EXHAUSTED", "404", "NOT_FOUND", "503"]):
+                logger.warning(f"[Gemini] {model} unavailable ({error_str[:50]}) for {context}. Switching model...")
                 switch_to_next_model()
             else:
-                logger.error(f"[Gemini] {model} failed for {context}: {e}")
+                logger.error(f"[Gemini] {model} critical error for {context}: {e}")
                 # Try OpenRouter even on non-quota errors if it's the last hope
                 break
     
-    # Ultimate Fallback: OpenRouter
-    logger.warning(f"[Gemini] All native models exhausted for {context}. Triggering OpenRouter...")
-    fallback_text, or_model = _generate_via_openrouter(prompt, context=context, enable_reasoning=enable_reasoning)
-    if fallback_text:
-        return fallback_text, f"openrouter/{or_model}"
+    # Ultimate Fallback: OpenRouter (ENGAGED ONLY IF NATIVE EXHAUSTED)
+    if OPENROUTER_API_KEY:
+        logger.warning(f"[Gemini] All native models exhausted for {context}. Engaging OpenRouter Fallback Tier...")
+        fallback_text, or_model = _generate_via_openrouter(prompt, context=context, enable_reasoning=enable_reasoning)
+        if fallback_text:
+            return fallback_text, f"openrouter/{or_model}"
+    else:
+        logger.error(f"[Gemini] No OpenRouter API Key available for emergency fallback.")
         
-    logger.error(f"[Gemini] Every intelligence path exhausted for {context}.")
+    logger.error(f"[Gemini] EVERY intelligence path exhausted for {context}.")
     return None, None
 
 
