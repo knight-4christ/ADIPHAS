@@ -37,13 +37,20 @@ def render():
 
     with right_col:
         st.subheader("🧠 StAMP Intelligence Briefing")
-        briefing = api_client.get_briefing()
+        briefing = api_client.get_latest_briefing()
         if briefing and "content" in briefing:
             st.markdown(briefing["content"])
             st.caption(f"Generated at: {briefing.get('generated_at', 'N/A')}")
         else:
             st.info("🛰️ Generating next autonomous briefing... check back in a few minutes.")
-            st.button("Request Manual Insight", key="manual_insight")
+            if st.button("Request Manual Insight", key="manual_insight"):
+                with st.spinner("Executing StAMP Intelligence Sweep (Tavily + AI Synthesis)..."):
+                    res = api_client.trigger_manual_briefing()
+                    if res and not res.get("error"):
+                        st.success("Briefing generated! Refreshing...")
+                        st.rerun()
+                    else:
+                        st.error("Manual trigger failed. Check logs or quota.")
 
         st.divider()
         st.subheader("📡 Live Intelligence Stream")

@@ -45,6 +45,24 @@ def scrape_news():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.post("/api/advisory/chat")
+def advisory_chat(messages: List[Dict[str, str]], enable_reasoning: bool = False, context: str = ""):
+    """Sends chat history and search context to the backend for bio-aware reasoning."""
+    # This function would typically interact with an LLM or another agent
+    # For now, it's a placeholder.
+    # The 'token' parameter from the original snippet is for client-side authentication,
+    # not directly used in the FastAPI endpoint unless it's part of Depends(security).
+    # Assuming the token is handled by FastAPI's security dependencies if needed.
+    
+    # Example placeholder logic:
+    response_message = "This is a placeholder response from the advisory chat endpoint."
+    if enable_reasoning:
+        response_message += " Reasoning was enabled."
+    if context:
+        response_message += f" Context provided: {context[:50]}..." # Truncate context for example
+    
+    return {"status": "success", "response": response_message}
+
 @router.post("/api/intelligence/fuse")
 def fuse_intelligence(reports: List[dict]):
     """
@@ -76,6 +94,14 @@ def get_realtime_intelligence(db: Session = Depends(get_db)):
         .filter(models.AutonomousSnapshot.snapshot_type == "realtime_intelligence")\
         .order_by(models.AutonomousSnapshot.generated_at.desc()).first()
     return snapshot
+
+@router.post("/api/system/briefing/trigger")
+def trigger_briefing(db: Session = Depends(get_db)):
+    """Manually forces a fresh StAMP intelligence sweep and briefing synthesis."""
+    from backend.dependencies import orchestrator
+    orchestrator.run_realtime_intelligence_cycle(db, force=True)
+    orchestrator.run_briefing_cycle(db, force=True)
+    return {"status": "success", "message": "Manual intelligence synthesis complete."}
 
 # Globals for primitive endpoint caching (so we don't spam SQLite during Dashboard polling)
 _cached_system_metrics = None
