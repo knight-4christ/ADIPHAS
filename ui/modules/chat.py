@@ -142,7 +142,8 @@ def render(is_overlay=False):
                     chat_res = api_client.advisory_chat(
                         active_thread["messages"], 
                         st.session_state.token, 
-                        enable_reasoning=enable_reasoning
+                        enable_reasoning=enable_reasoning,
+                        context=context_str
                     )
                     
                     if chat_res and not chat_res.get("error"):

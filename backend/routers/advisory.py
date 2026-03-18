@@ -47,7 +47,8 @@ def chat_advisory(payload: schemas.ChatPayload, current_user: models.User = Depe
     reply = advisory_engine.chat_with_ai(
         messages, 
         user_metadata=user_metadata, 
-        enable_reasoning=payload.enable_reasoning
+        enable_reasoning=payload.enable_reasoning,
+        context=payload.context or ""
     )
     
     return {"reply": reply}

@@ -16,14 +16,16 @@ class AdvisoryEngine:
         }
         self.gemini_model = gemini_model
 
-    def chat_with_ai(self, messages: list, user_metadata: dict = None, enable_reasoning: bool = False) -> str:
+    def chat_with_ai(self, messages: list, user_metadata: dict = None, enable_reasoning: bool = False, context: str = "") -> str:
         """
         Conversational entry point for the Advisory Chat.
-        Injects user biodata into the first message or system prompt.
+        Injects user biodata and real-time search context.
         """
         bio_block = ""
         if user_metadata:
             bio_block = f"\n\n[USER BIOLOGICAL PROFILE]\n- Genotype: {user_metadata.get('genotype', 'N/A')}\n- Blood Group: {user_metadata.get('blood_group', 'N/A')}\n- Known Conditions: {user_metadata.get('health_conditions', 'None')}\n"
+
+        context_block = f"\n\n[REAL-TIME INTELLIGENCE CONTEXT]\n{context}" if context else ""
 
         # Construct a conversational prompt from history
         history_str = ""
@@ -35,6 +37,7 @@ class AdvisoryEngine:
         Act as the ADIPHAS Health Advisory Agent. 
         Context: You are helping a resident of Lagos, Nigeria.
         {bio_block}
+        {context_block}
         
         Recent Conversation:
         {history_str}

@@ -52,18 +52,18 @@ class OrchestratorAgent:
         db.commit()
         logger.info(f"Predictive cycle complete. Generated {created_count} snapshots.")
 
-    def run_realtime_intelligence_cycle(self, db: Session):
+    def run_realtime_intelligence_cycle(self, db: Session, force: bool = False):
         """Uses Tavily to fetch live disease outbreak news and store as a snapshot.
-        Runs every cycle but only saves a new snapshot every 6 hours to conserve API calls."""
-        
-        # Check if a recent realtime snapshot exists (within 6 hours)
-        last_rt = db.query(models.AutonomousSnapshot)\
-            .filter(models.AutonomousSnapshot.snapshot_type == "realtime_intelligence")\
-            .order_by(models.AutonomousSnapshot.generated_at.desc()).first()
-        
-        if last_rt and (datetime.utcnow() - last_rt.generated_at).total_seconds() < 21600:
-            logger.info("Realtime intelligence snapshot is still fresh (<6h). Skipping.")
-            return
+        Runs every cycle but only saves a new snapshot every 6 hours unless forced."""
+        if not force:
+            # Check if a recent realtime snapshot exists (within 6 hours)
+            last_rt = db.query(models.AutonomousSnapshot)\
+                .filter(models.AutonomousSnapshot.snapshot_type == "realtime_intelligence")\
+                .order_by(models.AutonomousSnapshot.generated_at.desc()).first()
+            
+            if last_rt and (datetime.utcnow() - last_rt.generated_at).total_seconds() < 21600:
+                logger.info("Realtime intelligence snapshot is still fresh (<6h). Skipping.")
+                return
         
         tavily_key = os.getenv("TAVILY_API_KEY")
         if not tavily_key:
@@ -129,8 +129,18 @@ class OrchestratorAgent:
         db.commit()
         logger.info(f"Realtime intelligence snapshot saved ({len(all_results)} web signals).")
 
-    def run_briefing_cycle(self, db: Session):
-        """Autonomously generates a system-wide intelligence briefing."""
+    def run_briefing_cycle(self, db: Session, force: bool = False):
+        """Autonomously generates a system-wide intelligence briefing. Runs every 24h unless forced."""
+        if not force:
+            # Check for today's briefing
+            last_briefing = db.query(models.AutonomousSnapshot)\
+                .filter(models.AutonomousSnapshot.snapshot_type == "daily_briefing")\
+                .order_by(models.AutonomousSnapshot.generated_at.desc()).first()
+            
+            if last_briefing and (datetime.utcnow() - last_briefing.generated_at).total_seconds() < 86400:
+                logger.info("Daily StAMP briefing is already generated. Skipping.")
+                return
+
         logger.info("Starting Autonomous Briefing Cycle...")
         
         recent_alerts = db.query(models.EBSAlert).order_by(models.EBSAlert.created_at.desc()).limit(15).all()

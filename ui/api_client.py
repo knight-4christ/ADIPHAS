@@ -129,12 +129,13 @@ def advisory_search(query, k=3):
     """Performs a Hybrid RAG search (Chroma + Tavily) via the backend."""
     return _safe_request("GET", f"{API_URL}/api/advisory/search", params={"query": query, "k": k})
 
-def advisory_chat(messages, token, enable_reasoning=False):
-    """Sends chat history to the backend for bio-aware clinical reasoning."""
+def advisory_chat(messages, token, enable_reasoning=False, context=""):
+    """Sends chat history and search context to the backend for bio-aware reasoning."""
     headers = {"Authorization": f"Bearer {token}"}
     payload = {
         "messages": messages,
-        "enable_reasoning": enable_reasoning
+        "enable_reasoning": enable_reasoning,
+        "context": context
     }
     return _safe_request("POST", f"{API_URL}/api/advisory/chat", json=payload, headers=headers)
 
