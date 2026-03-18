@@ -18,7 +18,8 @@ Nigeria's Integrated Disease Surveillance and Response (IDSR) framework is large
 2.  **Hybrid NLP:** Implement a local-first **spaCy** pipeline for high-speed entity extraction, refined by **Gemini Pro** for deep semantic analysis.
 3.  **Knowledge Fusion:** Reconcile conflicting multi-source signals using the **Dempster-Shafer Theory of Evidence**.
 4.  **Role-Specific Intelligence:** Deliver actionable insights to Citizens (risk scores), Experts (verification cycles), and Admins (system diagnostics).
-5.  **RAG Advisory:** Ground AI-guided advisory responses in the system's own verified alert database using **ChromaDB**.
+5.  **Hybrid-RAG Advisory:** Ground AI responses in both local verified alerts (**Titan Vector Engine**) and global real-time context (**Tavily Search API**).
+6.  **AI Resilience:** Implement a **Universal Fallback Tier** (Gemini -> OpenRouter) to ensure 24/7 intelligence availability during API quota exhaustion.
 
 ---
 
@@ -26,9 +27,9 @@ Nigeria's Integrated Disease Surveillance and Response (IDSR) framework is large
 ### 2.1 High-Level Design
 ADIPHAS utilizes a four-layer architecture:
 1.  **Presentation Layer:** Streamlit-based dashboard with real-time log streaming and dark-mode aesthetics.
-2.  **Application Layer:** FastAPI backend managing JWT authentication, risk scoring, and and RAG retrieval.
-3.  **Intelligence Agent Layer:** Multithreaded agents (Scout, NLP, Fusion, Risk, Alerting) running on an **APScheduler** background cycle.
-4.  **Persistence Layer:** **SQLite** for structured data and **ChromaDB** for vector embeddings.
+2.  **Application Layer:** FastAPI backend managing JWT authentication, Resilient AI Failover, and Hybrid-RAG retrieval.
+3.  **Intelligence Agent Layer:** Multithreaded fleet (Scout, NLP, Fusion, StAMP Briefing Agent) running on an **APScheduler** background cycle.
+4.  **Persistence Layer:** **SQLite** for structured data and **Titan Vector Engine** (Vector Store) for epidemiological embeddings.
 
 ### 2.2 Local-First AI Strategy
 To ensure cost-efficiency and performance, ADIPHAS implements a tiered AI strategy:
@@ -67,8 +68,11 @@ Where $w_i \in \{0.2, 0.3, 0.5\}$ favor recent data. Model accuracy is audited u
 ### 4.1 Real-Time Metrics & Caching
 The system features a **5-second TTL (Time-To-Live)** cache for high-frequency dashboard metrics. It calculates cumulative daily totals for scraped articles and new signals, preventing database lockups during concurrent role access.
 
-### 4.2 RAG and Vector Intelligence
-The RAG pipeline uses **RecursiveCharacterTextSplitter** for indexing verified alerts into **ChromaDB**. Queries are first routed to the vector store; if similarity scores fall below the distance threshold, the system fails over to the **Tavily Search API** for real-time web context.
+### 4.2 Hybrid-RAG and Strategic Intelligence
+The RAG pipeline utilizes a dual-path retrieval strategy:
+- **Local Path**: Verified EBS alerts and IDSR historical aggregates are indexed in the **Titan Vector Engine** for high-precision local context.
+- **Global Path**: If local data is insufficient or a query involves emerging global trends, the system triggers the **Tavily Search API** for real-time web context.
+- **StAMP Synthesis**: The **Situational Awareness & Monitoring Protocol (StAMP)** generates a daily strategic briefing by fusing these two paths with anomaly detection metrics, providing an executive summary for public health officials.
 
 ### 4.3 Notification Infrastructure (Modular Status)
 The system includes modules for **SMS (Twilio)** and **Email (SMTP)** broadcasting. These are currently implemented as background utilities and can be activated for high-risk alerts (`risk_level == "High"`) once notification quotas are established.

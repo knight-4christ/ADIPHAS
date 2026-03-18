@@ -64,7 +64,43 @@ Before generating a future forecast, the engine performs an **Internal Backtest*
 
 ---
 
-## 4. Deduplication & Anti-Syndication
+## 4. StAMP Intelligence Protocol
+**Situational Awareness & Monitoring Protocol (StAMP)** is the ADIPHAS autonomous intelligence engine. It operates on a 24-hour cycle (with 6-hour real-time sweeps) to synthesize a "Strategic Briefing" for health officials.
+
+### 4.1 Real-Time Intelligence (Web Scouting)
+The system uses the **Tavily Search API** to pull live epidemiological signals from news sites, social media mentions, and community reports. These are normalized into "Intelligence Snapshots" and stored in the vector store.
+
+### 4.2 Autonomous Synthesis
+Every 24 hours, a specialized **Briefing Agent** performs a "Triple-Fusion":
+1. **DB Signals**: Verified EBS alerts from the last 7 days.
+2. **Anomalies**: NLP-detected outliers in case reports.
+3. **Web Context**: Live Tavily news results.
+
+The output is a Markdown-formatted **StAMP Strategic Briefing**, which is delivered to the Governance Dashboard.
+
+---
+
+## 5. Multi-LLM Resilience & High Availability
+To prevent intelligence blindness during API outages (e.g., Google Gemini quota limits), ADIPHAS implements a **Universal Fallback Tier**.
+
+### 5.1 Fallback Orchestration
+- **Primary Tier**: Google Gemini (Flash/Pro) for cost-efficient reasoning.
+- **Secondary Tier (Emergency)**: OpenRouter (Claude/Stepfun/Hunter) for guaranteed availability.
+- **Trigger**: Automatic failover occurs upon `429 (Resource Exhausted)` or `500 (Server Error)` from the primary provider.
+
+*Significance*: This ensures that the Advisory Chat and StAMP cycles remain operational even during global LLM outages, maintaining critical public health "eyes-on-target" status.
+
+---
+
+## 6. Personalization & Bio-Aware Advisory (Rule 10 Alignment)
+Aligning with the core mission of "tailored insights," the advisory engine injects **User Biodata** directly into the AI prompt:
+- **Genotype Sensitivity**: Automatic warnings for Malaria complications in sickle-cell (SS/SC) carriers.
+- **Blood Group Logic**: Risk escalation for Cholera in individuals with Blood Group O.
+- **Health Conditions**: Chronic respiratory conditions (e.g., Asthma) trigger higher severity ratings during air-quality or flu outbreaks.
+
+---
+
+## 7. Deduplication & Anti-Syndication
 To prevent "Echo Chamber" signals (where one news release is syndicated across 50 sites), ADIPHAS applies **MD5 Content Hashing**:
 - Normalized Text Hash = `MD5(lower(trim(records)))`
 - Fused signals only include content with unique hashes within a 7-day window.
