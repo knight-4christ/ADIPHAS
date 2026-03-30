@@ -60,14 +60,15 @@ def render():
             st.caption(f"Generated at: {briefing.get('generated_at', 'N/A')}")
         else:
             st.info("🛰️ Generating next autonomous briefing... check back in a few minutes.")
-            if st.button("Request Manual Insight", key="manual_insight"):
-                with st.spinner("Executing StAMP Intelligence Sweep (Tavily + AI Synthesis)..."):
-                    res = api_client.trigger_manual_briefing()
-                    if res and not res.get("error"):
-                        st.success("Briefing generated! Refreshing...")
-                        st.rerun()
-                    else:
-                        st.error("Manual trigger failed. Check logs or quota.")
+            
+        if st.button("🔄 Force Real-time StAMP Sweep", key="manual_insight", use_container_width=True):
+            with st.spinner("Executing StAMP Intelligence Sweep (Tavily + AI Synthesis)..."):
+                res = api_client.trigger_manual_briefing()
+                if res and not res.get("error"):
+                    st.success("Briefing generated! Refreshing...")
+                    st.rerun()
+                else:
+                    st.error("Manual trigger failed. Check logs or quota.")
 
         st.divider()
         st.subheader("📡 Live Intelligence Stream")
