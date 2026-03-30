@@ -87,9 +87,10 @@ def _generate_via_openrouter(prompt: str, context: str = "", enable_reasoning: b
                 message = result['choices'][0]['message']
                 text = message.get('content') or ""
                 
-                # If reasoning was requested and returned separately
+                # Log reasoning for transparency, but NEVER include in output
+                # Reasoning can be a string or a list of objects — either way, strip it
                 if 'reasoning_details' in message and message['reasoning_details']:
-                    text = f"[Reasoning]\n{message['reasoning_details']}\n\n[Response]\n{text}"
+                    logger.debug(f"[OpenRouter] Reasoning trace received from {model_id} (stripped from output)")
                 
                 logger.info(f"[OpenRouter] SUCCESS with {model_id} for {context}")
                 return text.strip(), model_id

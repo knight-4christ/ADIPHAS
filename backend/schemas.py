@@ -44,6 +44,7 @@ class SymptomPayload(BaseModel):
     duration_days: int
     exposures: Optional[str] = None
     travel_history: Optional[str] = None
+    location: Optional[str] = None
 
 class ChatMessage(BaseModel):
     role: str
@@ -53,6 +54,7 @@ class ChatPayload(BaseModel):
     messages: List[ChatMessage]
     enable_reasoning: Optional[bool] = False
     context: Optional[str] = None
+    location: Optional[str] = None
 
 class PHASNote(BaseModel):
     user_id: str

@@ -24,7 +24,8 @@ def check_symptoms(payload: dict, current_user: models.User = Depends(get_curren
     user_metadata = {
         "genotype": current_user.genotype,
         "blood_group": current_user.blood_group,
-        "health_conditions": current_user.health_conditions
+        "health_conditions": current_user.health_conditions,
+        "location": payload.get("location", current_user.location_lga)
     }
     
     result = advisory_engine.analyze_symptoms(symptoms, duration, user_metadata=user_metadata)
@@ -38,7 +39,8 @@ def chat_advisory(payload: schemas.ChatPayload, current_user: models.User = Depe
     user_metadata = {
         "genotype": current_user.genotype,
         "blood_group": current_user.blood_group,
-        "health_conditions": current_user.health_conditions
+        "health_conditions": current_user.health_conditions,
+        "location": payload.location or current_user.location_lga
     }
     
     # Convert ChatMessage objects to dicts for the engine
@@ -52,6 +54,19 @@ def chat_advisory(payload: schemas.ChatPayload, current_user: models.User = Depe
     )
     
     return {"reply": reply}
+
+@router.post("/dashboard_insight")
+def dashboard_insight(payload: dict, current_user: models.User = Depends(get_current_user)):
+    """Generates a rapid tailored insight for the user's dashboard."""
+    user_metadata = {
+        "genotype": current_user.genotype,
+        "blood_group": current_user.blood_group,
+        "health_conditions": current_user.health_conditions,
+        "location": payload.get("location", current_user.location_lga)
+    }
+    alerts_summary = payload.get("alerts_summary", "")
+    insight = advisory_engine.generate_dashboard_insight(user_metadata, alerts_summary)
+    return {"insight": insight}
 
 @router.post("/wellness_check")
 def check_wellness(payload: dict, current_user: models.User = Depends(get_current_user)):

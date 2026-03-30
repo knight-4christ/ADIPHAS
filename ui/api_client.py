@@ -129,15 +129,25 @@ def advisory_search(query, k=3):
     """Performs a Hybrid RAG search (Chroma + Tavily) via the backend."""
     return _safe_request("GET", f"{API_URL}/api/advisory/search", params={"query": query, "k": k})
 
-def advisory_chat(messages, token, enable_reasoning=False, context=""):
+def advisory_chat(messages, token, enable_reasoning=False, context="", location=""):
     """Sends chat history and search context to the backend for bio-aware reasoning."""
     headers = {"Authorization": f"Bearer {token}"}
     payload = {
         "messages": messages,
         "enable_reasoning": enable_reasoning,
-        "context": context
+        "context": context,
+        "location": location
     }
     return _safe_request("POST", f"{API_URL}/api/advisory/chat", json=payload, headers=headers)
+
+def get_dashboard_insight(token, location, alerts_summary=""):
+    """Fetches a rapid tailored insight for the user's dashboard."""
+    headers = {"Authorization": f"Bearer {token}"}
+    payload = {
+        "location": location,
+        "alerts_summary": alerts_summary
+    }
+    return _safe_request("POST", f"{API_URL}/api/advisory/dashboard_insight", json=payload, headers=headers)
 
 def trigger_manual_briefing():
     """Triggers a manual StAMP intelligence cycle via the backend."""

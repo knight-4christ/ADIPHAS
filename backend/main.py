@@ -139,9 +139,19 @@ def get_token_usage():
 @app.get("/system/briefing")
 def get_latest_briefing(db: Session = Depends(get_db)):
     """Returns the most recent system-wide autonomous briefing."""
+    import re
     briefing = db.query(models.AutonomousSnapshot)\
         .filter(models.AutonomousSnapshot.snapshot_type == "daily_briefing")\
         .order_by(models.AutonomousSnapshot.generated_at.desc()).first()
+    
+    if briefing and briefing.content:
+        content = briefing.content
+        # Strip leaked reasoning blocks: [Reasoning]...[Response] pattern
+        content = re.sub(r'\[Reasoning\].*?\[Response\]\s*', '', content, flags=re.DOTALL)
+        # Strip raw JSON reasoning objects like [{'type': 'reasoning.text', ...}]
+        content = re.sub(r"\[?\{['\"]type['\"]:\s*['\"]reasoning\.text['\"].*?\}\]?", '', content, flags=re.DOTALL)
+        briefing.content = content.strip()
+    
     return briefing
 
 # --- Security Dependencies ---

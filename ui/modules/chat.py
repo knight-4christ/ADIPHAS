@@ -139,11 +139,13 @@ def render(is_overlay=False):
                     enable_reasoning = (active_thread["mode"] == "Deep Reasoning (Hunter/Step)")
                     
                     # Use backend-orchestrated chat
+                    user_loc = st.session_state.get("user_location", "Unknown Location")
                     chat_res = api_client.advisory_chat(
                         active_thread["messages"], 
                         st.session_state.token, 
                         enable_reasoning=enable_reasoning,
-                        context=context_str
+                        context=context_str,
+                        location=user_loc
                     )
                     
                     if chat_res and not chat_res.get("error"):

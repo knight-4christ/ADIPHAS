@@ -10,7 +10,7 @@ from modules import (
     auth, home, local_feed, idsr_analytics, 
     ebs_alerts, health_map, personal_alerts, 
     health_profile, admin, chat, evaluation,
-    situational_awareness
+    situational_awareness, geolocation
 )
 
 # --- GLOBAL DATA FETCH (Cached at Top Level) ---
@@ -42,6 +42,10 @@ def main():
         layout="wide",
         initial_sidebar_state="expanded"
     )
+    
+    # --- BROWSER GEOLOCATION INTEGRATION ---
+    geolocation.inject_geolocation_js()
+    current_loc = geolocation.extract_and_geocode()
     
     # --- SESSION STATE & PERSISTENCE ---
     if "authenticated" not in st.session_state:

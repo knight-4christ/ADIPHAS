@@ -23,7 +23,7 @@ class AdvisoryEngine:
         """
         bio_block = ""
         if user_metadata:
-            bio_block = f"\n\n[USER BIOLOGICAL PROFILE]\n- Genotype: {user_metadata.get('genotype', 'N/A')}\n- Blood Group: {user_metadata.get('blood_group', 'N/A')}\n- Known Conditions: {user_metadata.get('health_conditions', 'None')}\n"
+            bio_block = f"\n\n[USER PROFILE & LOCATION]\n- Location: {user_metadata.get('location', 'Unknown')}\n- Genotype: {user_metadata.get('genotype', 'N/A')}\n- Blood Group: {user_metadata.get('blood_group', 'N/A')}\n- Known Conditions: {user_metadata.get('health_conditions', 'None')}\n"
 
         context_block = f"\n\n[REAL-TIME INTELLIGENCE CONTEXT]\n{context}" if context else ""
 
@@ -68,7 +68,7 @@ class AdvisoryEngine:
         
         bio_block = ""
         if user_metadata:
-            bio_block = f"\n\nUser Biological Profile:\n- Genotype: {user_metadata.get('genotype', 'N/A')}\n- Blood Group: {user_metadata.get('blood_group', 'N/A')}\n- Known Conditions: {user_metadata.get('health_conditions', 'None')}"
+            bio_block = f"\n\nUser Profile & Location:\n- Location: {user_metadata.get('location', 'Unknown')}\n- Genotype: {user_metadata.get('genotype', 'N/A')}\n- Blood Group: {user_metadata.get('blood_group', 'N/A')}\n- Known Conditions: {user_metadata.get('health_conditions', 'None')}"
             
         prompt = f"""
         Act as a Senior Clinical Epidemiologist and Medical Consultant in Nigeria.
@@ -214,3 +214,29 @@ class AdvisoryEngine:
             return {"alert_level": "HIGH", "alerts": alerts}
         
         return {"alert_level": "NORMAL", "alerts": []}
+
+    def generate_dashboard_insight(self, user_metadata: dict, alerts_summary: str = "") -> str:
+        """
+        Generates a quick, personalized 2-sentence situational awareness insight for the dashboard.
+        """
+        if not self.gemini_model:
+            return "AI summary engine offline."
+            
+        location = user_metadata.get('location', 'Unknown')
+        
+        bio_block = f"Genotype: {user_metadata.get('genotype', 'N/A')}, Blood Group: {user_metadata.get('blood_group', 'N/A')}, Conditions: {user_metadata.get('health_conditions', 'None')}"
+        
+        prompt = f"""
+        Act as the ADIPHAS public health command center AI. 
+        User Location: {location}
+        User Biodata: {bio_block}
+        Recent Local Alerts context: {alerts_summary}
+        
+        Provide a rapid, highly personalized 2-sentence situational briefing specifically tailored to this user's location and biological profile based on any potential local outbreaks or general wellness in that area. Focus purely on immediate awareness and actionable personal advice.
+        """
+        try:
+            from backend.core.model_config import smart_generate # type: ignore[import-untyped]
+            reply, _ = smart_generate(self.gemini_model, prompt, enable_reasoning=False)
+            return reply or "Stay safe and monitor local health feeds."
+        except Exception as e:
+            return f"Stay safe and monitor local health feeds. (Error: {str(e)})"

@@ -37,6 +37,23 @@ def render():
 
     with right_col:
         st.subheader("🧠 StAMP Intelligence Briefing")
+        
+        # --- PERSONALIZED DASHBOARD INSIGHT ---
+        if st.session_state.get("authenticated") and st.session_state.get("user_location"):
+            st.markdown("##### 🧬 Personalized Geo-Health Insight")
+            
+            if "dashboard_insight" not in st.session_state:
+                with st.spinner(f"Generating insight for {st.session_state.user_location}..."):
+                    res = api_client.get_dashboard_insight(
+                        st.session_state.token,
+                        st.session_state.user_location,
+                        f"Current StAMP Alert Count: {num_alerts}"
+                    )
+                    st.session_state.dashboard_insight = res.get("insight", "No insights available.")
+            
+            st.info(f"📍 **{st.session_state.user_location}**: {st.session_state.dashboard_insight}")
+            st.divider()
+
         briefing = api_client.get_latest_briefing()
         if briefing and "content" in briefing:
             st.markdown(briefing["content"])

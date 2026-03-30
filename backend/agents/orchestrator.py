@@ -172,6 +172,12 @@ Include: 1) Current Landscape 2) Critical Hotspots 3) Recommendation"""
             text, model_used = smart_generate(self.gemini_model, prompt, context="BriefingAgent")
             
             if text:
+                # Sanitize: strip any leaked reasoning traces before storing
+                import re
+                text = re.sub(r'\[Reasoning\].*?\[Response\]\s*', '', text, flags=re.DOTALL)
+                text = re.sub(r"\[?\{['\"]type['\"]:\s*['\"]reasoning\.text['\"].*?\}\]?", '', text, flags=re.DOTALL)
+                text = text.strip()
+                
                 snapshot = models.AutonomousSnapshot(
                     snapshot_type="daily_briefing",
                     content=text,

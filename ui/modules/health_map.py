@@ -44,13 +44,12 @@ def render():
     st.caption("Live outbreak signal visualisation — powered by real EBS alert data.")
     
     # --- Browser Geolocation (auto-center on user) ---
-    try:
-        import sys, os
-        sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-        from components.geolocation import render_location_picker
-        render_location_picker()
-    except Exception:
-        pass
+    user_lat = st.session_state.get("user_lat")
+    user_lon = st.session_state.get("user_lon")
+    user_loc = st.session_state.get("user_location")
+    
+    if user_lat and user_lon:
+        st.success(f"📍 Map centered on your location: **{user_loc or 'Detected'}**")
 
     # Fetch live alerts
     alerts = api_client.get_alerts()
@@ -133,9 +132,34 @@ def render():
         height=650,
         mapbox_style="carto-positron" # Light/White style
     )
+    # Determine map center: user location or default Lagos center
+    if user_lat and user_lon:
+        center_lat, center_lon = user_lat, user_lon
+        map_zoom = 12  # Closer zoom when we know user location
+        
+        # Add user position marker
+        import plotly.graph_objects as go
+        fig.add_trace(go.Scattermapbox(
+            lat=[user_lat],
+            lon=[user_lon],
+            mode='markers+text',
+            marker=go.scattermapbox.Marker(size=16, color='#3b82f6', symbol='circle'),
+            text=[f"📍 You ({user_loc or 'Your Location'})"],
+            textposition='top center',
+            name='Your Location',
+            showlegend=True
+        ))
+    else:
+        center_lat, center_lon = 6.5244, 3.3792  # Lagos center
+        map_zoom = 9.5
+    
     fig.update_layout(
         margin={"r": 0, "t": 0, "l": 0, "b": 0},
-        dragmode='pan'
+        dragmode='pan',
+        mapbox=dict(
+            center=dict(lat=center_lat, lon=center_lon),
+            zoom=map_zoom
+        )
     )
     st.plotly_chart(fig, use_container_width=True)
 

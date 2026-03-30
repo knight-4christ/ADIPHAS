@@ -186,8 +186,14 @@ def autonomous_monitoring_job():
             logger.error(f"Error in Phase 2 Autonomous cycles: {e}")
 
     except Exception as e:
-        log_activity("System", f"Error in monitoring job: {str(e)}")
-        db.rollback()
+        error_str = str(e)
+        if "UNIQUE constraint" in error_str or "duplicate key" in error_str:
+            # Duplicate URL — expected when re-scraping same articles
+            logger.warning(f"[System] Duplicate alert skipped (already in DB): {error_str[:80]}")
+            db.rollback()
+        else:
+            log_activity("System", f"Error in monitoring job: {error_str}")
+            db.rollback()
     finally:
         db.close()
 
@@ -264,18 +270,20 @@ async def start_scheduler():
     scheduler.start()
     logger.info("Background Scheduler started.")
     
-    # Self-healing database sweep
+    # Self-healing database sweep (SQLite-specific fixes)
+    from backend.database import is_sqlite
     db = database.SessionLocal()
     try:
-        db.execute(text("UPDATE ebs_alerts SET timestamp = REPLACE(timestamp, 'T', ' ') WHERE timestamp LIKE '%T%'"))
-        db.execute(text("UPDATE ebs_alerts SET created_at = REPLACE(created_at, 'T', ' ') WHERE created_at LIKE '%T%'"))
-        
-        # --- Add is_vectorized column if it doesn't exist (migration) ---
-        try:
-            db.execute(text("ALTER TABLE ebs_alerts ADD COLUMN is_vectorized BOOLEAN DEFAULT 0"))
-            logger.info("Migration: Added is_vectorized column to ebs_alerts.")
-        except Exception:
-            pass  # Column already exists
+        if is_sqlite:
+            db.execute(text("UPDATE ebs_alerts SET timestamp = REPLACE(timestamp, 'T', ' ') WHERE timestamp LIKE '%T%'"))
+            db.execute(text("UPDATE ebs_alerts SET created_at = REPLACE(created_at, 'T', ' ') WHERE created_at LIKE '%T%'"))
+            
+            # --- Add is_vectorized column if it doesn't exist (migration) ---
+            try:
+                db.execute(text("ALTER TABLE ebs_alerts ADD COLUMN is_vectorized BOOLEAN DEFAULT 0"))
+                logger.info("Migration: Added is_vectorized column to ebs_alerts.")
+            except Exception:
+                pass  # Column already exists
         
         db.commit()
     except Exception as e:
