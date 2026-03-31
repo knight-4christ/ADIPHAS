@@ -15,9 +15,9 @@ Nigeria's Integrated Disease Surveillance and Response (IDSR) framework is large
 
 ### 1.2 Objectives
 1.  **Autonomous Pipeline:** Harvest disease signals from 20+ authoritative sources using **Scrapling v0.4** with anti-bot bypass.
-2.  **Hybrid NLP:** Implement a local-first **spaCy** pipeline for high-speed entity extraction, refined by **Gemini Pro** for deep semantic analysis.
+2.  **Hybrid NLP & Sanitization:** Implement a local-first **spaCy** pipeline for high-speed extraction, refined by **Gemini 2.5 Flash** for deep semantic analysis, guarded by a deep regex sanitization layer to prevent AI reasoning trace (`<think>`) leakage.
 3.  **Knowledge Fusion:** Reconcile conflicting multi-source signals using the **Dempster-Shafer Theory of Evidence**.
-4.  **Role-Specific Intelligence:** Deliver actionable insights to Citizens (risk scores), Experts (verification cycles), and Admins (system diagnostics).
+4.  **Role-Specific & Location-Aware Intelligence:** Deliver actionable insights grounded by HTML5 Browser Geolocation (reverse-geocoding `lat`/`lon` to local LGAs) to dynamically generate personalised geo-health insights.
 5.  **Hybrid-RAG Advisory:** Ground AI responses in both local verified alerts (**Titan Vector Engine**) and global real-time context (**Tavily Search API**).
 6.  **AI Resilience:** Implement a **Universal Fallback Tier** (Gemini -> OpenRouter) to ensure 24/7 intelligence availability during API quota exhaustion.
 
@@ -26,10 +26,10 @@ Nigeria's Integrated Disease Surveillance and Response (IDSR) framework is large
 ## 2. System Architecture
 ### 2.1 High-Level Design
 ADIPHAS utilizes a four-layer architecture:
-1.  **Presentation Layer:** Streamlit-based dashboard with real-time log streaming and dark-mode aesthetics.
-2.  **Application Layer:** FastAPI backend managing JWT authentication, Resilient AI Failover, and Hybrid-RAG retrieval.
-3.  **Intelligence Agent Layer:** Multithreaded fleet (Scout, NLP, Fusion, StAMP Briefing Agent) running on an **APScheduler** background cycle.
-4.  **Persistence Layer:** **SQLite** for structured data and **Titan Vector Engine** (Vector Store) for epidemiological embeddings.
+1.  **Presentation Layer:** Streamlit-based dashboard featuring real-time log streaming, interactive heatmaps dynamically centered via HTML5 Browser Geolocation, and an explicit manual real-time bypass for StAMP sweeps.
+2.  **Application Layer:** FastAPI backend managing JWT authentication, Resilient AI Failover, data sanitization, and Hybrid-RAG retrieval.
+3.  **Intelligence Agent Layer:** Multithreaded fleet (Scout, NLP, Fusion, StAMP Briefing Agent) running continuously on a 15-minute **APScheduler** background cycle.
+4.  **Persistence Layer:** Hosted physically on **Neon Cloud PostgreSQL**, offering robust connection pooling to efficiently handle massive parallel read/writes from the multithreaded AI extractors, entirely eliminating the concurrency locks associated with embedded SQLite.
 
 ### 2.2 Local-First AI Strategy
 To ensure cost-efficiency and performance, ADIPHAS implements a tiered AI strategy:
@@ -72,7 +72,8 @@ The system features a **5-second TTL (Time-To-Live)** cache for high-frequency d
 The RAG pipeline utilizes a dual-path retrieval strategy:
 - **Local Path**: Verified EBS alerts and IDSR historical aggregates are indexed in the **Titan Vector Engine** for high-precision local context.
 - **Global Path**: If local data is insufficient or a query involves emerging global trends, the system triggers the **Tavily Search API** for real-time web context.
-- **StAMP Synthesis**: The **Situational Awareness & Monitoring Protocol (StAMP)** generates a daily strategic briefing by fusing these two paths with anomaly detection metrics, providing an executive summary for public health officials.
+- **StAMP Synthesis & Manual Bypass**: The **Situational Awareness & Monitoring Protocol (StAMP)** generates a daily strategic briefing by fusing these paths. To aid immediate incident investigation, experts can utilize the explicit "Force Real-time StAMP Sweep" bypass, directly commanding the pipeline to run instantaneous fresh reconnaissance outside standard scheduling boundaries.
+- **Reasoning Trace Sanitization**: All generative outputs are passed through a defensive 3-layer architecture (Generation, Storage, Serving) utilizing strict Regex algorithms to successfully strip any internal Chain-of-Thought (e.g., `<think>`) leakage produced by advanced reasoning models like DeepSeek.
 
 ### 4.3 Notification Infrastructure (Modular Status)
 The system includes modules for **SMS (Twilio)** and **Email (SMTP)** broadcasting. These are currently implemented as background utilities and can be activated for high-risk alerts (`risk_level == "High"`) once notification quotas are established.
@@ -80,13 +81,28 @@ The system includes modules for **SMS (Twilio)** and **Email (SMTP)** broadcasti
 ---
 
 ## 5. Summary of Achievements
--   **Accuracy:** Achieved $0.875$ micro-averaged F1 on representative health data.
--   **Efficiency:** Reduced LLM API calls by **95%** using local-first extraction and executive briefing caching (10-minute expiry).
--   **Robustness:** Scrapling integration ensures $100\%$ acquisition success for federal health agencies protected by anti-bot measures.
+-   **Concurrency & Data Integrity:** Replaced legacy sequential SQLite operations with high-availability **Neon PostgreSQL**, successfully eliminating connection locks under high NLP pipeline loads.
+-   **Accuracy & Integrity:** Achieved $0.875$ micro-averaged F1 on representative health data, while implementing complete sanitization protocols ensuring 100% public-ready briefing output free of raw model reasoning tokens.
+-   **Efficiency:** Reduced LLM API calls by **95%** using local-first extraction and caching, alongside the resilient Universal Fallback configuration.
+-   **Hyper-Personalization:** Connected browser-native HTML5 `navigator.geolocation` APIs with OpenStreetMap reverse geocoding to automatically center heatmaps and tailor instant epidemiological advisories based on the user's precise Local Government Area.
 
 ---
 
-## 6. References
+## 6. Limitations & Future Improvements
+### 6.1 Current System Limitations
+- **Geolocation Resolution Limits:** The current HTML5 reverse geocoding via OpenStreetMap relies on the accuracy of the user's device. Devices lacking GPS hardware (like some desktops) fall back to ISP-level IP coordinates, which may lack the specific Local Government Area (LGA) granularity required for hyper-local intelligence.
+- **LLM Quota Constraints:** The batch intelligence engine aggressively processes up to 50 raw articles concurrently. While highly efficient, this burst computation frequently exhausts free-tier Gemini API token limits (429 errors), requiring the fallback systems to engage secondary API networks.
+- **Anti-Bot Firewalls:** High-profile news portals (such as *Vanguard* and *The Guardian*) deploy unpredictable dynamic firewalls that can occasionally repel the `Scrapling` instances, leading to temporary data acquisition gaps from those specific nodes.
+
+### 6.2 Scalability and Future Work
+1. **Two-Way WhatsApp Integration:** Transitioning from the current one-way Twilio SMS alerting to a full two-way WhatsApp Business API. This would allow citizens to conversationally report symptoms into the system, crowdsourcing intelligence in real-time.
+2. **Federated Learning on Edge:** Implementing a feedback loop on the Expert Dashboard where experts can correct mislabeled diseases. These corrections would be used to autonomously fine-tune the local spaCy NER algorithms without exposing raw patient data.
+3. **Meteorological Data Fusion:** Integrating real-time climatic and satellite data (e.g., abnormal rainfall/flooding metrics) into the Dempster-Shafer fusion algorithms to predict water-borne outbreaks like Cholera *before* the first clinical case is ever reported.
+4. **Decentralized Node Architecture:** Refactoring the monolithic FastApi NLP engine into distributed serverless edge-nodes, allowing ADIPHAS to scale horizontally from a State-level command center into a complete National Digital Health Grid.
+
+---
+
+## 7. References
 -   Brownstein, J. S., et al. (2009). Digital Disease Detection. *New England Journal of Medicine*.
 -   Lewis, P., et al. (2020). Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks. *NeurIPS*.
 -   World Health Organisation. (2014). Early Detection and Event-Based Surveillance. *WHO Press*.

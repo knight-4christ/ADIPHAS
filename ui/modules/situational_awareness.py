@@ -57,7 +57,12 @@ def render():
         briefing = api_client.get_latest_briefing()
         if briefing and "content" in briefing:
             st.markdown(briefing["content"])
-            st.caption(f"Generated at: {briefing.get('generated_at', 'N/A')}")
+            try:
+                # Convert ISO string "2026-03-30T23:17:56.509344" to friendly "Mar 30, 2026 - 11:17 PM"
+                dt = pd.to_datetime(briefing.get('generated_at', ''))
+                st.caption(f"Generated at: {dt.strftime('%b %d, %Y - %I:%M %p')}")
+            except Exception:
+                st.caption(f"Generated at: {briefing.get('generated_at', 'N/A')}")
         else:
             st.info("🛰️ Generating next autonomous briefing... check back in a few minutes.")
             

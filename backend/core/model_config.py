@@ -10,7 +10,6 @@ logger = logging.getLogger(__name__)
 MODEL_CHAIN = [
     "gemini-2.0-flash",
     "gemini-2.5-flash",
-    "gemini-2.5-flash-8b",
 ]
 
 class ModelState:
@@ -23,10 +22,10 @@ _state = ModelState()
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
-# OpenRouter Free Model Chain (Verified active as of 2026-03-17)
+# OpenRouter Free Model Chain (Verified active as of 2026-03-31)
 # Includes reasoning-capable models for advanced analysis
 OPENROUTER_CHAIN = [
-    "openrouter/hunter-alpha",
+    "xiaomi/mimo-v2-pro",
     "stepfun/step-3.5-flash:free",
     "mistralai/mistral-small-3.1-24b-instruct:free",
     "google/gemma-3-27b-it:free",
