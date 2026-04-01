@@ -1,7 +1,7 @@
 from bs4 import BeautifulSoup  # type: ignore[import-untyped,import-not-found]
 from datetime import datetime
 import httpx  # type: ignore[import-untyped,import-not-found]
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List
 import logging
 import time
 import xml.etree.ElementTree as ET

@@ -81,10 +81,11 @@ def check_wellness(payload: dict, current_user: models.User = Depends(get_curren
 
 @router.get("/search")
 @limiter.limit("10/minute") # Rate limit added
-def advisory_search(request: Request, query: str, k: int = Query(3)):
+def advisory_search(request: Request, query: str, k: int = Query(3), force_combine: bool = Query(True)):
     """
     Hybrid RAG Search: Vector Store first, then Tavily.
+    When force_combine=True (default), both local RAG and live web results are returned.
     """
     vm = get_vector_manager()
-    result = vm.hybrid_search(query, k=k)
+    result = vm.hybrid_search(query, k=k, force_combine=force_combine)
     return result

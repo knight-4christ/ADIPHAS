@@ -1,7 +1,7 @@
 import numpy as np  # type: ignore[import-untyped]
 import math
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 class AlertingEngine:
     """

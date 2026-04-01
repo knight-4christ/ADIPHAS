@@ -72,32 +72,41 @@ class OrchestratorAgent:
         
         logger.info("Starting Realtime Intelligence Cycle (Tavily)...")
         
-        # Targeted disease queries for Lagos/Nigeria
+        # Dynamic date-aware queries for Lagos/Nigeria
+        now = datetime.utcnow()
+        current_year = now.year
+        current_month = now.strftime("%B")  # e.g. "April"
+        
         queries = [
-            "disease outbreak Lagos Nigeria 2026",
-            "cholera malaria lassa fever Nigeria latest",
+            f"disease outbreak Lagos Nigeria {current_month} {current_year}",
+            f"cholera malaria lassa fever Nigeria latest {current_year}",
             "epidemic health emergency Nigeria today",
         ]
         
         all_results: List[str] = []
         try:
-            from langchain_community.tools.tavily_search import TavilySearchResults  # type: ignore[import-untyped]
-            web_search = TavilySearchResults(api_key=tavily_key, max_results=3)
+            from langchain_tavily import TavilySearch  # type: ignore[import-untyped]
+            web_search = TavilySearch(tavily_api_key=tavily_key, max_results=3)
             
             for query in queries:
                 try:
-                    results = web_search.run(query)
-                    if isinstance(results, list):
-                        for r in results:
-                            content = r.get("content") or r.get("snippet") or str(r)
-                            url = r.get("url", "")
-                            all_results.append(f"- {str(content)[:200]} ({url})")  # type: ignore[index]
-                    elif isinstance(results, str):
-                        all_results.append(f"- {results[:300]}")  # type: ignore[index]
+                    raw_response = web_search.invoke(query)
+                    # New TavilySearch returns a dict with 'results' key
+                    if isinstance(raw_response, dict):
+                        results = raw_response.get("results", [])
+                    elif isinstance(raw_response, list):
+                        results = raw_response
+                    else:
+                        results = []
+                    
+                    for r in results:
+                        content = r.get("content") or r.get("snippet") or str(r)
+                        url = r.get("url", "")
+                        all_results.append(f"- {str(content)[:200]} ({url})")  # type: ignore[index]
                 except Exception as e:
                     logger.warning(f"Tavily query failed for '{query}': {e}")
         except ImportError:
-            logger.error("langchain_community not installed — Tavily search unavailable.")
+            logger.error("langchain_tavily not installed — Tavily search unavailable.")
             return
         
         if not all_results:
@@ -159,6 +168,7 @@ class OrchestratorAgent:
         rt_ctx = realtime_snap.content[:500] if realtime_snap else "No web intelligence available"
         
         prompt = f"""Generate a concise situational briefing (Markdown) for health officials.
+Today's Date: {datetime.now().strftime('%B %d, %Y')}
 DB Signals:
 {alert_ctx}
 Anomalies:

@@ -20,7 +20,7 @@ def render(is_overlay=False):
         return
 
     # 2. Main Chat Panel - Consolidated Header
-    header_col1, header_col2, header_col3 = st.columns([2, 1, 1])
+    header_col1, header_col2, header_col3, header_col4 = st.columns([2, 1, 0.7, 0.8])
     
     with header_col1:
         # Use a selectbox for thread switching instead of sidebar radio
@@ -53,6 +53,9 @@ def render(is_overlay=False):
         )
     
     with header_col3:
+        web_search_on = st.toggle("🌐 Web", value=True, help="Include live internet results via Tavily")
+    
+    with header_col4:
         if st.button("➕ New Chat", use_container_width=True):
             new_id = str(uuid.uuid4())[:8]
             st.session_state.chat_threads[new_id] = {
@@ -120,19 +123,26 @@ def render(is_overlay=False):
 
         # Stream AI Response
         with st.chat_message("assistant"):
-            with st.spinner("Retrieving local & global intelligence..."):
-                # Hybrid RAG Context Retrieval
-                rag_res = api_client.advisory_search(user_input)
+            with st.spinner("🔍 Retrieving local & global intelligence..." if web_search_on else "🔍 Searching local knowledge base..."):
+                # Hybrid RAG Context Retrieval (force_combine toggled by Web Search switch)
+                rag_res = api_client.advisory_search(user_input, force_combine=web_search_on)
                 context_str = ""
+                source = "unknown"
+                results = []
                 if rag_res and not rag_res.get("error"):
                     source = rag_res.get("source", "unknown")
                     results = rag_res.get("results", [])
                     if results:
                         context_str = "\n\n[CONTEXT FROM ADIPHAS INTELLIGENCE]\n"
-                        for r in results[:3]:
+                        for r in results[:5]:
                             c = r.get("content") or r.get("snippet") or str(r)
                             context_str += f"- {c}\n"
-                        context_str += "\nUse the above context to inform your response if relevant. Refine your advice based on these real-time signals."
+                        if source == "combined":
+                            context_str += "\nThe above includes BOTH local disease surveillance data AND live internet intelligence. Use all available context to inform your response."
+                        elif source == "web_search":
+                            context_str += "\nThe above is from LIVE internet sources. Use these real-time signals to inform your response."
+                        else:
+                            context_str += "\nThe above is from the local ADIPHAS knowledge base. Use it to inform your response if relevant."
 
                 try:
                     # Determine reasoning mode
@@ -156,11 +166,25 @@ def render(is_overlay=False):
                     reply = f"⚠️ Chat system error: {str(e)}"
             st.markdown(reply)
             if context_str:
-                with st.expander("📚 Sources Used (RAG)"):
-                    st.caption(f"Source: {source.upper()}")
+                # Label sources clearly
+                source_labels = {
+                    "combined": "🌐 Combined (Local RAG + Live Web)",
+                    "web_search": "🌐 Live Web Intelligence (Tavily)",
+                    "local_rag": "📁 Local Knowledge Base (RAG)",
+                    "local_rag_fallback": "📁 Local Knowledge Base (Fallback)",
+                }
+                source_label = source_labels.get(source, f"Source: {source.upper()}")
+                
+                with st.expander(f"📚 Sources Used — {source_label}"):
+                    st.caption(f"Retrieved at {datetime.now().strftime('%H:%M:%S on %b %d, %Y')}")
                     if results:
-                        for r in results[:3]:
-                            st.write(r.get("content") or r.get("snippet") or str(r))
+                        for r in results[:5]:
+                            content = r.get("content") or r.get("snippet") or str(r)
+                            url = r.get("url", "")
+                            if url:
+                                st.markdown(f"🔗 [{url}]({url})")
+                            st.write(content[:300] + "..." if len(str(content)) > 300 else content)
+                            st.divider()
 
         active_thread["messages"].append({"role": "assistant", "content": reply})
         if not is_overlay: st.rerun() # Rerun to update the sidebar title if it changed

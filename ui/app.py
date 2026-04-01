@@ -7,7 +7,7 @@ load_dotenv()  # Loads .env for UI process (e.g. GEMINI_API_KEY for chat)
 
 # Import new modules
 from modules import (
-    auth, home, local_feed, idsr_analytics, 
+    auth, local_feed, idsr_analytics, 
     ebs_alerts, health_map, personal_alerts, 
     health_profile, admin, chat, evaluation,
     situational_awareness, geolocation
@@ -83,7 +83,6 @@ def main():
     text_color = "#E2E8F0"    # Light Grey
     secondary_text = "#94A3B8"
     sidebar_bg = "#1C3C3C"    # Launchpad Dark Teal
-    card_bg = "#162222"       # Slightly lighter for cards
     
     # --- GLOBAL STYLING ---
     st.markdown(f"""

@@ -125,9 +125,9 @@ def get_idsr_history(lga_code=None, disease=None):
     if disease:
         params["disease"] = disease
     return _safe_request("GET", f"{API_URL}/api/data/idsr_history", params=params)
-def advisory_search(query, k=3):
+def advisory_search(query, k=3, force_combine=True):
     """Performs a Hybrid RAG search (Chroma + Tavily) via the backend."""
-    return _safe_request("GET", f"{API_URL}/api/advisory/search", params={"query": query, "k": k})
+    return _safe_request("GET", f"{API_URL}/api/advisory/search", params={"query": query, "k": k, "force_combine": force_combine})
 
 def advisory_chat(messages, token, enable_reasoning=False, context="", location=""):
     """Sends chat history and search context to the backend for bio-aware reasoning."""
@@ -176,7 +176,3 @@ def get_model_status():
 def get_latest_briefing():
     """Returns the most recent system-wide autonomous briefing snapshot."""
     return _safe_request("GET", f"{API_URL}/system/briefing")
-
-def get_autonomous_forecasts():
-    """Returns all pre-calculated autonomous forecasts and anomalies."""
-    return _safe_request("GET", f"{API_URL}/api/system/forecasts")
