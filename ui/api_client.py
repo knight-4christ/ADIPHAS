@@ -51,13 +51,14 @@ def scrape_news():
 def fuse_intelligence(reports):
     return _safe_request("POST", f"{API_URL}/api/intelligence/fuse", json=reports)
 
-def register(username, password, email=None, full_name=None, role="CITIZEN"):
+def register(username, password, email=None, full_name=None, role="CITIZEN", location_lga=None):
     payload = {
         "username": username,
         "password": password,
         "email": email,
         "full_name": full_name,
-        "role": role
+        "role": role,
+        "location_lga": location_lga
     }
     return _safe_request("POST", f"{API_URL}/api/auth/register", json=payload)
 

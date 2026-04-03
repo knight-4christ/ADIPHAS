@@ -64,6 +64,7 @@ def render_login_modal():
                                 st.error("Invalid credentials.")
         
         with tab2:
+            st.info("📍 Your location will be automatically fetched and securely saved upon sign up.")
             with st.form("signup_form"):
                 new_user = st.text_input("Desired Username")
                 new_email = st.text_input("Email Address")
@@ -77,8 +78,9 @@ def render_login_modal():
                     if not new_user or not new_pass or not new_email:
                         st.error("Please fill in all required fields.")
                     else:
-                        with st.spinner("Creating account..."):
-                            res = api_client.register(new_user, new_pass, new_email, new_full_name, new_role)
+                        with st.spinner("Creating account & fetching location..."):
+                            user_loc = st.session_state.get('user_location')
+                            res = api_client.register(new_user, new_pass, new_email, new_full_name, new_role, user_loc)
                             if "id" in res:
                                 st.success("Account created successfully! Please switch to the Login tab.")
                             else:

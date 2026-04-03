@@ -264,7 +264,15 @@ def main():
             # User profile widget
             st.divider()
             st.write(f"👤 **{st.session_state.user['username']}**")
+            
+            # Determine global location
+            profile_loc = st.session_state.user.get('location_lga') or st.session_state.user.get('state')
+            detected_loc = st.session_state.get('user_location')
+            loc_val = detected_loc if detected_loc else profile_loc
+            st.session_state.global_location = loc_val if loc_val else "Unknown Location"
+            
             st.caption(f"Role: {user_role} | ID: {st.session_state.user.get('id', 'Unknown')[:8]}")
+            st.caption(f"📍 {st.session_state.global_location}")
             st.divider()
             
             if st.button("Logout", key="logout_btn", use_container_width=True):
