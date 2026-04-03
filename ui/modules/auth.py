@@ -48,8 +48,15 @@ def render_login_modal():
                                 me = api_client.get_me(token)
                                 if "username" in me:
                                     st.session_state.user = me
-                                    st.success(f"Welcome back, {me['username']}!")
-                                    time.sleep(0.5)
+                                    
+                                    # Get user location (detected or profile)
+                                    detected_loc = st.session_state.get('user_location')
+                                    profile_loc = me.get('location_lga') or me.get('state')
+                                    loc = detected_loc if detected_loc else profile_loc
+                                    loc_msg = f" | Location: {loc}" if loc else ""
+                                    
+                                    st.success(f"Welcome back, {me['username']}!{loc_msg}")
+                                    time.sleep(1.2)
                                     st.rerun()
                                 else:
                                     st.error("Failed to load profile.")
