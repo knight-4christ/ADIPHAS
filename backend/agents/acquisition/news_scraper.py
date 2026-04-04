@@ -6,6 +6,7 @@ import logging
 import time
 import xml.etree.ElementTree as ET
 import re
+from scrapling import Fetcher  # type: ignore[import-untyped]
 
 logger = logging.getLogger(__name__)
 
@@ -259,23 +260,24 @@ class NewsScraperAgent:
         return results
 
     def _scrape_html(self, source: dict) -> list:
-        """Scrape HTML using robust httpx.
-        Sites that block or time out are skipped to prevent backend hangs.
+        """Scrape HTML using Scrapling Fetcher for stealth.
+        Sites that block or time out are handled via browser impersonation.
         """
         page = None
         try:
-            headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                "AcceptLanguage": "en-US,en;q=0.9",
-            }
-            with httpx.Client(timeout=20, verify=False, follow_redirects=True) as client:
-                res = client.get(source["url"], headers=headers)
-                res.raise_for_status()
-                # Parse the HTML with native BeautifulSoup
-                page = BeautifulSoup(res.text, "lxml")
+            # Scrapling Fetcher uses curl-cffi for impersonation and stealthy headers by default
+            fetcher = Fetcher()
+            res = fetcher.get(source["url"], timeout=20, follow_redirects=True)
+            
+            if res.status != 200:
+                logger.warning(f"[Scraper] {source['name']} returned status {res.status}")
+                return []
                 
+            # Parse the HTML with native BeautifulSoup from Scrapling's response text
+            page = BeautifulSoup(res.text, "lxml")
+            
         except Exception as err:
-            logger.warning(f"[Scraper] Failed to fetch {source['name']}: {err}")
+            logger.warning(f"[Scraper] Failed to fetch {source['name']} via Scrapling: {err}")
             return []
 
         extracted = []
