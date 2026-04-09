@@ -79,30 +79,34 @@ def delete_user(user_id: str, db: Session = Depends(get_db), current_user: model
 @router.post("/api/auth/register", response_model=schemas.UserOut)
 @limiter.limit("5/minute") # Protect registration from brute-force
 def register(request: Request, user: schemas.UserCreate, db: Session = Depends(get_db)):
-    db_user = db.query(models.User).filter(models.User.username == user.username).first()
-    if db_user:
-        raise HTTPException(status_code=400, detail="Username already registered")
+    try:
+        db_user = db.query(models.User).filter(models.User.username == user.username).first()
+        if db_user:
+            raise HTTPException(status_code=400, detail="Username already registered")
+            
+        if user.email:
+            db_email = db.query(models.User).filter(models.User.email == user.email).first()
+            if db_email:
+                raise HTTPException(status_code=400, detail="Email already registered")
         
-    if user.email:
-        db_email = db.query(models.User).filter(models.User.email == user.email).first()
-        if db_email:
-            raise HTTPException(status_code=400, detail="Email already registered")
-    
-    hashed_pwd = auth_utils.get_password_hash(user.password)
-    new_user = models.User(
-        username=user.username,
-        email=user.email,
-        full_name=user.full_name,
-        role="CITIZEN",  # Force default role, prevent client privilege escalation
-        location_lga=user.location_lga,
-        genotype=user.genotype,
-        blood_group=user.blood_group,
-        hashed_password=hashed_pwd
-    )
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-    return new_user
+        hashed_pwd = auth_utils.get_password_hash(user.password)
+        new_user = models.User(
+            username=user.username,
+            email=user.email,
+            full_name=user.full_name,
+            role="CITIZEN",
+            location_lga=user.location_lga,
+            genotype=user.genotype,
+            blood_group=user.blood_group,
+            hashed_password=hashed_pwd
+        )
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+        return new_user
+    except Exception as e:
+        import traceback
+        raise HTTPException(status_code=500, detail=f"Registration crash: {str(e)}\n\n{traceback.format_exc()}")
 
 @router.post("/api/auth/login", response_model=schemas.Token)
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
