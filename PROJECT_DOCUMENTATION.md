@@ -28,8 +28,8 @@ Nigeria's Integrated Disease Surveillance and Response (IDSR) framework is large
 ADIPHAS utilizes a four-layer architecture:
 1.  **Presentation Layer:** Streamlit-based dashboard featuring real-time log streaming, interactive heatmaps dynamically centered via HTML5 Browser Geolocation, and an explicit manual real-time bypass for StAMP sweeps.
 2.  **Application Layer:** FastAPI backend managing JWT authentication, Resilient AI Failover, data sanitization, and Hybrid-RAG retrieval.
-3.  **Intelligence Agent Layer:** Multithreaded fleet (Scout, NLP, Fusion, StAMP Briefing Agent) running continuously on a 15-minute **APScheduler** background cycle.
-4.  **Persistence Layer:** Hosted physically on **Neon Cloud PostgreSQL**, offering robust connection pooling to efficiently handle massive parallel read/writes from the multithreaded AI extractors, entirely eliminating the concurrency locks associated with embedded SQLite.
+3.  **Intelligence Agent Layer:** Multithreaded fleet (Scout, NLP, Fusion, StAMP Briefing Agent) running continuously on a **2-hour APScheduler** background cycle, optimised to maximise intelligence coverage within free-tier API rate limits.
+4.  **Persistence Layer:** Hosted physically on **Neon Cloud PostgreSQL**, offering robust connection pooling (`pool_size=10`, `max_overflow=20`, `pool_pre_ping=True`) to efficiently handle massive parallel read/writes from the multithreaded AI extractors, entirely eliminating the concurrency locks associated with embedded SQLite.
 
 ### 2.2 Local-First AI Strategy
 To ensure cost-efficiency and performance, ADIPHAS implements a tiered AI strategy:
@@ -65,25 +65,50 @@ Where $w_i \in \{0.2, 0.3, 0.5\}$ favor recent data. Model accuracy is audited u
 ---
 
 ## 4. Implementation Details
-### 4.1 Real-Time Metrics & Caching
+### 4.1 Production Deployment Architecture
+ADIPHAS is deployed on a **split-cloud architecture** designed for cost-efficiency and reliability:
+-   **Backend (FastAPI):** Hosted on **Render** as a Native Python 3.11 Web Service, running `uvicorn backend.main:app` with automatic builds from the GitHub `master` branch.
+-   **Frontend (Streamlit):** Hosted on **Streamlit Community Cloud**, reading the backend URL from `st.secrets` to route all API calls to the Render instance.
+-   **Database:** Hosted on **Neon PostgreSQL** (serverless), connected via `DATABASE_URL` with `psycopg2-binary` and SQLAlchemy connection pooling.
+-   **Keep-Alive:** A cron job (via [cron-job.org](https://cron-job.org)) pings the `/healthcheck` endpoint every 14 minutes to prevent Render free-tier spin-down.
+
+### 4.2 Authentication & Security
+The authentication system implements several hardened security measures:
+-   **Password Hashing:** Uses **native `bcrypt`** (not `passlib`) to avoid the known 72-byte wrap detection bug that crashes `passlib` on modern `bcrypt>=4.x` backends. Passwords are hashed via `bcrypt.hashpw()` with auto-generated salts.
+-   **JWT Tokens:** Signed using `HS256` with a cryptographically random `SECRET_KEY` (environment variable). Tokens expire after 30 minutes.
+-   **Rate Limiting:** Registration endpoint is protected with `slowapi` at 5 requests/minute to prevent brute-force account creation.
+-   **Role-Based Access Control (RBAC):** Three-tier role hierarchy (`CITIZEN < EXPERT < ADMIN`) enforced at the router level via dependency injection.
+
+### 4.3 Real-Time Metrics & Caching
 The system features a **5-second TTL (Time-To-Live)** cache for high-frequency dashboard metrics. It calculates cumulative daily totals for scraped articles and new signals, preventing database lockups during concurrent role access.
 
-### 4.2 Hybrid-RAG and Strategic Intelligence
+### 4.4 Hybrid-RAG and Strategic Intelligence
 The RAG pipeline utilizes a dual-path retrieval strategy:
 - **Local Path**: Verified EBS alerts and IDSR historical aggregates are indexed in the **Titan Vector Engine** for high-precision local context.
 - **Global Path**: If local data is insufficient or a query involves emerging global trends, the system triggers the **Tavily Search API** for real-time web context.
 - **StAMP Synthesis & Manual Bypass**: The **Situational Awareness & Monitoring Protocol (StAMP)** generates a daily strategic briefing by fusing these paths. To aid immediate incident investigation, experts can utilize the explicit "Force Real-time StAMP Sweep" bypass, directly commanding the pipeline to run instantaneous fresh reconnaissance outside standard scheduling boundaries.
 - **Reasoning Trace Sanitization**: All generative outputs are passed through a defensive 3-layer architecture (Generation, Storage, Serving) utilizing strict Regex algorithms to successfully strip any internal Chain-of-Thought (e.g., `<think>`) leakage produced by advanced reasoning models like DeepSeek.
 
-### 4.3 Notification Infrastructure (Modular Status)
+### 4.5 AI Model Resilience & Universal Fallback
+ADIPHAS implements a **three-tier AI resilience architecture** to guarantee 24/7 intelligence availability:
+1.  **Tier 1 — Native Gemini Chain:** Primary models (`gemini-2.0-flash` → `gemini-2.5-flash`) with automatic failover on 429/503 errors.
+2.  **Tier 2 — OpenRouter Free Chain:** Nine verified free models including `Gemma 4 31B`, `Nemotron 3 120B`, `Qwen3 Coder 480B`, `GPT-OSS 120B`, `Hermes 405B`, and others, providing massive redundancy.
+3.  **Tier 3 — Rule-Based Fallback:** When all AI paths are exhausted, the system generates statistical summaries from raw database aggregates, ensuring the dashboard never displays blank intelligence panels.
+
+The background scheduler interval is set to **120 minutes (2 hours)** to optimise intelligence coverage within the free-tier rate limits (~50 requests/day on OpenRouter).
+
+### 4.6 Notification Infrastructure (Modular Status)
 The system includes modules for **SMS (Twilio)** and **Email (SMTP)** broadcasting. These are currently implemented as background utilities and can be activated for high-risk alerts (`risk_level == "High"`) once notification quotas are established.
 
 ---
 
 ## 5. Summary of Achievements
--   **Concurrency & Data Integrity:** Replaced legacy sequential SQLite operations with high-availability **Neon PostgreSQL**, successfully eliminating connection locks under high NLP pipeline loads.
+-   **Production Deployment:** Successfully deployed a fully operational split-cloud architecture (Render + Streamlit Cloud + Neon PostgreSQL) accessible at `https://adiphas.streamlit.app`.
+-   **Concurrency & Data Integrity:** Replaced legacy sequential SQLite operations with high-availability **Neon PostgreSQL**, successfully eliminating connection locks under high NLP pipeline loads. Implemented automatic primary key sequence repair tooling for SQLite-to-PostgreSQL migrations.
 -   **Accuracy & Integrity:** Achieved $0.875$ micro-averaged F1 on representative health data, while implementing complete sanitization protocols ensuring 100% public-ready briefing output free of raw model reasoning tokens.
--   **Efficiency:** Reduced LLM API calls by **95%** using local-first extraction and caching, alongside the resilient Universal Fallback configuration.
+-   **AI Resilience:** Built a **12-model deep fallback chain** (2 Gemini native + 9 OpenRouter free + 1 rule-based) ensuring intelligence generation even under complete API quota exhaustion. Removed dead model endpoints (`stepfun`, `mistral-small-3.1`, `xiaomi/mimo-v2-pro`) that were wasting API calls.
+-   **Efficiency:** Reduced LLM API calls by **95%** using local-first extraction and caching. Optimised the background scheduler from 15-minute to 2-hour intervals to sustainably operate within free-tier API budgets.
+-   **Security Hardening:** Replaced the vulnerable `passlib` password hashing library with native `bcrypt` to resolve the 72-byte wrap detection crash. Implemented server-side error logging with clean user-facing error messages.
 -   **Hyper-Personalization:** Connected browser-native HTML5 `navigator.geolocation` APIs with OpenStreetMap reverse geocoding to automatically center heatmaps and tailor instant epidemiological advisories based on the user's precise Local Government Area.
 
 ---
@@ -91,8 +116,10 @@ The system includes modules for **SMS (Twilio)** and **Email (SMTP)** broadcasti
 ## 6. Limitations & Future Improvements
 ### 6.1 Current System Limitations
 - **Geolocation Resolution Limits:** The current HTML5 reverse geocoding via OpenStreetMap relies on the accuracy of the user's device. Devices lacking GPS hardware (like some desktops) fall back to ISP-level IP coordinates, which may lack the specific Local Government Area (LGA) granularity required for hyper-local intelligence.
-- **LLM Quota Constraints:** The batch intelligence engine aggressively processes up to 50 raw articles concurrently. While highly efficient, this burst computation frequently exhausts free-tier Gemini API token limits (429 errors), requiring the fallback systems to engage secondary API networks.
+- **LLM Quota Constraints:** The batch intelligence engine aggressively processes up to 50 raw articles concurrently. While highly efficient, this burst computation frequently exhausts free-tier Gemini API token limits (429 errors), requiring the fallback systems to engage secondary API networks. The current 2-hour scheduler interval is a pragmatic compromise between intelligence freshness and free-tier sustainability.
 - **Anti-Bot Firewalls:** High-profile news portals (such as *Vanguard* and *The Guardian*) deploy unpredictable dynamic firewalls that can occasionally repel the `Scrapling` instances, leading to temporary data acquisition gaps from those specific nodes.
+- **Render Free Tier Constraints:** The Render free tier spins down after 15 minutes of inactivity, requiring an external keep-alive cron job. Cold starts take 30-60 seconds, during which the first user request may timeout.
+- **Gemini Embedding Regional Restrictions:** The Gemini Embedding API returns `FAILED_PRECONDITION: User location is not supported` from certain server regions. The system auto-falls back to OpenRouter's `nvidia/llama-nemotron-embed-vl-1b-v2:free` for vector embeddings.
 
 ### 6.2 Scalability and Future Work
 1. **Two-Way WhatsApp Integration:** Transitioning from the current one-way Twilio SMS alerting to a full two-way WhatsApp Business API. This would allow citizens to conversationally report symptoms into the system, crowdsourcing intelligence in real-time.

@@ -4,9 +4,10 @@
   # ADIPHAS
   ### Autonomous Disease Intelligence & Personal Health Advisory System
   
-  [![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
-  [![FastAPI](https://img.shields.io/badge/FastAPI-v0.100%2B-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+  [![Python](https://img.shields.io/badge/Python-3.11-blue?logo=python&logoColor=white)](https://www.python.org/)
+  [![FastAPI](https://img.shields.io/badge/FastAPI-v0.109-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
   [![Streamlit](https://img.shields.io/badge/Streamlit-v1.30%2B-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io/)
+  [![Live](https://img.shields.io/badge/Live-adiphas.streamlit.app-00C9A7)](https://adiphas.streamlit.app)
   [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE.txt)
 </div>
 
@@ -50,13 +51,12 @@ graph TD
 
 ## 🛠 Installation & Setup
 
-### 🐳 Docker Deployment (Recommended)
-Host the entire stack (FastAPI, Streamlit, PostgreSQL) with a single command:
-```bash
-docker-compose up --build -d
-```
+### 🌐 Live Production Instance
+ADIPHAS is deployed and accessible at:
+- **Frontend:** [adiphas.streamlit.app](https://adiphas.streamlit.app)
+- **Backend API:** [adiphas.onrender.com](https://adiphas.onrender.com/healthcheck)
 
-### 🚀 Quick Start
+### 🚀 Quick Start (Local Development)
 The easiest way to run the entire hybrid system (Backend, Frontend, and Autonomous Agents) locally:
 
 1. **Clone & Configure**:
@@ -98,15 +98,19 @@ ADIPHAS includes dedicated scripts to demonstrate its capabilities during live d
 1. **Verify Real Epidemiological Seed Data**:
    - Access the *Predictive Modeling* tab in the UI to view real 2024/2025 NCDC trajectories for Cholera and Lassa Fever.
 2. **Observe Autonomous Cycles**:
-   - Watch the terminal running `start_adiphas.ps1` to see the Orchestrator, Scraper, and NLP processor actively categorizing new intelligence globally every 15 minutes.
+   - Watch the terminal running `start_adiphas.ps1` to see the Orchestrator, Scraper, and NLP processor actively categorizing new intelligence globally every 2 hours.
 3. **Test the LLM Fallback Engine**:
-   - ADIPHAS features a proprietary robust fallback mechanism (`model_config.py`). If the primary Gemini model is rate-limited, it automatically swerves down the chain to fallback models to keep the system alive without crashing.
+   - ADIPHAS features a proprietary robust fallback mechanism (`model_config.py`). If the primary Gemini model is rate-limited, it automatically swerves through a chain of **9 free OpenRouter models** (Gemma 4, Nemotron 3, Qwen3-Coder, GPT-OSS, Hermes 405B, and more) to keep the system alive without crashing.
 
 ---
 
 ## ⚠️ Important Considerations for Production
 
-- **Database Concurrency**: ADIPHAS currently uses SQLite by default for easy setup. However, under high concurrency (many simultaneous UI users + background intelligence agents running), SQLite may encounter `database is locked` errors. For production deployments, it is **highly recommended** to migrate the database `DATABASE_URL` in the `.env` file to PostgreSQL.
+- **Database:** ADIPHAS uses **Neon PostgreSQL** in production. For local development, it falls back to SQLite automatically if `DATABASE_URL` is not set.
+- **Authentication:** Password hashing uses native `bcrypt` (not `passlib`). The `SECRET_KEY` environment variable is mandatory.
+- **AI Budget:** The scheduler runs every 2 hours to stay within free-tier API limits. Add OpenRouter credits ($5-10) for higher frequency.
+- **Keep-Alive:** Render free tier requires a cron job pinging `/healthcheck` every 14 minutes.
+- **Full deployment details:** See **[Deployment Guide](./DEPLOYMENT_GUIDE.md)**.
 
 ---
 
