@@ -116,31 +116,45 @@ def render():
                         "Type": ["Historical"]*hist_len + ["Forecast"]*fcst_len
                     })
 
-                    fig = px.line(chart_data, x="Date", y="Cases", color="Type", markers=True,
-                                 template="plotly_dark",
-                                 color_discrete_map={"Historical": "#94a3b8", "Forecast": "#0ea5e9"})
-                    
-                    # Add confidence intervals
-                    fig.add_trace(go.Scatter(
-                        x=chart_data[chart_data["Type"] == "Forecast"]["Date"],
-                        y=chart_data[chart_data["Type"] == "Forecast"]["Upper CI"],
-                        fill=None, mode='lines', line_color='rgba(14, 165, 233, 0)', showlegend=False
-                    ))
-                    fig.add_trace(go.Scatter(
-                        x=chart_data[chart_data["Type"] == "Forecast"]["Date"],
-                        y=chart_data[chart_data["Type"] == "Forecast"]["Lower CI"],
-                        fill='tonexty', mode='lines', line_color='rgba(14, 165, 233, 0)',
-                        fillcolor='rgba(14, 165, 233, 0.2)', name='95% Confidence Interval'
-                    ))
-                    
-                    fig.update_layout(
-                        margin=dict(l=20, r=20, t=40, b=20),
-                        paper_bgcolor='rgba(0,0,0,0)',
-                        plot_bgcolor='rgba(0,0,0,0)',
-                        font=dict(family="Inter, sans-serif", size=12, color="#94a3b8"),
-                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-                    )
-                    st.plotly_chart(fig, width='stretch')
+                    # Only chart if we have valid data
+                    if hist_vals and preds and len(chart_data) > 0:
+                        # Build color map only for types actually present
+                        present_types = chart_data["Type"].unique().tolist()
+                        color_map = {}
+                        if "Historical" in present_types:
+                            color_map["Historical"] = "#94a3b8"
+                        if "Forecast" in present_types:
+                            color_map["Forecast"] = "#0ea5e9"
+
+                        fig = px.line(chart_data, x="Date", y="Cases", color="Type", markers=True,
+                                     template="plotly_dark",
+                                     color_discrete_map=color_map)
+                        
+                        # Add confidence intervals
+                        forecast_mask = chart_data["Type"] == "Forecast"
+                        if forecast_mask.any():
+                            fig.add_trace(go.Scatter(
+                                x=chart_data[forecast_mask]["Date"],
+                                y=chart_data[forecast_mask]["Upper CI"],
+                                fill=None, mode='lines', line_color='rgba(14, 165, 233, 0)', showlegend=False
+                            ))
+                            fig.add_trace(go.Scatter(
+                                x=chart_data[forecast_mask]["Date"],
+                                y=chart_data[forecast_mask]["Lower CI"],
+                                fill='tonexty', mode='lines', line_color='rgba(14, 165, 233, 0)',
+                                fillcolor='rgba(14, 165, 233, 0.2)', name='95% Confidence Interval'
+                            ))
+                        
+                        fig.update_layout(
+                            margin=dict(l=20, r=20, t=40, b=20),
+                            paper_bgcolor='rgba(0,0,0,0)',
+                            plot_bgcolor='rgba(0,0,0,0)',
+                            font=dict(family="Inter, sans-serif", size=12, color="#94a3b8"),
+                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                        )
+                        st.plotly_chart(fig, width='stretch')
+                    else:
+                        st.info("📊 Insufficient data points to render forecast chart.")
                 
                 # --- Hybrid RAG Intelligence Section ---
                 st.markdown("---")
