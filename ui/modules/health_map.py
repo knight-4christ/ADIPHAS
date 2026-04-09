@@ -143,7 +143,7 @@ def render():
             lat=[user_lat],
             lon=[user_lon],
             mode='markers+text',
-            marker=go.scattermapbox.Marker(size=16, color='#3b82f6', symbol='circle'),
+            marker=go.scattermapbox.Marker(size=16, color='#3b82f6'),
             text=[f"📍 You ({user_loc or 'Your Location'})"],
             textposition='top center',
             name='Your Location',
