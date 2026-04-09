@@ -1,8 +1,12 @@
 import requests  # type: ignore[import-untyped]
 import os
+import streamlit as st
 
-# Default to localhost for local dev
-API_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
+# Try Streamlit Secrets first, then OS environment, then fallback to localhost
+try:
+    API_URL = st.secrets.get("BACKEND_URL", os.getenv("BACKEND_URL", "http://localhost:8000"))
+except Exception:
+    API_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
 
 def _safe_request(method, url, **kwargs):
     """Internal helper to handle requests and catch non-JSON responses."""
