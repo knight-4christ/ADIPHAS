@@ -91,8 +91,8 @@ The RAG pipeline utilizes a dual-path retrieval strategy:
 
 ### 4.5 AI Model Resilience & Universal Fallback
 ADIPHAS implements a **three-tier AI resilience architecture** to guarantee 24/7 intelligence availability:
-1.  **Tier 1 — Native Gemini Chain:** Primary models (`gemini-2.0-flash` → `gemini-2.5-flash`) with automatic failover on 429/503 errors.
-2.  **Tier 2 — OpenRouter Free Chain:** Nine verified free models including `Gemma 4 31B`, `Nemotron 3 120B`, `Qwen3 Coder 480B`, `GPT-OSS 120B`, `Hermes 405B`, and others, providing massive redundancy.
+1.  **Tier 1 — Healed Gemini Chain:** Primary models (`gemini-2.0-flash` → `gemini-2.5-flash`) augmented with an **Exponential Backoff Protocol**. When the 15 RPM free-tier limit is hit, the system performs a tactical pause (5, 10, 15 seconds) to allow quota regeneration before proceeding, eliminating 429 crash loops.
+2.  **Tier 2 — OpenRouter Free Chain:** Nine verified free models including `Gemma 4 31B`, `Nemotron 3 120B`, `Qwen3 Coder 480B`, `GPT-OSS 120B`, `Hermes 405B`, and others, providing massive redundancy if Gemini hard-fails.
 3.  **Tier 3 — Rule-Based Fallback:** When all AI paths are exhausted, the system generates statistical summaries from raw database aggregates, ensuring the dashboard never displays blank intelligence panels.
 
 The background scheduler interval is set to **120 minutes (2 hours)** to optimise intelligence coverage within the free-tier rate limits (~50 requests/day on OpenRouter).
@@ -108,6 +108,7 @@ The system includes modules for **SMS (Twilio)** and **Email (SMTP)** broadcasti
 -   **Accuracy & Integrity:** Achieved $0.875$ micro-averaged F1 on representative health data, while implementing complete sanitization protocols ensuring 100% public-ready briefing output free of raw model reasoning tokens.
 -   **AI Resilience:** Built a **12-model deep fallback chain** (2 Gemini native + 9 OpenRouter free + 1 rule-based) ensuring intelligence generation even under complete API quota exhaustion. Removed dead model endpoints (`stepfun`, `mistral-small-3.1`, `xiaomi/mimo-v2-pro`) that were wasting API calls.
 -   **Efficiency:** Reduced LLM API calls by **95%** using local-first extraction and caching. Optimised the background scheduler from 15-minute to 2-hour intervals to sustainably operate within free-tier API budgets.
+-   **Information Warfare & Stealth Data Acquisition:** Successfully defeated complex Cloudflare and WAF (Web Application Firewall) blocks on government portals (NCDC, FMoH, The Guardian). By manually enforcing native Google Chrome 116 TLS fingerprint impersonation (`impersonate="chrome116"`) and stealth headers via **Scrapling v0.4**, ADIPHAS consistently bypasses 403 Forbidden constraints, allowing uninterrupted surveillance.
 -   **Security Hardening:** Replaced the vulnerable `passlib` password hashing library with native `bcrypt` to resolve the 72-byte wrap detection crash. Implemented server-side error logging with clean user-facing error messages.
 -   **Hyper-Personalization:** Connected browser-native HTML5 `navigator.geolocation` APIs with OpenStreetMap reverse geocoding to automatically center heatmaps and tailor instant epidemiological advisories based on the user's precise Local Government Area.
 
@@ -116,8 +117,7 @@ The system includes modules for **SMS (Twilio)** and **Email (SMTP)** broadcasti
 ## 6. Limitations & Future Improvements
 ### 6.1 Current System Limitations
 - **Geolocation Resolution Limits:** The current HTML5 reverse geocoding via OpenStreetMap relies on the accuracy of the user's device. Devices lacking GPS hardware (like some desktops) fall back to ISP-level IP coordinates, which may lack the specific Local Government Area (LGA) granularity required for hyper-local intelligence.
-- **LLM Quota Constraints:** The batch intelligence engine aggressively processes up to 50 raw articles concurrently. While highly efficient, this burst computation frequently exhausts free-tier Gemini API token limits (429 errors), requiring the fallback systems to engage secondary API networks. The current 2-hour scheduler interval is a pragmatic compromise between intelligence freshness and free-tier sustainability.
-- **Anti-Bot Firewalls:** High-profile news portals (such as *Vanguard* and *The Guardian*) deploy unpredictable dynamic firewalls that can occasionally repel the `Scrapling` instances, leading to temporary data acquisition gaps from those specific nodes.
+- **LLM Quota Constraints:** The batch intelligence engine aggressively processes up to 50 raw articles concurrently. While highly efficient, this burst computation safely navigates limits utilizing Exponential Backoff, but sustained anomalies can occasionally exhaust free-tier Gemini API caps, requesting the fallback systems engage secondary API networks.
 - **Render Free Tier Constraints:** The Render free tier spins down after 15 minutes of inactivity, requiring an external keep-alive cron job. Cold starts take 30-60 seconds, during which the first user request may timeout.
 - **Gemini Embedding Regional Restrictions:** The Gemini Embedding API returns `FAILED_PRECONDITION: User location is not supported` from certain server regions. The system auto-falls back to OpenRouter's `nvidia/llama-nemotron-embed-vl-1b-v2:free` for vector embeddings.
 
