@@ -1,6 +1,6 @@
 import streamlit as st
-import pandas as pd
-import plotly.express as px
+import folium
+from streamlit_folium import st_folium
 import api_client
 
 LAGOS_LGAS = {
@@ -114,54 +114,53 @@ def render():
                 "Value": 5, "Status": "Normal", "Signals": 0, "Diseases": "-"
             })
 
-    df_map = pd.DataFrame(map_data)
-    if df_map.empty:
+    if not map_data:
         st.warning("No LGAs match the current filter.")
         return
 
-    fig = px.scatter_mapbox(
-        df_map,
-        lat="lat", lon="lon",
-        hover_name="LGA",
-        hover_data={"Value": False, "Status": True, "Signals": True, "Diseases": True},
-        color="Status",
-        color_discrete_map=COLOR_MAP,
-        size="Value",
-        size_max=45,
-        zoom=9.5,
-        height=650,
-        mapbox_style="carto-positron" # Light/White style
-    )
     # Determine map center: user location or default Lagos center
     if user_lat and user_lon:
         center_lat, center_lon = user_lat, user_lon
-        map_zoom = 12  # Closer zoom when we know user location
-        
-        # Add user position marker
-        import plotly.graph_objects as go
-        fig.add_trace(go.Scattermapbox(
-            lat=[user_lat],
-            lon=[user_lon],
-            mode='markers+text',
-            marker=go.scattermapbox.Marker(size=16, color='#3b82f6'),
-            text=[f"📍 You ({user_loc or 'Your Location'})"],
-            textposition='top center',
-            name='Your Location',
-            showlegend=True
-        ))
+        map_zoom = 12
     else:
-        center_lat, center_lon = 6.5244, 3.3792  # Lagos center
-        map_zoom = 9.5
-    
-    fig.update_layout(
-        margin={"r": 0, "t": 0, "l": 0, "b": 0},
-        dragmode='pan',
-        mapbox=dict(
-            center=dict(lat=center_lat, lon=center_lon),
-            zoom=map_zoom
-        )
-    )
-    st.plotly_chart(fig, use_container_width=True)
+        center_lat, center_lon = 6.5244, 3.3792
+        map_zoom = 10
+
+    m = folium.Map(location=[center_lat, center_lon], zoom_start=map_zoom, tiles="CartoDB dark_matter")
+
+    if user_lat and user_lon:
+        folium.Marker(
+            [user_lat, user_lon],
+            popup=f"📍 You ({user_loc or 'Your Location'})",
+            tooltip="Your Location",
+            icon=folium.Icon(color="blue", icon="user")
+        ).add_to(m)
+
+    for item in map_data:
+        color = COLOR_MAP.get(item["Status"], "green")
+        # Scale radius for folium display natively
+        radius = max((item["Value"] / 3) + 4, 6)
+        
+        # HTML Popup content
+        html_content = f"<b>{item['LGA']}</b><br/>" \
+                       f"Risk Level: {item['Status']}<br/>" \
+                       f"Active Signals: {item['Signals']}<br/>" \
+                       f"Identified Pathogens: {item['Diseases']}"
+                       
+        folium.CircleMarker(
+            location=[item["lat"], item["lon"]],
+            radius=radius,
+            color=color,
+            weight=1,
+            fill=True,
+            fill_color=color,
+            fill_opacity=0.6,
+            tooltip=f"{item['LGA']} - {item['Status']}",
+            popup=folium.Popup(html_content, max_width=350)
+        ).add_to(m)
+
+    # Render folium map into Streamlit gracefully
+    st_folium(m, use_container_width=True, height=650, returned_objects=[])
 
     if live_data:
         st.success(f"✅ Map rendered from **{len(alerts)} live EBS signals** across {len(map_data)} LGAs.")
