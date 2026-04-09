@@ -163,3 +163,4 @@ backend/data/
 backend_output.txt
 tmp/
 .gemini/
+db_fix.py

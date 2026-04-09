@@ -20,7 +20,7 @@ startup_insight_cache: Dict[str, Any] = {"insight": None, "generated_at": None}
 
 def autonomous_monitoring_job():
     """
-    Background job that runs every 15 minutes to scrape news and extract alerts.
+    Background job that runs every 2 hours to scrape news and extract alerts.
     """
     logger.info(f"[{datetime.now().replace(microsecond=0)}] Autonomous Agent waking up to scan for outbreaks...")
     db = database.SessionLocal()
@@ -266,7 +266,7 @@ def _generate_startup_insight():
 async def start_scheduler():
     """Initializes and starts the background scheduler and deferred startup tasks."""
     scheduler = BackgroundScheduler()
-    scheduler.add_job(autonomous_monitoring_job, 'interval', minutes=15)
+    scheduler.add_job(autonomous_monitoring_job, 'interval', minutes=120)
     scheduler.start()
     logger.info("Background Scheduler started.")
     

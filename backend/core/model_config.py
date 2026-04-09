@@ -22,16 +22,17 @@ _state = ModelState()
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
-# OpenRouter Free Model Chain (Verified active as of 2026-03-31)
-# Includes reasoning-capable models for advanced analysis
+# OpenRouter Free Model Chain (Updated 2026-04-09 — 9 verified free models)
 OPENROUTER_CHAIN = [
-    "xiaomi/mimo-v2-pro",
-    "stepfun/step-3.5-flash:free",
-    "mistralai/mistral-small-3.1-24b-instruct:free",
-    "google/gemma-3-27b-it:free",
-    "meta-llama/llama-3.3-70b-instruct:free",
-    "meta-llama/llama-3.2-3b-instruct:free",
-    "minimax/minimax-m2.5:free",
+    "google/gemma-4-31b-it:free",                          # Gemma 4 — top quality
+    "nvidia/nemotron-3-super-120b-a12b:free",              # 120B powerhouse
+    "qwen/qwen3-coder:free",                               # 480B MoE
+    "openai/gpt-oss-120b:free",                            # OpenAI open-source
+    "nousresearch/hermes-3-llama-3.1-405b:free",           # 405B fallback
+    "google/gemma-3-27b-it:free",                          # Reliable Gemma 3
+    "meta-llama/llama-3.3-70b-instruct:free",              # Strong Llama
+    "meta-llama/llama-3.2-3b-instruct:free",               # Lightweight last resort
+    "minimax/minimax-m2.5:free",                           # MiniMax fallback
 ]
 
 def get_current_model() -> str:

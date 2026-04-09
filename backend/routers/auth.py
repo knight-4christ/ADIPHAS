@@ -104,9 +104,12 @@ def register(request: Request, user: schemas.UserCreate, db: Session = Depends(g
         db.commit()
         db.refresh(new_user)
         return new_user
+    except HTTPException:
+        raise  # Re-raise known HTTP errors (400 username taken, etc.)
     except Exception as e:
-        import traceback
-        raise HTTPException(status_code=500, detail=f"Registration crash: {str(e)}\n\n{traceback.format_exc()}")
+        import logging, traceback
+        logging.getLogger(__name__).error(f"Registration error: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
 
 @router.post("/api/auth/login", response_model=schemas.Token)
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
