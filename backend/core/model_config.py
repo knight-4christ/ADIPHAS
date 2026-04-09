@@ -164,8 +164,10 @@ def smart_generate(gemini_client, prompt: str, context: str = "", enable_reasoni
     """
     from backend.core.token_tracker import track_usage
     
-    attempts = len(MODEL_CHAIN)
-    for _ in range(attempts):
+    import time
+    
+    attempts = len(MODEL_CHAIN) * 2  # Allow multiple retries per model to survive 15 RPM limits
+    for attempt_num in range(attempts):
         model = get_current_model()
         try:
             # Native Gemini Flash supports some reasoning-like behaviors by default
@@ -181,8 +183,13 @@ def smart_generate(gemini_client, prompt: str, context: str = "", enable_reasoni
         except Exception as e:
             error_str = str(e)
             # Universal error catching for fallback
-            if any(code in error_str for code in ["429", "RESOURCE_EXHAUSTED", "404", "NOT_FOUND", "503"]):
-                logger.warning(f"[Gemini] {model} unavailable ({error_str[:50]}) for {context}. Switching model...")
+            if any(code in error_str for code in ["429", "RESOURCE_EXHAUSTED", "503"]):
+                wait_val = 5 * (attempt_num + 1)
+                logger.warning(f"[Gemini] {model} hit Rate Limit for {context}. Tactical sleep for {wait_val}s...")
+                time.sleep(wait_val)
+                switch_to_next_model()
+            elif any(code in error_str for code in ["404", "NOT_FOUND"]):
+                logger.warning(f"[Gemini] {model} unavailable. Switching model...")
                 switch_to_next_model()
             else:
                 logger.error(f"[Gemini] {model} critical error for {context}: {e}")

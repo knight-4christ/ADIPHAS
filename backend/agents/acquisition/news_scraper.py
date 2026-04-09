@@ -266,8 +266,14 @@ class NewsScraperAgent:
         page = None
         try:
             # Scrapling Fetcher uses curl-cffi for impersonation and stealthy headers by default
+            Fetcher.configure(stealthy_headers=True)
             fetcher = Fetcher()
-            res = fetcher.get(source["url"], timeout=20, follow_redirects=True)
+            res = fetcher.get(
+                source["url"], 
+                timeout=20, 
+                follow_redirects=True, 
+                impersonate="chrome116"  # Forces TLS fingerprinting to bypass 403
+            )
             
             if res.status != 200:
                 logger.warning(f"[Scraper] {source['name']} returned status {res.status}")
