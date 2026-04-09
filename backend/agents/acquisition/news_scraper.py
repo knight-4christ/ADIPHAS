@@ -266,8 +266,7 @@ class NewsScraperAgent:
         page = None
         try:
             # Scrapling Fetcher uses curl-cffi for impersonation and stealthy headers by default
-            Fetcher.configure(stealthy_headers=True)
-            fetcher = Fetcher()
+            fetcher = Fetcher(stealthy_headers=True)
             res = fetcher.get(
                 source["url"], 
                 timeout=20, 
