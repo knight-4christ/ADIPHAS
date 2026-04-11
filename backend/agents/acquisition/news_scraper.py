@@ -96,7 +96,7 @@ SOURCES = [
     {
         "name": "Nigeria Health Watch",
         "category": "Health Journalism",
-        "url": "https://articles.nigeriahealthwatch.com/feed",
+        "url": "https://articles.nigeriahealthwatch.com/feed/",
         "method": "rss",
         "priority": 2,
         "keywords": [],
@@ -109,18 +109,18 @@ SOURCES = [
         "priority": 2,
         "keywords": [],
     },
-    {
-        "name": "HealthNews.ng",
-        "category": "Health Journalism",
-        "url": "http://healthnews.ng/feed",
-        "method": "rss",
-        "priority": 2,
-        "keywords": [],
-    },
+    # {
+    #     "name": "HealthNews.ng",
+    #     "category": "Health Journalism",
+    #     "url": "http://healthnews.ng/feed",
+    #     "method": "rss",
+    #     "priority": 2,
+    #     "keywords": [],
+    # },
     {
         "name": "Public Health Nigeria",
         "category": "Health Journalism",
-        "url": "https://www.publichealth.com.ng/feed",
+        "url": "https://www.publichealth.com.ng/feed/",
         "method": "rss",
         "priority": 2,
         "keywords": [],
@@ -128,7 +128,7 @@ SOURCES = [
     {
         "name": "NiMedHealth",
         "category": "Health Journalism",
-        "url": "https://nimedhealth.com.ng/feed",
+        "url": "https://nimedhealth.com.ng/feed/",
         "method": "rss",
         "priority": 2,
         "keywords": [],
@@ -260,26 +260,29 @@ class NewsScraperAgent:
         return results
 
     def _scrape_html(self, source: dict) -> list:
-        """Scrape HTML using Scrapling Fetcher for stealth.
-        Sites that block or time out are handled via browser impersonation.
+        """Scrape HTML using Scrapling Fetcher v0.4 for stealth.
+        Uses curl_cffi TLS fingerprinting to bypass anti-bot firewalls
+        on government health portals.
         """
         page = None
         try:
-            # Scrapling Fetcher uses curl-cffi for impersonation and stealthy headers by default
-            fetcher = Fetcher(stealthy_headers=True)
-            res = fetcher.get(
-                source["url"], 
-                timeout=20, 
-                follow_redirects=True, 
-                impersonate="chrome116"  # Forces TLS fingerprinting to bypass 403
+            # Scrapling v0.4: Fetcher.get() is a class method.
+            # impersonate + stealthy_headers enable TLS fingerprinting & real browser headers.
+            # verify=False handles SSL cert issues on Render's server environment.
+            res = Fetcher.get(
+                source["url"],
+                stealthy_headers=True,
+                impersonate="chrome",
+                verify=False,
+                timeout=20,
             )
             
             if res.status != 200:
                 logger.warning(f"[Scraper] {source['name']} returned status {res.status}")
                 return []
                 
-            # Parse the HTML with native BeautifulSoup from Scrapling's response text
-            page = BeautifulSoup(res.text, "lxml")
+            # Scrapling v0.4: use html_content for raw HTML string
+            page = BeautifulSoup(res.html_content, "lxml")
             
         except Exception as err:
             logger.warning(f"[Scraper] Failed to fetch {source['name']} via Scrapling: {err}")
