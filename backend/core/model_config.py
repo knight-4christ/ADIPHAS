@@ -22,7 +22,6 @@ UNIFIED_MODEL_POOL = [
     {"id": "qwen/qwen3-coder:free",                         "provider": "openrouter", "tier": 1},
     {"id": "openai/gpt-oss-120b:free",                      "provider": "openrouter", "tier": 1},
     {"id": "nousresearch/hermes-3-llama-3.1-405b:free",     "provider": "openrouter", "tier": 1},
-    {"id": "zhipu-ai/glm-4.5-air:free",                     "provider": "openrouter", "tier": 1},
     
     # --- OpenRouter Tier 2: Mid-range (6 models) ---
     {"id": "google/gemma-3-27b-it:free",                    "provider": "openrouter", "tier": 2},
@@ -46,16 +45,16 @@ UNIFIED_MODEL_POOL = [
 # so no single model handles all requests at once
 # ══════════════════════════════════════════════════════════════════════════════
 AGENT_MODEL_ASSIGNMENTS = {
-    "ForecastNarrative":    {"start_offset": 0,  "max_tries": 5},   # gemini-2.0-flash first
-    "BriefingAgent":        {"start_offset": 2,  "max_tries": 6},   # gemma-4-31b first
-    "RealtimeIntel":        {"start_offset": 5,  "max_tries": 5},   # gpt-oss-120b first
-    "KnowledgeFusion":      {"start_offset": 8,  "max_tries": 5},   # gemma-3-27b first
-    "NLP_EntityExtraction": {"start_offset": 0,  "max_tries": 4},   # gemini-2.0-flash (fast)
-    "NLP_BatchExtraction":  {"start_offset": 1,  "max_tries": 4},   # gemini-2.5-flash (fast)
-    "RiskSummary":          {"start_offset": 3,  "max_tries": 5},   # nemotron-120b first
-    "IntelligenceBriefing": {"start_offset": 6,  "max_tries": 5},   # hermes-405b first
-    "StartupInsight":       {"start_offset": 10, "max_tries": 5},   # llama-3.3-70b first
-    "AdvisoryChat":         {"start_offset": 0,  "max_tries": 6},   # user-facing, best first
+    "ForecastNarrative":    {"start_offset": 0,  "max_tries": 10},  # gemini-2.0-flash first
+    "BriefingAgent":        {"start_offset": 2,  "max_tries": 10},  # gemma-4-31b first
+    "RealtimeIntel":        {"start_offset": 5,  "max_tries": 10},  # gpt-oss-120b first
+    "KnowledgeFusion":      {"start_offset": 8,  "max_tries": 10},  # gemma-3-27b first
+    "NLP_EntityExtraction": {"start_offset": 0,  "max_tries": 5},   # gemini-2.0-flash (fast)
+    "NLP_BatchExtraction":  {"start_offset": 1,  "max_tries": 5},   # gemini-2.5-flash (fast)
+    "RiskSummary":          {"start_offset": 3,  "max_tries": 10},  # nemotron-120b first
+    "IntelligenceBriefing": {"start_offset": 6,  "max_tries": 10},  # hermes-405b first
+    "StartupInsight":       {"start_offset": 10, "max_tries": 10},  # llama-3.3-70b first
+    "AdvisoryChat":         {"start_offset": 0,  "max_tries": 10},  # user-facing, best first
 }
 
 # Default fallback for unknown contexts

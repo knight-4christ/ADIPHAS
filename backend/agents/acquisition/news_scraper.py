@@ -267,12 +267,10 @@ class NewsScraperAgent:
         page = None
         try:
             # Scrapling v0.4: Fetcher.get() is a class method.
-            # impersonate + stealthy_headers enable TLS fingerprinting & real browser headers.
-            # verify=False handles SSL cert issues on Render's server environment.
+            # stealthy_headers enable TLS fingerprinting & real browser headers.
             res = Fetcher.get(
                 source["url"],
                 stealthy_headers=True,
-                verify=False,
                 timeout=20,
             )
             
