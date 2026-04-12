@@ -173,22 +173,26 @@ def render():
                 st.metric("Risk Assessment", risk_lvl)
                 st.caption(f"📍 **Target LGA:** {item.get('location_text')}")
                 st.caption(f"🛰️ **Capture Node:** {item.get('source')}")
-                if st.button("🔗 Open Source", width='stretch'):
-                    st.write("Source URL restriction active.")
+                url = item.get('url')
+                if url:
+                    st.link_button("🔗 Open Source", url, use_container_width=True)
+                else:
+                    if st.button("🔗 Open Source", use_container_width=True, disabled=True):
+                        pass
                 
-                if st.button("📖 Get Deeper Context (RAG)", width='stretch'):
+                if st.button("📖 Get Deeper Context (RAG)", use_container_width=True):
                     with st.spinner("Retrieving intelligence..."):
                         q = f"Latest protocols and news for {item.get('disease')} in {item.get('location_text')}"
                         r = api_client.advisory_search(q)
                         if r and not r.get("error"):
                             st.session_state[f"rag_context_{item.get('alert_id')}"] = r
-                
-                rag_data = st.session_state.get(f"rag_context_{item.get('alert_id')}")
-                if rag_data:
-                    with st.expander("🌐 Intelligence Context", expanded=True):
-                        st.caption(f"Source: {rag_data.get('source').upper()}")
-                        for rss in rag_data.get('results', [])[:2]:
-                            st.write(rss.get('content') or rss.get('snippet') or str(rss))
+                            
+            rag_data = st.session_state.get(f"rag_context_{item.get('alert_id')}")
+            if rag_data:
+                with st.expander("🌐 Intelligence Context", expanded=True):
+                    st.caption(f"Source: {rag_data.get('source', '').upper()}")
+                    for rss in rag_data.get('results', [])[:2]:
+                        st.write(rss.get('content') or rss.get('snippet') or str(rss))
 
         st.divider()
         

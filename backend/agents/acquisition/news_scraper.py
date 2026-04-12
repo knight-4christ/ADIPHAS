@@ -272,7 +272,6 @@ class NewsScraperAgent:
             res = Fetcher.get(
                 source["url"],
                 stealthy_headers=True,
-                impersonate="chrome",
                 verify=False,
                 timeout=20,
             )
