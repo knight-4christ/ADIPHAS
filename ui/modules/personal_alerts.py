@@ -106,7 +106,7 @@ def render():
                 "Location": a.get('location_text') or "Lagos",
                 "Source": a.get('source', 'Unknown'),
                 "Risk": a.get('risk_level', 'Low'),
-                "Date": ts.replace('T', ' ').split(' ')[0] if (' ' in ts or 'T' in ts) else ts,
+                "Recency": api_client.time_ago(ts),
                 "_sort_time": ts,
                 "_full_data": a
             })

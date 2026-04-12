@@ -61,25 +61,21 @@ def render():
                     ts = a.get('timestamp', '')
                     created_ts = a.get('created_at', str(ts)) # Fallback to timestamp if created_at is missing
                     is_new = created_ts > last_check
-                    
-                    dt = ts.replace('T', ' ').split(' ')[0] if (' ' in ts or 'T' in ts) else ts
-                    tm = ts.replace('T', ' ').split(' ')[1][:5] if (' ' in ts or 'T' in ts) else ""
-                    
                     feed_data.append({
                         "Status": "🆕 NEW" if is_new else "✅ Seen",
-                        "Date": dt,
-                        "Time": tm,
+                        "Recency": api_client.time_ago(ts),
                         "Source": a.get('source', 'Unknown'),
                         "Disease": a.get('disease', 'General'),
-                        "Headline": a.get('text', '')
+                        "Headline": a.get('text', ''),
+                        "_raw_ts": ts  # Used for sorting
                     })
                 
                 df = pd.DataFrame(feed_data)
                 
                 if not df.empty:
-                    # Sort for grouping so NEW appears first
+                    # Sort for grouping so NEW appears first, then by raw timestamp
                     df['is_new_val'] = df['Status'] == "🆕 NEW"
-                    df = df.sort_values(by=["is_new_val", "Date", "Time"], ascending=[False, False, False]).drop(columns=['is_new_val'])
+                    df = df.sort_values(by=["is_new_val", "_raw_ts"], ascending=[False, False]).drop(columns=['is_new_val', '_raw_ts'])
                     
                     st.subheader(f"🆕 Fresh Intelligence ({len(df)} signals)")
                     st.dataframe(

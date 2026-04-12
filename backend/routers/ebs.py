@@ -30,8 +30,12 @@ def submit_ebs(alert: schemas.EBSAlertCreate, db: Session = Depends(get_db)):
     return db_alert
 
 @router.get("/api/ebs/list", response_model=List[schemas.EBSAlertResponse])
-def list_alerts(db: Session = Depends(get_db)):
-    return db.query(models.EBSAlert).all()
+def list_alerts(limit: int = 200, db: Session = Depends(get_db)):
+    """Returns alerts ordered by newest first. Defaults to latest 200 to prevent stale data overload."""
+    return db.query(models.EBSAlert)\
+        .order_by(models.EBSAlert.timestamp.desc())\
+        .limit(limit)\
+        .all()
 
 @router.post("/api/ebs/{alert_id}/verify")
 def verify_alert(alert_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(check_role("EXPERT"))):

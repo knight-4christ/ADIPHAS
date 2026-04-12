@@ -2,60 +2,123 @@ import logging
 import os
 import requests
 import json
+import time
+import threading
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
-# Model fallback chain — ordered by preference for NATIVE Gemini
-MODEL_CHAIN = [
-    "gemini-2.0-flash",
-    "gemini-2.5-flash",
+# ══════════════════════════════════════════════════════════════════════════════
+# UNIFIED MODEL POOL — 20 models across Gemini Native + OpenRouter Free Tier
+# ══════════════════════════════════════════════════════════════════════════════
+UNIFIED_MODEL_POOL = [
+    # --- Gemini Native (2 models) — highest reliability, no OpenRouter overhead ---
+    {"id": "gemini-2.0-flash",                              "provider": "gemini",     "tier": 1},
+    {"id": "gemini-2.5-flash",                              "provider": "gemini",     "tier": 1},
+    
+    # --- OpenRouter Tier 1: Large/Premium (6 models) ---
+    {"id": "google/gemma-4-31b-it:free",                    "provider": "openrouter", "tier": 1},
+    {"id": "nvidia/nemotron-3-super-120b-a12b:free",        "provider": "openrouter", "tier": 1},
+    {"id": "qwen/qwen3-coder:free",                         "provider": "openrouter", "tier": 1},
+    {"id": "openai/gpt-oss-120b:free",                      "provider": "openrouter", "tier": 1},
+    {"id": "nousresearch/hermes-3-llama-3.1-405b:free",     "provider": "openrouter", "tier": 1},
+    {"id": "zhipu-ai/glm-4.5-air:free",                     "provider": "openrouter", "tier": 1},
+    
+    # --- OpenRouter Tier 2: Mid-range (6 models) ---
+    {"id": "google/gemma-3-27b-it:free",                    "provider": "openrouter", "tier": 2},
+    {"id": "google/gemma-4-26b-a4b:free",                   "provider": "openrouter", "tier": 2},
+    {"id": "meta-llama/llama-3.3-70b-instruct:free",        "provider": "openrouter", "tier": 2},
+    {"id": "nvidia/nemotron-3-nano-30b-a3b:free",           "provider": "openrouter", "tier": 2},
+    {"id": "openai/gpt-oss-20b:free",                       "provider": "openrouter", "tier": 2},
+    {"id": "minimax/minimax-m2.5:free",                     "provider": "openrouter", "tier": 2},
+    
+    # --- OpenRouter Tier 3: Lightweight Fallbacks (6 models) ---
+    {"id": "meta-llama/llama-3.2-3b-instruct:free",         "provider": "openrouter", "tier": 3},
+    {"id": "nvidia/nemotron-nano-12b-2-vl:free",            "provider": "openrouter", "tier": 3},
+    {"id": "nvidia/nemotron-nano-9b-v2:free",               "provider": "openrouter", "tier": 3},
+    {"id": "arcee-ai/arcee-trinity-large-preview:free",     "provider": "openrouter", "tier": 3},
+    {"id": "qwen/qwen3-30b-a3b:free",                       "provider": "openrouter", "tier": 3},
+    {"id": "qwen/qwen3-4b:free",                             "provider": "openrouter", "tier": 3},
 ]
+
+# ══════════════════════════════════════════════════════════════════════════════
+# AGENT-TO-MODEL DISTRIBUTION — each agent starts at a different offset
+# so no single model handles all requests at once
+# ══════════════════════════════════════════════════════════════════════════════
+AGENT_MODEL_ASSIGNMENTS = {
+    "ForecastNarrative":    {"start_offset": 0,  "max_tries": 5},   # gemini-2.0-flash first
+    "BriefingAgent":        {"start_offset": 2,  "max_tries": 6},   # gemma-4-31b first
+    "RealtimeIntel":        {"start_offset": 5,  "max_tries": 5},   # gpt-oss-120b first
+    "KnowledgeFusion":      {"start_offset": 8,  "max_tries": 5},   # gemma-3-27b first
+    "NLP_EntityExtraction": {"start_offset": 0,  "max_tries": 4},   # gemini-2.0-flash (fast)
+    "NLP_BatchExtraction":  {"start_offset": 1,  "max_tries": 4},   # gemini-2.5-flash (fast)
+    "RiskSummary":          {"start_offset": 3,  "max_tries": 5},   # nemotron-120b first
+    "IntelligenceBriefing": {"start_offset": 6,  "max_tries": 5},   # hermes-405b first
+    "StartupInsight":       {"start_offset": 10, "max_tries": 5},   # llama-3.3-70b first
+    "AdvisoryChat":         {"start_offset": 0,  "max_tries": 6},   # user-facing, best first
+}
+
+# Default fallback for unknown contexts
+_DEFAULT_ASSIGNMENT = {"start_offset": 0, "max_tries": 6}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# RATE LIMIT TRACKING — per-model 429 cooldown (60s auto-skip)
+# ══════════════════════════════════════════════════════════════════════════════
+_rate_limit_tracker: dict[str, float] = {}  # model_id -> timestamp of last 429
+_RATE_LIMIT_COOLDOWN = 60  # seconds to skip a model after it returns 429
+_tracker_lock = threading.Lock()
+
 
 class ModelState:
     def __init__(self):
-        self.current_index: int = 0
-        self.last_switch: str | None = None
         self.switch_count: int = 0
+        self.last_switch: str | None = None
 
 _state = ModelState()
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-
-# OpenRouter Free Model Chain (Updated 2026-04-09 — 9 verified free models)
-OPENROUTER_CHAIN = [
-    "google/gemma-4-31b-it:free",                          # Gemma 4 — top quality
-    "nvidia/nemotron-3-super-120b-a12b:free",              # 120B powerhouse
-    "qwen/qwen3-coder:free",                               # 480B MoE
-    "openai/gpt-oss-120b:free",                            # OpenAI open-source
-    "nousresearch/hermes-3-llama-3.1-405b:free",           # 405B fallback
-    "google/gemma-3-27b-it:free",                          # Reliable Gemma 3
-    "meta-llama/llama-3.3-70b-instruct:free",              # Strong Llama
-    "meta-llama/llama-3.2-3b-instruct:free",               # Lightweight last resort
-    "minimax/minimax-m2.5:free",                           # MiniMax fallback
-]
-
-def get_current_model() -> str:
-    """Returns the currently active model name."""
-    return MODEL_CHAIN[_state.current_index]
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 
-def switch_to_next_model() -> str:
-    """Moves to the next model in the fallback chain. Returns the new model name."""
-    old_model = get_current_model()
-    _state.current_index = (_state.current_index + 1) % len(MODEL_CHAIN)
-    _state.last_switch = datetime.now().replace(microsecond=0).isoformat()
-    _state.switch_count += 1
-    new_model = get_current_model()
-    logger.warning(f"[ModelFallback] Switched from {old_model} -> {new_model} (switch #{_state.switch_count})")
-    return new_model
+def _is_recently_rate_limited(model_id: str) -> bool:
+    """Check if a model was rate-limited within the cooldown window."""
+    with _tracker_lock:
+        last_hit = _rate_limit_tracker.get(model_id)
+        if last_hit and (time.time() - last_hit) < _RATE_LIMIT_COOLDOWN:
+            return True
+        return False
 
-def _generate_via_openrouter(prompt: str, context: str = "", enable_reasoning: bool = False) -> tuple[str | None, str | None]:
-    """Ultimate fallback via OpenRouter REST API with its own internal retry chain. Returns (text, model_id)."""
+
+def _mark_rate_limited(model_id: str):
+    """Mark a model as recently rate-limited."""
+    with _tracker_lock:
+        _rate_limit_tracker[model_id] = time.time()
+        logger.info(f"[RateLimit] Marked {model_id} as rate-limited for {_RATE_LIMIT_COOLDOWN}s")
+
+
+def _call_gemini(gemini_client, model_id: str, prompt: str, context: str):
+    """Dispatch a call to native Gemini API. Returns text or raises Exception."""
+    from backend.core.token_tracker import track_usage
+    
+    response = gemini_client.models.generate_content(
+        model=model_id,
+        contents=prompt
+    )
+    track_usage(response, context=f"{context} [model={model_id}]")
+    logger.info(f"[Gemini] {context} completed using {model_id}")
+    text = response.text
+    if text:
+        return text.strip()
+    return None
+
+
+def _call_openrouter(model_id: str, prompt: str, context: str, enable_reasoning: bool = False):
+    """Dispatch a call to OpenRouter API. Returns text or raises Exception."""
+    from backend.core.token_tracker import track_openrouter_usage
+    
     if not OPENROUTER_API_KEY:
-        logger.error("[OpenRouter] API Key missing. Fallback impossible.")
-        return None, None
-
+        raise RuntimeError("OpenRouter API key not configured")
+    
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY.strip()}",
@@ -64,46 +127,130 @@ def _generate_via_openrouter(prompt: str, context: str = "", enable_reasoning: b
         "X-Title": "ADIPHAS Intelligence",
     }
     
-    for model_id in OPENROUTER_CHAIN:
-        logger.info(f"[OpenRouter] Attempting {context} using {model_id} (Reasoning: {enable_reasoning})")
+    payload = {
+        "model": model_id,
+        "messages": [{"role": "user", "content": prompt}]
+    }
+    
+    if enable_reasoning or "hunter" in model_id or "thinking" in model_id:
+        payload["reasoning"] = {"enabled": True}
+    
+    response = requests.post(url, headers=headers, data=json.dumps(payload), timeout=30)
+    
+    if response.status_code == 429:
+        _mark_rate_limited(model_id)
+        logger.warning(f"[OpenRouter] {model_id} hit 429 for {context}")
+        raise RateLimitError(f"429 on {model_id}")
+    
+    if response.status_code != 200:
+        logger.warning(f"[OpenRouter] {model_id} failed with status {response.status_code}: {response.text[:200]}")
+        return None
+    
+    result = response.json()
+    if 'choices' in result and len(result['choices']) > 0:
+        message = result['choices'][0]['message']
+        text = message.get('content') or ""
         
-        payload = {
-            "model": model_id,
-            "messages": [{"role": "user", "content": prompt}]
-        }
+        # Track OpenRouter usage
+        usage = result.get('usage', {})
+        track_openrouter_usage(
+            model_id=model_id,
+            prompt_tokens=usage.get('prompt_tokens', 0),
+            completion_tokens=usage.get('completion_tokens', 0),
+            context=context
+        )
         
-        # Only enable reasoning for models that support it or if explicitly requested
-        if enable_reasoning or "hunter" in model_id or "thinking" in model_id:
-            payload["reasoning"] = {"enabled": True}
+        if 'reasoning_details' in message and message['reasoning_details']:
+            logger.debug(f"[OpenRouter] Reasoning trace received from {model_id} (stripped from output)")
+        
+        logger.info(f"[OpenRouter] SUCCESS with {model_id} for {context}")
+        return text.strip() if text else None
+    else:
+        logger.warning(f"[OpenRouter] {model_id} returned empty choices for {context}")
+        return None
+
+
+class RateLimitError(Exception):
+    """Raised when a model returns a 429 rate limit response."""
+    pass
+
+
+def smart_generate(gemini_client, prompt: str, context: str = "", enable_reasoning: bool = False):
+    """
+    Unified AI generation across the entire model pool.
+    Each agent context starts at a different offset in the pool,
+    distributing load so no single model handles all requests.
+    
+    On 429 errors, models are auto-skipped for 60 seconds.
+    Progressive cooldown (2s, 4s, 6s...) between retries.
+    """
+    assignment = AGENT_MODEL_ASSIGNMENTS.get(context, _DEFAULT_ASSIGNMENT)
+    pool_size = len(UNIFIED_MODEL_POOL)
+    max_tries = assignment["max_tries"]
+    start = assignment["start_offset"]
+    
+    skipped_count = 0
+    
+    for i in range(max_tries):
+        idx = (start + i) % pool_size
+        model_entry = UNIFIED_MODEL_POOL[idx]
+        model_id = model_entry["id"]
+        provider = model_entry["provider"]
+        
+        # Skip models that were rate-limited recently
+        if _is_recently_rate_limited(model_id):
+            logger.debug(f"[SmartGen] Skipping {model_id} (rate-limited cooldown active)")
+            skipped_count += 1
+            continue
+        
+        logger.info(f"[SmartGen] {context} → trying {model_id} (attempt {i+1}/{max_tries})")
         
         try:
-            response = requests.post(url, headers=headers, data=json.dumps(payload), timeout=30)
-            if response.status_code != 200:
-                logger.warning(f"[OpenRouter] {model_id} failed with status {response.status_code}: {response.text}")
-                continue
-                
-            result = response.json()
-            if 'choices' in result and len(result['choices']) > 0:
-                message = result['choices'][0]['message']
-                text = message.get('content') or ""
-                
-                # Log reasoning for transparency, but NEVER include in output
-                # Reasoning can be a string or a list of objects — either way, strip it
-                if 'reasoning_details' in message and message['reasoning_details']:
-                    logger.debug(f"[OpenRouter] Reasoning trace received from {model_id} (stripped from output)")
-                
-                logger.info(f"[OpenRouter] SUCCESS with {model_id} for {context}")
-                return text.strip(), model_id
-            else:
-                logger.warning(f"[OpenRouter] {model_id} returned empty choices: {result}")
-                
-        except Exception as e:
-            logger.error(f"[OpenRouter] {model_id} error for {context}: {e}")
-            continue
+            if provider == "gemini":
+                if not gemini_client:
+                    continue
+                result = _call_gemini(gemini_client, model_id, prompt, context)
+                if result:
+                    return result, model_id
             
+            elif provider == "openrouter":
+                if not OPENROUTER_API_KEY:
+                    continue
+                result = _call_openrouter(model_id, prompt, context, enable_reasoning)
+                if result:
+                    return result, f"openrouter/{model_id}"
+        
+        except RateLimitError:
+            # Already marked as rate-limited in _call_openrouter
+            cooldown = 2 * (i + 1)
+            logger.info(f"[SmartGen] Cooling down {cooldown}s before next model...")
+            time.sleep(cooldown)
+            continue
+        
+        except Exception as e:
+            error_str = str(e)
+            if any(code in error_str for code in ["429", "RESOURCE_EXHAUSTED"]):
+                _mark_rate_limited(model_id)
+                cooldown = 2 * (i + 1)
+                logger.warning(f"[SmartGen] {model_id} rate limited for {context}. Cooling down {cooldown}s...")
+                time.sleep(cooldown)
+            elif any(code in error_str for code in ["404", "NOT_FOUND"]):
+                logger.warning(f"[SmartGen] {model_id} unavailable (404). Skipping.")
+            elif "503" in error_str:
+                logger.warning(f"[SmartGen] {model_id} service unavailable. Skipping.")
+            else:
+                logger.error(f"[SmartGen] {model_id} unexpected error for {context}: {e}")
+            continue
+    
+    _state.switch_count += 1
+    _state.last_switch = datetime.now().replace(microsecond=0).isoformat()
+    logger.error(f"[SmartGen] ALL {max_tries} model attempts exhausted for {context} (skipped {skipped_count} rate-limited).")
     return None, None
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# EMBEDDING FALLBACK (unchanged — OpenRouter)
+# ══════════════════════════════════════════════════════════════════════════════
 def _embed_via_openrouter(text_or_list: str | list[str]) -> list[list[float]] | None:
     """Fallback embedding generation via OpenRouter."""
     if not OPENROUTER_API_KEY:
@@ -118,7 +265,6 @@ def _embed_via_openrouter(text_or_list: str | list[str]) -> list[list[float]] | 
     
     inputs = [text_or_list] if isinstance(text_or_list, str) else text_or_list
     
-    # OpenRouter embedding payload structure
     payload = {
         "model": model,
         "input": inputs
@@ -129,8 +275,6 @@ def _embed_via_openrouter(text_or_list: str | list[str]) -> list[list[float]] | 
         response = requests.post(url, headers=headers, json=payload, timeout=30)
         response.raise_for_status()
         data = response.json()
-        
-        # Extract embeddings
         embeddings = [item["embedding"] for item in data["data"]]
         return embeddings
     except Exception as e:
@@ -138,84 +282,142 @@ def _embed_via_openrouter(text_or_list: str | list[str]) -> list[list[float]] | 
         return None
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# STARTUP VALIDATION — ping each OpenRouter model to confirm availability
+# ══════════════════════════════════════════════════════════════════════════════
+_validated_models: list[str] = []
+
+def validate_model_pool():
+    """
+    Called at startup (in a background thread). Pings each OpenRouter model
+    with a minimal prompt to check availability. Marks unavailable models
+    as rate-limited for the first cycle so they're skipped.
+    """
+    global _validated_models
+    
+    if not OPENROUTER_API_KEY:
+        logger.warning("[ModelValidation] No OpenRouter API key — skipping validation")
+        return
+    
+    logger.info("[ModelValidation] Starting model pool validation...")
+    available = []
+    unavailable = []
+    
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY.strip()}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://adiphas.ai",
+        "X-Title": "ADIPHAS Validation",
+    }
+    
+    for entry in UNIFIED_MODEL_POOL:
+        if entry["provider"] != "openrouter":
+            available.append(entry["id"])
+            continue
+        
+        model_id = entry["id"]
+        payload = {
+            "model": model_id,
+            "messages": [{"role": "user", "content": "hi"}],
+            "max_tokens": 1,  # Minimal usage
+        }
+        
+        try:
+            response = requests.post(url, headers=headers, data=json.dumps(payload), timeout=10)
+            if response.status_code == 200:
+                available.append(model_id)
+                logger.info(f"[ModelValidation] ✓ {model_id}")
+            elif response.status_code == 429:
+                # Rate limited but model exists — it's valid but cooling down
+                available.append(model_id)
+                _mark_rate_limited(model_id)
+                logger.info(f"[ModelValidation] ~ {model_id} (exists but rate-limited)")
+            else:
+                unavailable.append(model_id)
+                # Mark as rate-limited for 5 minutes so it's skipped initially
+                with _tracker_lock:
+                    _rate_limit_tracker[model_id] = time.time() + 240  # extra 4min penalty
+                logger.warning(f"[ModelValidation] ✗ {model_id} (status {response.status_code})")
+        except Exception as e:
+            unavailable.append(model_id)
+            logger.warning(f"[ModelValidation] ✗ {model_id} (error: {e})")
+        
+        time.sleep(1)  # Don't burst the validation pings
+    
+    _validated_models = available
+    logger.info(f"[ModelValidation] Complete: {len(available)}/{len(UNIFIED_MODEL_POOL)} models available, {len(unavailable)} unavailable")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# STATUS & LOGGING
+# ══════════════════════════════════════════════════════════════════════════════
+def get_current_model() -> str:
+    """Returns the first model in the pool (for backward compatibility)."""
+    return UNIFIED_MODEL_POOL[0]["id"]
+
+
 def get_model_status_log() -> str:
-    """Returns a formatted summary of the active AI model chain and fallbacks for startup logging."""
-    native_chain = " -> ".join(MODEL_CHAIN)
-    or_chain = " -> ".join(OPENROUTER_CHAIN)
+    """Returns a formatted summary of the unified AI model pool for startup logging."""
+    pool_summary = []
+    for i, m in enumerate(UNIFIED_MODEL_POOL):
+        tier_label = f"T{m['tier']}"
+        provider_label = m['provider'].upper()
+        pool_summary.append(f"  [{i:2d}] {tier_label} {provider_label}: {m['id']}")
+    
+    # Show agent assignments
+    agent_summary = []
+    for agent, cfg in AGENT_MODEL_ASSIGNMENTS.items():
+        start_model = UNIFIED_MODEL_POOL[cfg['start_offset'] % len(UNIFIED_MODEL_POOL)]['id']
+        agent_summary.append(f"  {agent}: offset={cfg['start_offset']} → {start_model} (max {cfg['max_tries']} tries)")
     
     status = [
-        "\n" + "="*50,
-        "ADIPHAS INTELLIGENCE: AI MODEL STATUS",
-        "="*50,
-        f"Primary Native Chain: {native_chain}",
-        f"Verified Fallback (OR): {or_chain}",
-        f"Active Model index: {_state.current_index} ({get_current_model()})",
+        "\n" + "="*60,
+        "ADIPHAS INTELLIGENCE: UNIFIED MODEL POOL",
+        "="*60,
+        f"Total Models: {len(UNIFIED_MODEL_POOL)}",
+        f"Gemini Native: {sum(1 for m in UNIFIED_MODEL_POOL if m['provider'] == 'gemini')}",
+        f"OpenRouter Free: {sum(1 for m in UNIFIED_MODEL_POOL if m['provider'] == 'openrouter')}",
         f"OpenRouter Fallback: {'ENABLED' if OPENROUTER_API_KEY else 'DISABLED (Check .env)'}",
-        f"Total Fallback Switches: {_state.switch_count}",
-        "="*50 + "\n"
+        "",
+        "Model Pool:",
+        "\n".join(pool_summary),
+        "",
+        "Agent Assignments:",
+        "\n".join(agent_summary),
+        "",
+        f"Rate Limit Cooldown: {_RATE_LIMIT_COOLDOWN}s per model",
+        f"Total Exhaustion Events: {_state.switch_count}",
+        "="*60 + "\n"
     ]
     return "\n".join(status)
 
 
-def smart_generate(gemini_client, prompt: str, context: str = "", enable_reasoning: bool = False):
-    """
-    Calls Gemini with automatic model fallback on 429 errors.
-    If all native models fail, tries OpenRouter.
-    """
-    from backend.core.token_tracker import track_usage
-    
-    import time
-    
-    attempts = len(MODEL_CHAIN) * 2  # Allow multiple retries per model to survive 15 RPM limits
-    for attempt_num in range(attempts):
-        model = get_current_model()
-        try:
-            # Native Gemini Flash supports some reasoning-like behaviors by default
-            response = gemini_client.models.generate_content(
-                model=model,
-                contents=prompt
-            )
-            # Track tokens with model name
-            track_usage(response, context=f"{context} [model={model}]")
-            logger.info(f"[Gemini] {context} completed using {model}")
-            return response.text.strip(), model
-            
-        except Exception as e:
-            error_str = str(e)
-            # Universal error catching for fallback
-            if any(code in error_str for code in ["429", "RESOURCE_EXHAUSTED", "503"]):
-                wait_val = 5 * (attempt_num + 1)
-                logger.warning(f"[Gemini] {model} hit Rate Limit for {context}. Tactical sleep for {wait_val}s...")
-                time.sleep(wait_val)
-                switch_to_next_model()
-            elif any(code in error_str for code in ["404", "NOT_FOUND"]):
-                logger.warning(f"[Gemini] {model} unavailable. Switching model...")
-                switch_to_next_model()
-            else:
-                logger.error(f"[Gemini] {model} critical error for {context}: {e}")
-                # Try OpenRouter even on non-quota errors if it's the last hope
-                break
-    
-    # Ultimate Fallback: OpenRouter (ENGAGED ONLY IF NATIVE EXHAUSTED)
-    if OPENROUTER_API_KEY:
-        logger.warning(f"[Gemini] All native models exhausted for {context}. Engaging OpenRouter Fallback Tier...")
-        fallback_text, or_model = _generate_via_openrouter(prompt, context=context, enable_reasoning=enable_reasoning)
-        if fallback_text:
-            return fallback_text, f"openrouter/{or_model}"
-    else:
-        logger.error(f"[Gemini] No OpenRouter API Key available for emergency fallback.")
-        
-    logger.error(f"[Gemini] EVERY intelligence path exhausted for {context}.")
-    return None, None
-
-
 def get_model_status() -> dict:
-    """Returns the current model fallback status."""
+    """Returns the current unified model pool status."""
+    # Count currently rate-limited models
+    now = time.time()
+    with _tracker_lock:
+        rate_limited = [
+            model_id for model_id, ts in _rate_limit_tracker.items()
+            if (now - ts) < _RATE_LIMIT_COOLDOWN
+        ]
+    
     return {
-        "current_model": get_current_model(),
-        "model_chain": MODEL_CHAIN,
-        "openrouter_chain": OPENROUTER_CHAIN,
-        "switch_count": _state.switch_count,
-        "last_switch": _state.last_switch,
-        "openrouter_enabled": bool(OPENROUTER_API_KEY)
+        "pool_size": len(UNIFIED_MODEL_POOL),
+        "model_pool": [
+            {
+                "id": m["id"],
+                "provider": m["provider"],
+                "tier": m["tier"],
+                "rate_limited": m["id"] in rate_limited
+            }
+            for m in UNIFIED_MODEL_POOL
+        ],
+        "agent_assignments": AGENT_MODEL_ASSIGNMENTS,
+        "rate_limited_models": rate_limited,
+        "exhaustion_count": _state.switch_count,
+        "last_exhaustion": _state.last_switch,
+        "openrouter_enabled": bool(OPENROUTER_API_KEY),
+        "validated_models": _validated_models,
     }

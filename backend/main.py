@@ -121,7 +121,7 @@ def healthcheck():
 
 @app.get("/system/model-status")
 def get_model_status():
-    """Returns the current Gemini model fallback status."""
+    """Returns the unified model pool status across all providers."""
     from backend.core.model_config import get_model_status  # type: ignore[import-untyped]
     return get_model_status()
 
@@ -132,7 +132,7 @@ def get_startup_insight():
 
 @app.get("/system/token-usage")
 def get_token_usage():
-    """Returns the running Gemini token usage for this server session."""
+    """Returns the running AI token usage across all providers (Gemini + OpenRouter)."""
     from backend.core.token_tracker import get_session_totals  # type: ignore[import-untyped]
     return get_session_totals()
 

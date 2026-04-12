@@ -162,16 +162,22 @@ def autonomous_monitoring_job():
             
         log_activity("AutonomousAgent", "Monitoring cycle complete.")
         
-        # --- NEW: Autonomous Phase 2 Cycles ---
+        # --- Autonomous Phase 2 Cycles (with cooldowns to prevent rate limit bursts) ---
         try:
             orchestrator.run_predictive_cycle(db)
             log_activity("PredictiveAgent", "Forecast snapshots updated.")
             
+            time.sleep(10)  # Cooldown between AI-heavy phases
+            
             orchestrator.run_auto_verification_cycle(db)
             log_activity("VerifierAgent", "Auto-verification pass complete.")
             
+            time.sleep(10)  # Cooldown between AI-heavy phases
+            
             # Realtime Tavily intelligence (self-throttles to every 6h)
             orchestrator.run_realtime_intelligence_cycle(db)
+            
+            time.sleep(10)  # Cooldown between AI-heavy phases
             
             # Briefing run once per day (checks for existing within 24h)
             last_briefing = db.query(models.AutonomousSnapshot)\
@@ -294,6 +300,11 @@ async def start_scheduler():
     # Schedule the initial runs on the background scheduler's thread pool
     # We stagger them to avoid concurrent lock contention on the vector store at cold-start
     import threading
+    
+    # Validate model pool availability in background
+    from backend.core.model_config import validate_model_pool
+    threading.Thread(target=validate_model_pool, daemon=True, name="ModelValidation").start()
+    
     threading.Thread(target=_generate_startup_insight, daemon=True, name="StartupInsight").start()
     
     def delayed_monitoring():

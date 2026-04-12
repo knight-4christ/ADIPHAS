@@ -1,5 +1,7 @@
 import requests  # type: ignore[import-untyped]
 import os
+import time
+from datetime import datetime
 import streamlit as st
 
 # Try Streamlit Secrets first, then OS environment, then fallback to localhost
@@ -7,6 +9,42 @@ try:
     API_URL = st.secrets.get("BACKEND_URL", os.getenv("BACKEND_URL", "http://localhost:8000"))
 except Exception:
     API_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
+
+# ── Client-side TTL cache to prevent redundant polling ──
+_cache: dict = {}
+_DEFAULT_CACHE_TTL = 30  # seconds
+
+def _cached_request(cache_key: str, method: str, url: str, ttl: int = _DEFAULT_CACHE_TTL, **kwargs):
+    """Returns cached response if available and fresh, otherwise makes a new request."""
+    now = time.time()
+    if cache_key in _cache and (now - _cache[cache_key]["time"]) < ttl:
+        return _cache[cache_key]["data"]
+    data = _safe_request(method, url, **kwargs)
+    _cache[cache_key] = {"data": data, "time": now}
+    return data
+
+def time_ago(iso_str: str) -> str:
+    """Converts an ISO timestamp into a human-readable 'time ago' string."""
+    if not iso_str: return "Unknown"
+    try:
+        dt = datetime.fromisoformat(iso_str.replace('Z', '+00:00'))
+        # If naive, assume UTC (backend operates in UTC)
+        if dt.tzinfo is None:
+            now = datetime.utcnow()
+        else:
+            from datetime import timezone
+            now = datetime.now(timezone.utc)
+            
+        diff = now - dt
+        seconds = diff.total_seconds()
+        
+        if seconds < 60: return "Just now"
+        if seconds < 3600: return f"{int(seconds // 60)}m ago"
+        if seconds < 86400: return f"{int(seconds // 3600)}h ago"
+        if seconds < 172800: return "Yesterday"
+        return f"{int(seconds // 86400)}d ago"
+    except Exception:
+        return str(iso_str).split('T')[0]
 
 def _safe_request(method, url, **kwargs):
     """Internal helper to handle requests and catch non-JSON responses."""
@@ -40,7 +78,7 @@ def upload_idsr(file):
     return _safe_request("POST", f"{API_URL}/api/data/idsr_upload", files=files)
 
 def get_alerts():
-    return _safe_request("GET", f"{API_URL}/api/ebs/list")
+    return _cached_request("ebs_list", "GET", f"{API_URL}/api/ebs/list", ttl=30)
 
 def assess_symptoms(payload):
     return _safe_request("POST", f"{API_URL}/api/advisory/symptom_check", json=payload)
@@ -175,9 +213,9 @@ def get_system_metrics():
     return _safe_request("GET", f"{API_URL}/api/system/metrics")
 
 def get_model_status():
-    """Returns the current Gemini model fallback status."""
-    return _safe_request("GET", f"{API_URL}/system/model-status")
+    """Returns the current unified model pool status."""
+    return _cached_request("model_status", "GET", f"{API_URL}/system/model-status", ttl=30)
 
 def get_latest_briefing():
     """Returns the most recent system-wide autonomous briefing snapshot."""
-    return _safe_request("GET", f"{API_URL}/system/briefing")
+    return _cached_request("briefing", "GET", f"{API_URL}/system/briefing", ttl=60)

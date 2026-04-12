@@ -45,7 +45,7 @@ def render():
                         with col1:
                             st.markdown(f"**Location:** {alert.get('location_text')}")
                             st.markdown(f"**🛡️ Evidence Trace:** Source: {alert.get('source', 'Autonomous Agent')} (ID: {alert.get('alert_id')[:8]})")
-                            st.markdown(f"**Timestamp:** {alert.get('timestamp')}")
+                            st.markdown(f"**Timestamp:** {api_client.time_ago(alert.get('timestamp'))}")
                             
                             # RAG Verification
                             if st.button("🔍 Cross-Reference Intelligence", key=f"rag_{alert['alert_id']}"):
