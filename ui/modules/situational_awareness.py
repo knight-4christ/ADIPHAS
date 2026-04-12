@@ -23,7 +23,49 @@ def render():
 
     st.divider()
 
-    # --- MAIN CONTENT: MAP + BRIEFING ---
+    # --- TOP CONTENT: StAMP BRIEFING ---
+    st.subheader("🧠 StAMP Intelligence Briefing")
+    
+    # Personalized Insight First
+    if st.session_state.get("authenticated") and st.session_state.get("user_location"):
+        st.markdown("##### 🧬 Personalized Geo-Health Insight")
+        
+        if "dashboard_insight" not in st.session_state:
+            with st.spinner(f"Generating insight for {st.session_state.user_location}..."):
+                res = api_client.get_dashboard_insight(
+                    st.session_state.token,
+                    st.session_state.user_location,
+                    f"Current StAMP Alert Count: {num_alerts}"
+                )
+                st.session_state.dashboard_insight = res.get("insight", "No insights available.")
+        
+        st.info(f"📍 **{st.session_state.user_location}**: {st.session_state.dashboard_insight}")
+        st.divider()
+
+    briefing = api_client.get_latest_briefing()
+    if briefing and "content" in briefing:
+        st.markdown(briefing["content"])
+        try:
+            # Convert ISO string "2026-03-30T23:17:56.509344" to friendly "Mar 30, 2026 - 11:17 PM"
+            dt = pd.to_datetime(briefing.get('generated_at', ''))
+            st.caption(f"Generated at: {dt.strftime('%b %d, %Y - %I:%M %p')}")
+        except Exception:
+            st.caption(f"Generated at: {briefing.get('generated_at', 'N/A')}")
+    else:
+        st.info("🛰️ Generating next autonomous briefing... check back in a few minutes.")
+        
+    if st.button("🔄 Force Real-time StAMP Sweep", key="manual_insight", use_container_width=True):
+        with st.spinner("Executing StAMP Intelligence Sweep (Tavily + AI Synthesis)..."):
+            res = api_client.trigger_manual_briefing()
+            if res and not res.get("error"):
+                st.success("Briefing generated! Refreshing...")
+                st.rerun()
+            else:
+                st.error("Manual trigger failed. Check logs or quota.")
+
+    st.divider()
+
+    # --- MAIN CONTENT: MAP + LIVE STREAM ---
     left_col, right_col = st.columns([2, 1])
 
     with left_col:
@@ -36,46 +78,6 @@ def render():
             st.error(f"Error loading map: {e}")
 
     with right_col:
-        st.subheader("🧠 StAMP Intelligence Briefing")
-        
-        # --- PERSONALIZED DASHBOARD INSIGHT ---
-        if st.session_state.get("authenticated") and st.session_state.get("user_location"):
-            st.markdown("##### 🧬 Personalized Geo-Health Insight")
-            
-            if "dashboard_insight" not in st.session_state:
-                with st.spinner(f"Generating insight for {st.session_state.user_location}..."):
-                    res = api_client.get_dashboard_insight(
-                        st.session_state.token,
-                        st.session_state.user_location,
-                        f"Current StAMP Alert Count: {num_alerts}"
-                    )
-                    st.session_state.dashboard_insight = res.get("insight", "No insights available.")
-            
-            st.info(f"📍 **{st.session_state.user_location}**: {st.session_state.dashboard_insight}")
-            st.divider()
-
-        briefing = api_client.get_latest_briefing()
-        if briefing and "content" in briefing:
-            st.markdown(briefing["content"])
-            try:
-                # Convert ISO string "2026-03-30T23:17:56.509344" to friendly "Mar 30, 2026 - 11:17 PM"
-                dt = pd.to_datetime(briefing.get('generated_at', ''))
-                st.caption(f"Generated at: {dt.strftime('%b %d, %Y - %I:%M %p')}")
-            except Exception:
-                st.caption(f"Generated at: {briefing.get('generated_at', 'N/A')}")
-        else:
-            st.info("🛰️ Generating next autonomous briefing... check back in a few minutes.")
-            
-        if st.button("🔄 Force Real-time StAMP Sweep", key="manual_insight", use_container_width=True):
-            with st.spinner("Executing StAMP Intelligence Sweep (Tavily + AI Synthesis)..."):
-                res = api_client.trigger_manual_briefing()
-                if res and not res.get("error"):
-                    st.success("Briefing generated! Refreshing...")
-                    st.rerun()
-                else:
-                    st.error("Manual trigger failed. Check logs or quota.")
-
-        st.divider()
         st.subheader("📡 Live Intelligence Stream")
         if num_alerts > 0:
             for a in alerts[:5]:
