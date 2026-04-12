@@ -35,7 +35,8 @@ class AdvisoryEngine:
 
         full_prompt = f"""
         Act as the ADIPHAS Health Advisory Agent. 
-        Context: You are helping a resident of Lagos, Nigeria.
+        Context: You are helping a resident of Lagos, Nigeria named {user_metadata.get('name', 'User') if user_metadata else 'User'}.
+        Address them by their name directly.
         {bio_block}
         {context_block}
         
@@ -43,7 +44,8 @@ class AdvisoryEngine:
         {history_str}
         
         Provide the next response following the guidelines of NCDC and WHO. 
-        Be professional, concise, and prioritize safety.
+        Be professional, comprehensive, detailed, and simple to understand.
+        CRITICAL RULE: DO NOT use markdown tables. Provide output as text and bullet points only.
         """
         try:
             from backend.core.model_config import smart_generate  # type: ignore[import-untyped]
@@ -73,15 +75,17 @@ class AdvisoryEngine:
         prompt = f"""
         Act as a Senior Clinical Epidemiologist and Medical Consultant in Nigeria.
         Condition: Patient reports {', '.join(symptoms)} over {duration_days} days.
+        Patient Name: {user_metadata.get('name', 'User') if user_metadata else 'User'}
         {bio_block}
         {context_block}
         
-        Provide a concise (2 sentence) actionable advisory. 
+        Provide a highly professional, comprehensive, detailed yet simple-to-understand actionable advisory tailored to {user_metadata.get('name', 'the user') if user_metadata else 'them'}. 
         Focus on: 
-        1. Specific Clinical Protocol (e.g., "Initiate ORS and isolate", "Perform RDT for Malaria").
-        2. Public Health Action (e.g., "Report to LGA surveillance officer if symptoms persist").
+        1. Specific Clinical Protocol.
+        2. Public Health Action.
         
-        IMPORTANT: Use the provided Biological Profile (Genotype/Blood Group) to tailor the advice (e.g., implications for malaria or sickle-cell risks).
+        IMPORTANT: Use their Biological Profile to tailor the advice. 
+        CRITICAL RULE: DO NOT use markdown tables under any circumstances. Use bullet points and paragraphs.
         """
         try:
             from backend.core.model_config import smart_generate  # type: ignore[import-untyped]
@@ -226,13 +230,16 @@ class AdvisoryEngine:
         
         bio_block = f"Genotype: {user_metadata.get('genotype', 'N/A')}, Blood Group: {user_metadata.get('blood_group', 'N/A')}, Conditions: {user_metadata.get('health_conditions', 'None')}"
         
+        user_name = user_metadata.get('name', 'User')
         prompt = f"""
         Act as the ADIPHAS public health command center AI. 
+        User Name: {user_name}
         User Location: {location}
         User Biodata: {bio_block}
         Recent Local Alerts context: {alerts_summary}
         
-        Provide a rapid, highly personalized 2-sentence situational briefing specifically tailored to this user's location and biological profile based on any potential local outbreaks or general wellness in that area. Focus purely on immediate awareness and actionable personal advice.
+        Provide a highly personalized, comprehensive, detailed and professional situational briefing tailored specifically to {user_name}'s location ({location}) and biological profile. Address {user_name} directly.
+        CRITICAL RULE: DO NOT use tables. Output simple, easy-to-read prose. Keep it under 3-4 sentences total so it fits on a dashboard.
         """
         try:
             from backend.core.model_config import smart_generate # type: ignore[import-untyped]

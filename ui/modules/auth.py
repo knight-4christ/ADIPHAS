@@ -55,7 +55,15 @@ def render_login_modal():
                                     loc = detected_loc if detected_loc else profile_loc
                                     loc_msg = f" | Location: {loc}" if loc else ""
                                     
-                                    st.success(f"Welcome back, {me['username']}!{loc_msg}")
+                                    if not me.get('location_lga'):
+                                        st.session_state.active_nav_cat = "Account"
+                                        st.session_state.active_nav_mod = "My Profile"
+                                        st.warning("Please complete your biodata first.")
+                                    else:
+                                        st.session_state.active_nav_cat = "Surveillance"
+                                        st.session_state.active_nav_mod = "Command Centre"
+                                        st.success(f"Welcome back, {me['username']}!{loc_msg}")
+                                        
                                     time.sleep(1.2)
                                     st.rerun()
                                 else:

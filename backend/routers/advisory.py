@@ -22,6 +22,7 @@ def check_symptoms(payload: dict, current_user: models.User = Depends(get_curren
     
     # Extract biodata for personalization
     user_metadata = {
+        "name": current_user.username,
         "genotype": current_user.genotype,
         "blood_group": current_user.blood_group,
         "health_conditions": current_user.health_conditions,
@@ -37,6 +38,7 @@ def chat_advisory(payload: schemas.ChatPayload, current_user: models.User = Depe
     Stateful chat endpoint that uses universal fallbacks and high-performance reasoning models.
     """
     user_metadata = {
+        "name": current_user.username,
         "genotype": current_user.genotype,
         "blood_group": current_user.blood_group,
         "health_conditions": current_user.health_conditions,
@@ -59,6 +61,7 @@ def chat_advisory(payload: schemas.ChatPayload, current_user: models.User = Depe
 def dashboard_insight(payload: dict, current_user: models.User = Depends(get_current_user)):
     """Generates a rapid tailored insight for the user's dashboard."""
     user_metadata = {
+        "name": current_user.username,
         "genotype": current_user.genotype,
         "blood_group": current_user.blood_group,
         "health_conditions": current_user.health_conditions,

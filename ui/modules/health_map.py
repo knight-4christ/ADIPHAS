@@ -1,5 +1,6 @@
 import streamlit as st
 import folium
+from folium import plugins
 from streamlit_folium import st_folium
 import api_client
 
@@ -118,15 +119,20 @@ def render():
         st.warning("No LGAs match the current filter.")
         return
 
-    # Determine map center: user location or default Lagos center
-    if user_lat and user_lon:
+    # Determine map center: Priority 1: LGA Filter, Priority 2: User Location, Priority 3: Default Lagos
+    if lga_filter and lga_filter[0] in LAGOS_LGAS:
+        first_lga_coords = LAGOS_LGAS[lga_filter[0]]
+        center_lat, center_lon = first_lga_coords["lat"], first_lga_coords["lon"]
+        map_zoom = 13
+    elif user_lat and user_lon:
         center_lat, center_lon = user_lat, user_lon
         map_zoom = 12
     else:
         center_lat, center_lon = 6.5244, 3.3792
         map_zoom = 10
 
-    m = folium.Map(location=[center_lat, center_lon], zoom_start=map_zoom, tiles="CartoDB dark_matter")
+    m = folium.Map(location=[center_lat, center_lon], zoom_start=map_zoom, tiles="CartoDB positron")
+    plugins.Fullscreen().add_to(m)
 
     if user_lat and user_lon:
         folium.Marker(

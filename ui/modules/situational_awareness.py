@@ -65,6 +65,31 @@ def render():
 
     st.divider()
 
+    with st.expander("📡 Active Surveillance Zones (Monitored LGAs)", expanded=False):
+        from .health_map import LAGOS_LGAS
+        active_lgas = []
+        for a in alerts:
+            ltext = a.get('location_text', '')
+            for lga in LAGOS_LGAS.keys():
+                if lga.lower() in ltext.lower():
+                    active_lgas.append(lga)
+        active_lgas = set(active_lgas)
+
+        monitored = []
+        for lga in LAGOS_LGAS.keys():
+            if lga in active_lgas:
+                monitored.append(f"🔴 **{lga}**: Active Outbreak Signals")
+            else:
+                monitored.append(f"🟢 **{lga}**: Surveillance Nominal")
+        
+        c1, c2, c3 = st.columns(3)
+        for i, item in enumerate(monitored):
+            if i % 3 == 0: c1.write(item)
+            elif i % 3 == 1: c2.write(item)
+            else: c3.write(item)
+            
+    st.divider()
+
     # --- MAIN CONTENT: MAP + LIVE STREAM ---
     left_col, right_col = st.columns([2, 1])
 

@@ -168,6 +168,7 @@ class OrchestratorAgent:
         rt_ctx = realtime_snap.content[:500] if realtime_snap else "No web intelligence available"
         prompt = f"""Generate a highly professional, detailed, and comprehensive situational briefing (Markdown) for public health officials.
 CRITICAL MOBILE UX RULE: While the content must be detailed and analytical, YOU MUST use bullet points, bold text, and short paragraphs (max 2 sentences per paragraph) to prevent massive walls of text and ensure readability on mobile devices.
+CRITICAL RULE: DO NOT use markdown tables under any circumstances.
 Today's Date: {datetime.now().strftime('%B %d, %Y')}
 DB Signals:
 {alert_ctx}

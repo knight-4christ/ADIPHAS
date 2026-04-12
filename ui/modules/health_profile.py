@@ -31,6 +31,18 @@ def render():
     with col2:
         st.subheader("Edit Bio-Data")
         
+        browser_loc = st.session_state.get('user_location')
+        if browser_loc and browser_loc != user.get('location_lga'):
+            st.info(f"📍 Browser detected you near **{browser_loc}**.")
+            if st.button("Save as Current Location"):
+                res = api_client.update_profile(st.session_state.token, {"location_lga": browser_loc})
+                if res and "username" in res:
+                    st.session_state.user = res
+                    st.success("Location successfully locked to profile!")
+                    st.rerun()
+                else:
+                    st.error("Failed to update location.")
+        
         with st.form("edit_profile"):
             # Added username editing
             new_username = st.text_input("Username / ID", value=user.get('username', ''))
