@@ -11,14 +11,17 @@ def render():
     alerts = api_client.get_alerts()
     num_alerts = len(alerts) if isinstance(alerts, list) else 0
     
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
+    # Rendered as two 2-column rows to natively enforce a 2x2 grid on mobile/smaller screens
+    top_c1, top_c2 = st.columns(2)
+    with top_c1:
         st.metric("Total Signals", num_alerts, delta=f"+{num_alerts % 5} new", help="Total EBS signals captured in the current cycle")
-    with col2:
+    with top_c2:
         st.metric("System Posture", "ELEVATED" if num_alerts > 10 else "ROUTINE", delta_color="inverse")
-    with col3:
+        
+    bot_c1, bot_c2 = st.columns(2)
+    with bot_c1:
         st.metric("F1-Extraction", "0.92", help="Current NLP Accuracy Score")
-    with col4:
+    with bot_c2:
         st.metric("Active Providers", "2", help="Gemini + OpenRouter Fallback Tier")
 
     st.divider()

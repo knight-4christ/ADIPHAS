@@ -34,8 +34,18 @@ def _generate_pdf_bytes(content: str, title: str = "ADIPHAS Intelligence Report"
     
     def _s(text: str) -> str:
         # FPDF core fonts only support latin-1. Emojis and other Unicode characters crash it.
-        return text.encode('latin-1', 'replace').decode('latin-1')
-        
+        # Also split any extremely long words (like raw URLs) that exceed 80 chars
+        # because fpdf2 multi_cell crashes if a word is longer than the page width.
+        safe_text = text.encode('latin-1', 'replace').decode('latin-1')
+        words = []
+        for w in safe_text.split():
+            if len(w) > 75:
+                # Insert spaces into the long word so fpdf can wrap it
+                words.append(" ".join(w[i:i+75] for i in range(0, len(w), 75)))
+            else:
+                words.append(w)
+        return " ".join(words) if safe_text.strip() else safe_text
+
     # Header
     pdf.set_font("Helvetica", "B", 16)
     pdf.cell(0, 12, _s(title), ln=True, align="C")
@@ -65,7 +75,7 @@ def _generate_pdf_bytes(content: str, title: str = "ADIPHAS Intelligence Report"
             pdf.set_font("Helvetica", "", 10)
             pdf.cell(8)  # Indent
             pdf.multi_cell(0, 6, _s(f"• {line[2:]}"))
-        elif line.startswith("─"):
+        elif line.startswith("─") or line.startswith("="):
             pdf.set_draw_color(200, 200, 200)
             pdf.line(10, pdf.get_y(), 200, pdf.get_y())
             pdf.ln(4)
