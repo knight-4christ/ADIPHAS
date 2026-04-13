@@ -3,18 +3,14 @@ import api_client
 import pandas as pd
 from datetime import datetime
 
-# Lagos LGA Coordinates (Approximate Centers) from app.py for consistency
-LAGOS_LGAS = [
-    "Agege", "Ajeromi-Ifelodun", "Alimosho", "Amuwo-Odofin", "Apapa", "Badagry", 
-    "Epe", "Eti-Osa", "Ibeju-Lekki", "Ifako-Ijaiye", "Ikeja", "Ikorodu", 
-    "Kosofe", "Lagos Island", "Lagos Mainland", "Mushin", "Ojo", "Oshodi-Isolo", 
-    "Shomolu", "Surulere"
-]
-
-def render():
+def render(force_completion: bool = False):
     st.title("👤 My Health Profile")
     
     user = st.session_state.user
+    
+    # --- MANDATORY COMPLETION BANNER ---
+    if force_completion:
+        st.error("🚨 **Action Required**: You must complete ALL bio-data fields below before accessing other modules. This ensures you receive personalized health intelligence tailored to your profile.")
     
     col1, col2 = st.columns([1, 2])
     
@@ -28,101 +24,183 @@ def render():
         st.text(f"Username: {user.get('username')}")
         st.text(f"Role: {user.get('role')}")
         
+        # Show which fields are missing
+        if force_completion:
+            st.write("---")
+            st.markdown("**📋 Completion Status:**")
+            fields_status = {
+                "Blood Group": user.get('blood_group'),
+                "Genotype": user.get('genotype'),
+                "Location": user.get('location_lga'),
+                "Health Conditions": user.get('health_conditions'),
+            }
+            for field_name, value in fields_status.items():
+                if value and str(value).strip() and value != 'None':
+                    st.markdown(f"✅ {field_name}")
+                else:
+                    st.markdown(f"❌ **{field_name}** — Required")
+        
     with col2:
         st.subheader("Edit Bio-Data")
         
-        browser_loc = st.session_state.get('user_location')
-        if browser_loc and browser_loc != user.get('location_lga'):
-            st.info(f"📍 Browser detected you near **{browser_loc}**.")
-            if st.button("Save as Current Location"):
-                res = api_client.update_profile(st.session_state.token, {"location_lga": browser_loc})
-                if res and "username" in res:
-                    st.session_state.user = res
-                    st.success("Location successfully locked to profile!")
-                    st.rerun()
+        # --- LOCATION DETECTION (Button-based, not dropdown) ---
+        st.markdown("**📍 Current Location**")
+        current_loc = user.get('location_lga', '')
+        detected_loc = st.session_state.get('user_location')
+        
+        loc_col1, loc_col2 = st.columns([2, 1])
+        with loc_col1:
+            if current_loc:
+                st.success(f"📍 Location set: **{current_loc}**")
+            else:
+                st.warning("📍 No location set yet — click the button to detect →")
+        
+        with loc_col2:
+            if st.button("📍 Detect My Location", use_container_width=True, type="primary"):
+                if detected_loc:
+                    # Save detected browser location to profile
+                    res = api_client.update_profile(st.session_state.token, {"location_lga": detected_loc})
+                    if res and "username" in res:
+                        st.session_state.user = res
+                        st.success(f"✅ Location saved: **{detected_loc}**")
+                        st.rerun()
+                    else:
+                        st.error("Failed to save location.")
                 else:
-                    st.error("Failed to update location.")
+                    st.warning("⚠️ Browser location not available. Please allow location access in your browser and refresh.")
+        
+        if detected_loc and detected_loc != current_loc:
+            st.info(f"🛰️ Browser detected you near **{detected_loc}**. Click 'Detect My Location' to update.")
+        
+        st.divider()
         
         with st.form("edit_profile"):
             # Added username editing
             new_username = st.text_input("Username / ID", value=user.get('username', ''))
             
             c1, c2 = st.columns(2)
-            bg = c1.selectbox("Blood Group", ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"], index=0) # Should set index based on current
-            gt = c2.selectbox("Genotype", ["AA", "AS", "SS", "AC"], index=0) 
             
-            lga = st.selectbox("Current Location (LGA)", LAGOS_LGAS)
+            # Set current values for dropdowns
+            bg_options = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]
+            current_bg = user.get('blood_group', '')
+            bg_index = bg_options.index(current_bg) if current_bg in bg_options else 0
+            
+            gt_options = ["AA", "AS", "SS", "AC"]
+            current_gt = user.get('genotype', '')
+            gt_index = gt_options.index(current_gt) if current_gt in gt_options else 0
+            
+            bg = c1.selectbox("Blood Group *", bg_options, index=bg_index)
+            gt = c2.selectbox("Genotype *", gt_options, index=gt_index)
+            
             address = st.text_input("Residential Address", value=user.get('address', ''))
             
-            conditions = st.text_area("Underlying Conditions", value=user.get('health_conditions', ''))
+            conditions = st.text_area(
+                "Underlying Health Conditions *", 
+                value=user.get('health_conditions', ''),
+                placeholder="e.g., Asthma, Diabetes, Hypertension, or 'None' if healthy",
+                help="Enter 'None' if you have no underlying conditions. This field is required."
+            )
             
-            if st.form_submit_button("Update Profile"):
-                update_data = {
-                    "username": new_username,
-                    "blood_group": bg,
-                    "genotype": gt,
-                    "location_lga": lga,
-                    "health_conditions": conditions
-                }
+            if force_completion:
+                st.info("💡 All fields marked with * are mandatory. Click 'Detect My Location' above to set your location. Enter 'None' for health conditions if you have no underlying conditions.")
+            
+            submitted = st.form_submit_button("Update Profile", use_container_width=True)
+            if submitted:
+                # Validate all required fields
+                validation_errors = []
+                if not bg:
+                    validation_errors.append("Blood Group is required")
+                if not gt:
+                    validation_errors.append("Genotype is required")
+                if not user.get('location_lga') and not detected_loc:
+                    validation_errors.append("Location is required — click 'Detect My Location' above")
+                if not conditions or not conditions.strip():
+                    validation_errors.append("Health Conditions is required (enter 'None' if healthy)")
                 
-                with st.spinner("Updating..."):
-                    res = api_client.update_profile(st.session_state.token, update_data)
-                    if "username" in res:
-                        st.session_state.user = res
-                        st.success("Profile Updated Successfully!")
-                        st.rerun()
-                    else:
-                        st.error("Update failed.")
+                if validation_errors:
+                    for err in validation_errors:
+                        st.error(f"❌ {err}")
+                else:
+                    update_data = {
+                        "username": new_username,
+                        "blood_group": bg,
+                        "genotype": gt,
+                        "health_conditions": conditions.strip()
+                    }
+                    # Only update location if detected and not already set
+                    if detected_loc and not user.get('location_lga'):
+                        update_data["location_lga"] = detected_loc
+                    
+                    with st.spinner("Updating..."):
+                        res = api_client.update_profile(st.session_state.token, update_data)
+                        if "username" in res:
+                            st.session_state.user = res
+                            st.success("✅ Profile Updated Successfully!")
+                            if force_completion:
+                                st.balloons()
+                                st.info("🎉 Profile complete! You now have access to all modules. Refreshing...")
+                            st.rerun()
+                        else:
+                            st.error("Update failed.")
 
     st.divider()
     
-    # --- HEALTH TRACKER (Symptoms Only) ---
-    st.subheader("🩺 Health Tracker & Advisory")
-    
-    st.write("Analyze symptoms against autonomous disease intelligence.")
-    with st.form("symptom_form"):
-        symptoms = st.multiselect("Select Symptoms", 
-            ["Fever", "Bleeding", "Headache", "Vomiting", "Diarrhea", "Rice-water stool", "Chills", "Sore throat", "Rash"]
-        )
-        duration = st.slider("Duration (days)", 1, 14, 1)
+    # --- HEALTH TRACKER (Symptoms Only) — hide during forced completion ---
+    if not force_completion:
+        st.subheader("🩺 Health Tracker & Advisory")
         
-        if st.form_submit_button("Assess Risk"):
-            if symptoms:
-                payload = {
-                    "symptoms": symptoms, 
-                    "duration_days": duration,
-                    "user_id": st.session_state.user.get("id"),
-                    "timestamp": datetime.now().isoformat()
-                }
-                with st.spinner("Consulting Advisory Engine..."):
-                    result = api_client.assess_symptoms(payload)
-                
-                st.divider()
-                # Display Risk
-                risk_score = result.get("risk_score", 0)
-                st.progress(risk_score)
-                
-                cat = result.get("risk_category", "Low")
-                if "CRITICAL" in cat.upper():
-                    st.error(f"🚨 {cat}")
-                elif "HIGH" in cat.upper():
-                    st.warning(f"⚠️ {cat}")
-                else:
-                    st.success(f"✅ {cat}")
-                
-                # AI Situational Summary
-                ai_summary = result.get("ai_situational_summary")
-                if ai_summary:
-                    st.info(f"🛡️ **AI Situational Risk**: {ai_summary}")
-
-                # AI Clinical Insight
-                ai_insight = result.get("ai_clinical_insight")
-                if ai_insight:
-                    st.success(f"🩺 **AI Clinical Insight**: {ai_insight}")
+        st.write("Analyze symptoms against autonomous disease intelligence.")
+        with st.form("symptom_form"):
+            symptoms = st.multiselect("Select Symptoms", 
+                ["Fever", "Bleeding", "Headache", "Vomiting", "Diarrhea", "Rice-water stool", "Chills", "Sore throat", "Rash"]
+            )
+            duration = st.slider("Duration (days)", 1, 14, 1)
+            
+            if st.form_submit_button("Assess Risk"):
+                if symptoms:
+                    payload = {
+                        "symptoms": symptoms, 
+                        "duration_days": duration,
+                        "user_id": st.session_state.user.get("id"),
+                        "timestamp": datetime.now().isoformat()
+                    }
+                    with st.spinner("Consulting Advisory Engine..."):
+                        result = api_client.assess_symptoms(payload)
                     
-                st.write("**Personalized Advisory:**")
-                for sug in result.get("suggestions", []):
-                    st.markdown(f"- {sug}")
-            else:
-                st.info("Select symptoms to begin.")
+                    st.divider()
+                    # Display Risk
+                    risk_score = result.get("risk_score", 0)
+                    st.progress(risk_score)
+                    
+                    cat = result.get("risk_category", "Low")
+                    if "CRITICAL" in cat.upper():
+                        st.error(f"🚨 {cat}")
+                    elif "HIGH" in cat.upper():
+                        st.warning(f"⚠️ {cat}")
+                    else:
+                        st.success(f"✅ {cat}")
+                    
+                    # AI Situational Summary
+                    ai_summary = result.get("ai_situational_summary")
+                    if ai_summary:
+                        st.info(f"🛡️ **AI Situational Risk**: {ai_summary}")
 
+                    # AI Clinical Insight
+                    ai_insight = result.get("ai_clinical_insight")
+                    if ai_insight:
+                        st.success(f"🩺 **AI Clinical Insight**: {ai_insight}")
+                        
+                        # Download/Copy buttons for AI insight
+                        from .download_utils import render_download_buttons
+                        render_download_buttons(
+                            ai_insight,
+                            filename_prefix="adiphas_clinical_insight",
+                            title="ADIPHAS Clinical Advisory",
+                            key_suffix="symptom_ai"
+                        )
+                        
+                    st.write("**Personalized Advisory:**")
+                    for sug in result.get("suggestions", []):
+                        st.markdown(f"- {sug}")
+                else:
+                    st.info("Select symptoms to begin.")

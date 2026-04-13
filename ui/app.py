@@ -13,6 +13,15 @@ from modules import (
     situational_awareness, geolocation
 )
 
+def is_profile_complete(user: dict) -> bool:
+    """Checks if the user has completed all mandatory bio-data fields."""
+    required_fields = ['blood_group', 'genotype', 'location_lga', 'health_conditions']
+    for field in required_fields:
+        value = user.get(field)
+        if not value or str(value).strip() == '' or value == 'None':
+            return False
+    return True
+
 # --- GLOBAL DATA FETCH (Cached at Top Level) ---
 @st.cache_data(ttl=20, show_spinner="Gathering health intelligence...")
 def fetch_global_alerts():
@@ -161,7 +170,119 @@ def main():
             border: 1px solid #475569;
             border-radius: 6px;
         }}
+        
+        /* === MOBILE RESPONSIVE === */
+        @media (max-width: 768px) {{
+            /* Stack columns vertically on mobile */
+            [data-testid="stHorizontalBlock"] {{
+                flex-direction: column !important;
+            }}
+            [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {{
+                width: 100% !important;
+                min-width: 100% !important;
+            }}
+            
+            /* Reduce padding for mobile */
+            .main .block-container {{
+                padding: 0.5rem 0.8rem !important;
+            }}
+            
+            /* Smaller headings on mobile */
+            h1 {{ font-size: 1.4rem !important; }}
+            h2 {{ font-size: 1.2rem !important; }}
+            h3 {{ font-size: 1.05rem !important; }}
+            
+            /* Full-width buttons on mobile */
+            div.stButton > button {{
+                width: 100% !important;
+                padding: 0.7rem 1rem !important;
+                font-size: 14px !important;
+            }}
+            
+            /* Compact metrics */
+            [data-testid="stMetricValue"] {{
+                font-size: 1.2rem !important;
+            }}
+            [data-testid="stMetricLabel"] {{
+                font-size: 0.75rem !important;
+            }}
+            
+            /* Sidebar auto-collapse on mobile */
+            [data-testid="stSidebar"] {{
+                min-width: 200px !important;
+                max-width: 260px !important;
+            }}
+            
+            /* Touch-friendly expanders */
+            details summary {{
+                padding: 12px 8px !important;
+                font-size: 14px !important;
+            }}
+        }}
+        
+        @media (max-width: 480px) {{
+            .main .block-container {{
+                padding: 0.3rem 0.5rem !important;
+            }}
+            h1 {{ font-size: 1.2rem !important; }}
+            [data-testid="stMetricValue"] {{
+                font-size: 1rem !important;
+            }}
+        }}
+        
+        /* === BACK TO TOP BUTTON === */
+        #back-to-top {{
+            position: fixed;
+            bottom: 90px;
+            right: 20px;
+            z-index: 99998;
+            background: linear-gradient(135deg, #0ea5e9, #06b6d4);
+            color: white;
+            border: 2px solid #38bdf8;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            font-size: 22px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s ease, opacity 0.3s ease;
+        }}
+        #back-to-top:hover {{
+            transform: scale(1.15);
+        }}
         </style>
+        
+        <!-- Back to Top Button -->
+        <button id="back-to-top" onclick="window.scrollTo({{top: 0, behavior: 'smooth'}})" title="Back to top">⬆</button>
+        <script>
+        window.addEventListener('scroll', function() {{
+            const btn = document.getElementById('back-to-top');
+            if (btn) {{
+                if (window.scrollY > 400) {{
+                    btn.style.display = 'flex';
+                }} else {{
+                    btn.style.display = 'none';
+                }}
+            }}
+        }});
+        // Also check inside Streamlit's main scrollable container
+        const mainSection = document.querySelector('section.main');
+        if (mainSection) {{
+            mainSection.addEventListener('scroll', function() {{
+                const btn = document.getElementById('back-to-top');
+                if (btn) {{
+                    if (mainSection.scrollTop > 400) {{
+                        btn.style.display = 'flex';
+                    }} else {{
+                        btn.style.display = 'none';
+                    }}
+                }}
+            }});
+        }}
+        </script>
     """, unsafe_allow_html=True)
 
     # --- SIDEBAR & NAVIGATION ---
@@ -300,6 +421,16 @@ def main():
         st.warning("⚠️ Access Restricted. Please Login.")
         auth.render_login_modal()
         st.stop()
+    
+    # --- MANDATORY BIO-DATA COMPLETION GATE ---
+    # Non-admin authenticated users must complete their profile before accessing any module
+    if st.session_state.authenticated:
+        user_role = st.session_state.user.get("role", "CITIZEN")
+        if user_role != "ADMIN" and not is_profile_complete(st.session_state.user):
+            st.warning("⚠️ **Profile Incomplete** — Please complete all bio-data fields before accessing other modules.")
+            st.info("📝 Blood Group, Genotype, Location (LGA), and Health Conditions are all required for personalized health intelligence.")
+            health_profile.render(force_completion=True)
+            st.stop()
 
     # Module Router (Using startswith because labels now have counts)
     if choice == "Command Centre":

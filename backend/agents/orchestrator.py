@@ -178,27 +178,92 @@ Live Web Intelligence:
 {rt_ctx}
 Include: 1) Executive Landscape 2) Critical Geo-Hotspots 3) Epidemiological Analysis 4) Actionable Recommendations"""
         
-        try:
-            from backend.core.model_config import smart_generate  # type: ignore[import-untyped]
-            text, model_used = smart_generate(self.gemini_model, prompt, context="BriefingAgent")
-            
-            if text:
-                # Sanitize: strip any leaked reasoning traces before storing
-                import re
-                text = re.sub(r'\[Reasoning\].*?\[Response\]\s*', '', text, flags=re.DOTALL)
-                text = re.sub(r"\[?\{['\"]type['\"]:\s*['\"]reasoning\.text['\"].*?\}\]?", '', text, flags=re.DOTALL)
-                text = text.strip()
+        import re
+        import time as _time
+        
+        # Collect source URLs for transparency
+        source_urls = []
+        if recent_alerts:
+            for a in recent_alerts:
+                if a.url:
+                    source_urls.append(f"- [{a.source}]({a.url})")
+        if realtime_snap and realtime_snap.content:
+            # Extract URLs from realtime snapshot content
+            import re as _re
+            urls_found = _re.findall(r'\(https?://[^\)]+\)', realtime_snap.content)
+            for u in urls_found[:5]:
+                source_urls.append(f"- Web: {u.strip('()')}") 
+        
+        sources_footer = ""
+        if source_urls:
+            sources_footer = "\n\n---\n**📚 Intelligence Sources:**\n" + "\n".join(list(set(source_urls))[:10])
+        
+        # Retry AI generation up to 3 times with cooldowns
+        generated_text = None
+        model_used = None
+        for attempt in range(3):
+            try:
+                from backend.core.model_config import smart_generate  # type: ignore[import-untyped]
+                text, model_used = smart_generate(self.gemini_model, prompt, context="BriefingAgent")
                 
-                snapshot = models.AutonomousSnapshot(
-                    snapshot_type="daily_briefing",
-                    content=text,
-                    expires_at=datetime.utcnow() + timedelta(hours=24)
-                )
-                db.add(snapshot)
-                db.commit()
-                logger.info("System-wide briefing generated successfully.")
-        except Exception as e:
-            logger.error(f"Briefing generation failed: {e}")
+                if text:
+                    # Sanitize: strip any leaked reasoning traces before storing
+                    text = re.sub(r'\[Reasoning\].*?\[Response\]\s*', '', text, flags=re.DOTALL)
+                    text = re.sub(r"\[?\{['\"]type['\"]:\s*['\"]reasoning\.text['\"].*?\}\]?", '', text, flags=re.DOTALL)
+                    generated_text = text.strip() + sources_footer
+                    break
+            except Exception as e:
+                wait_time = 15 * (attempt + 1)
+                logger.warning(f"[BriefingAgent] Attempt {attempt+1}/3 failed ({e}). Retrying in {wait_time}s...")
+                _time.sleep(wait_time)
+        
+        if generated_text:
+            snapshot = models.AutonomousSnapshot(
+                snapshot_type="daily_briefing",
+                content=generated_text,
+                expires_at=datetime.utcnow() + timedelta(hours=24)
+            )
+            db.add(snapshot)
+            db.commit()
+            logger.info(f"System-wide briefing generated successfully via {model_used}.")
+        else:
+            # Rule-based fallback — users must NEVER see an empty briefing
+            logger.warning("[BriefingAgent] All AI retries failed. Generating rule-based fallback briefing.")
+            
+            alert_count = len(recent_alerts) if recent_alerts else 0
+            anomaly_count = len(active_anomalies) if active_anomalies else 0
+            diseases_seen = set(a.disease for a in recent_alerts if a.disease) if recent_alerts else set()
+            locations_seen = set(a.location_text for a in recent_alerts if a.location_text) if recent_alerts else set()
+            high_risk = [a for a in recent_alerts if a.risk_level in ('High', 'Critical')] if recent_alerts else []
+            
+            fallback_content = f"""## 🛰️ ADIPHAS Intelligence Briefing — {datetime.now().strftime('%B %d, %Y')}
+
+**⚠️ AI-powered analysis temporarily unavailable. This is a data-driven summary.**
+
+### Executive Landscape
+- **{alert_count}** active disease signals across **{len(locations_seen)}** locations
+- **{anomaly_count}** anomalies flagged by predictive engine
+- Active diseases under surveillance: **{', '.join(diseases_seen) if diseases_seen else 'None detected'}**
+
+### Critical Signals
+"""
+            if high_risk:
+                for a in high_risk[:5]:
+                    fallback_content += f"- 🔴 **{a.disease}** in {a.location_text} — Risk: {a.risk_level}\n"
+            else:
+                fallback_content += "- No critical-risk signals at this time.\n"
+            
+            fallback_content += f"\n### Recommendations\n- Continue monitoring local health feeds for emerging patterns.\n- Report unusual symptoms to your nearest health facility.\n- Next AI-powered briefing will be generated in the next monitoring cycle."
+            fallback_content += sources_footer
+            
+            snapshot = models.AutonomousSnapshot(
+                snapshot_type="daily_briefing",
+                content=fallback_content,
+                expires_at=datetime.utcnow() + timedelta(hours=24)
+            )
+            db.add(snapshot)
+            db.commit()
+            logger.info("Rule-based fallback briefing stored.")
 
     def run_auto_verification_cycle(self, db: Session):
         """Autonomously verifies alerts using multi-source cross-referencing."""

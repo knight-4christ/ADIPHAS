@@ -53,9 +53,19 @@ def render():
                                     sq = f"{alert.get('disease')} outbreaks in {alert.get('location_text')} Nigeria"
                                     rres = api_client.advisory_search(sq)
                                     if rres and not rres.get("error"):
-                                        st.info(f"Source: {rres.get('source').upper()}")
-                                        for rs in rres.get('results', [])[:2]:
-                                            st.caption(rs.get('content') or rs.get('snippet') or str(rs))
+                                        st.info(f"Source: {rres.get('source', '').upper()}")
+                                        for rs in rres.get('results', [])[:3]:
+                                            content = rs.get('content') or rs.get('snippet') or str(rs)
+                                            url = rs.get('url', '')
+                                            title = rs.get('title', '')
+                                            with st.container(border=True):
+                                                if title:
+                                                    st.markdown(f"**{title}**")
+                                                st.write(content[:300] + '...' if len(str(content)) > 300 else content)
+                                                if url:
+                                                    st.link_button("🔗 View Source", url, use_container_width=True)
+                                                else:
+                                                    st.caption("💾 Local Knowledge Base")
                                     else:
                                         st.write("No similar context found.")
                         with col2:

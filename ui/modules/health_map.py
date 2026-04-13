@@ -58,7 +58,7 @@ def render():
 
     col1, col2, col3 = st.columns(3)
     with col1:
-        view_mode = st.selectbox("Layer Logic", ["Disease Outbreaks", "Risk Heatmap"])
+        view_mode = st.selectbox("Layer Logic", ["Disease Outbreaks", "Risk Heatmap", "All Monitored Zones"])
     with col2:
         lga_filter = st.multiselect("Filter LGA", list(LAGOS_LGAS.keys()))
     with col3:
@@ -74,9 +74,9 @@ def render():
 
     map_data = []
 
+    # Build LGA alert buckets (used by all view modes)
+    lga_buckets = {}
     if live_data:
-        # Aggregate alerts by LGA
-        lga_buckets = {}
         for a in alerts:
             lga, coords = _match_lga(a.get("location_text", ""))
             if not lga:
@@ -85,6 +85,37 @@ def render():
                 lga_buckets[lga] = {"coords": coords, "alerts": []}
             lga_buckets[lga]["alerts"].append(a)
 
+    if view_mode == "All Monitored Zones":
+        # Show ALL 20 LGAs regardless of alert status
+        for lga, coords in LAGOS_LGAS.items():
+            if lga_filter and lga not in lga_filter:
+                continue
+            
+            if lga in lga_buckets:
+                bucket_alerts = lga_buckets[lga]["alerts"]
+                risk_priorities = ["Critical", "High", "Moderate", "Low"]
+                risk_levels = [a.get("risk_level", "Low") for a in bucket_alerts]
+                top_risk = next((r for r in risk_priorities if r in risk_levels), "Low")
+                diseases = ", ".join(set(a.get("disease", "Unknown") for a in bucket_alerts if a.get("disease")))
+                map_data.append({
+                    "LGA": lga,
+                    "lat": coords["lat"],
+                    "lon": coords["lon"],
+                    "Value": RISK_WEIGHT.get(top_risk, 12) + (len(bucket_alerts) * 3),
+                    "Status": top_risk,
+                    "Signals": len(bucket_alerts),
+                    "Diseases": diseases or "General Health"
+                })
+            else:
+                # No alerts — show as green/nominal
+                map_data.append({
+                    "LGA": lga, "lat": coords["lat"], "lon": coords["lon"],
+                    "Value": 8, "Status": "Normal", "Signals": 0, "Diseases": "No active signals"
+                })
+        
+        st.success(f"📡 Showing all **{len(map_data)}** monitored zones across Lagos State.")
+    
+    elif live_data:
         for lga, bucket in lga_buckets.items():
             if lga_filter and lga not in lga_filter:
                 continue

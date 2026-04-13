@@ -26,31 +26,58 @@ def render():
     # --- TOP CONTENT: StAMP BRIEFING ---
     st.subheader("🧠 StAMP Intelligence Briefing")
     
-    # Personalized Insight First
-    if st.session_state.get("authenticated") and st.session_state.get("user_location"):
-        st.markdown("##### 🧬 Personalized Geo-Health Insight")
+    # Personalized Insight — ALWAYS show for authenticated users (fallback to profile LGA)
+    if st.session_state.get("authenticated"):
+        user = st.session_state.get("user", {})
+        user_name = user.get("username", "User")
+        # Priority: detected location → profile LGA → default
+        user_location = st.session_state.get("user_location") or user.get("location_lga") or "Lagos"
+        
+        st.markdown(f"##### 🧬 Personalized Briefing for **{user_name}** — 📍 {user_location}")
         
         if "dashboard_insight" not in st.session_state:
-            with st.spinner(f"Generating insight for {st.session_state.user_location}..."):
+            with st.spinner(f"Generating tailored insight for {user_name} in {user_location}..."):
                 res = api_client.get_dashboard_insight(
                     st.session_state.token,
-                    st.session_state.user_location,
-                    f"Current StAMP Alert Count: {num_alerts}"
+                    user_location,
+                    f"User: {user_name}. Current StAMP Alert Count: {num_alerts}"
                 )
                 st.session_state.dashboard_insight = res.get("insight", "No insights available.")
         
-        st.info(f"📍 **{st.session_state.user_location}**: {st.session_state.dashboard_insight}")
+        st.info(f"📍 **{user_location}**: {st.session_state.dashboard_insight}")
+        
+        # Download/Copy for personalized insight
+        from .download_utils import render_download_buttons
+        render_download_buttons(
+            st.session_state.dashboard_insight, 
+            filename_prefix=f"adiphas_insight_{user_name}",
+            title=f"ADIPHAS Personalized Insight — {user_name}",
+            key_suffix="dash_insight"
+        )
         st.divider()
 
+    # System-wide StAMP Briefing
     briefing = api_client.get_latest_briefing()
     if briefing and "content" in briefing:
         st.markdown(briefing["content"])
         try:
-            # Convert ISO string "2026-03-30T23:17:56.509344" to friendly "Mar 30, 2026 - 11:17 PM"
+            # Convert ISO string to friendly format
             dt = pd.to_datetime(briefing.get('generated_at', ''))
             st.caption(f"Generated at: {dt.strftime('%b %d, %Y - %I:%M %p')}")
         except Exception:
             st.caption(f"Generated at: {briefing.get('generated_at', 'N/A')}")
+        
+        # Download/Copy for StAMP briefing
+        from .download_utils import render_download_buttons
+        render_download_buttons(
+            briefing["content"],
+            filename_prefix="adiphas_stamp_briefing",
+            title="ADIPHAS StAMP Intelligence Briefing",
+            key_suffix="stamp_main"
+        )
+        
+        # Intelligence Sources section
+        _render_briefing_sources(briefing, alerts)
     else:
         st.info("🛰️ Generating next autonomous briefing... check back in a few minutes.")
         
@@ -65,55 +92,63 @@ def render():
 
     st.divider()
 
-    with st.expander("📡 Active Surveillance Zones (Monitored LGAs)", expanded=False):
-        from .health_map import LAGOS_LGAS
-        active_lgas = []
-        for a in alerts:
-            ltext = a.get('location_text', '')
-            for lga in LAGOS_LGAS.keys():
-                if lga.lower() in ltext.lower():
-                    active_lgas.append(lga)
-        active_lgas = set(active_lgas)
+    # --- MAP ---
+    st.subheader("📍 Lagos Health Heatmap")
+    try:
+        from .health_map import render as render_map
+        render_map()
+    except Exception as e:
+        st.error(f"Error loading map: {e}")
 
-        monitored = []
-        for lga in LAGOS_LGAS.keys():
-            if lga in active_lgas:
-                monitored.append(f"🔴 **{lga}**: Active Outbreak Signals")
-            else:
-                monitored.append(f"🟢 **{lga}**: Surveillance Nominal")
-        
-        c1, c2, c3 = st.columns(3)
-        for i, item in enumerate(monitored):
-            if i % 3 == 0: c1.write(item)
-            elif i % 3 == 1: c2.write(item)
-            else: c3.write(item)
-            
     st.divider()
 
-    # --- MAIN CONTENT: MAP + LIVE STREAM ---
-    left_col, right_col = st.columns([2, 1])
-
-    with left_col:
-        st.subheader("📍 Lagos Health Heatmap")
-        # Reuse mapping logic from health_map
-        try:
-            from .health_map import render as render_map
-            render_map()
-        except Exception as e:
-            st.error(f"Error loading map: {e}")
-
-    with right_col:
-        st.subheader("📡 Live Intelligence Stream")
+    # --- LIVE INTELLIGENCE STREAM (Dropdown/Expander) ---
+    with st.expander("📡 Live Intelligence Stream", expanded=False):
         if num_alerts > 0:
-            for a in alerts[:5]:
-                with st.expander(f"{a.get('disease', 'Signal')} in {a.get('location_text', 'Unknown')}"):
-                    st.write(a.get("text"))
-                    st.caption(f"Source: {a.get('source')} | Confidence: {a.get('confidence_score', 'N/A')}")
+            for a in alerts[:8]:
+                with st.container(border=True):
+                    risk = a.get('risk_level', 'Low')
+                    colour = {"Critical": "🔴", "High": "🟠", "Moderate": "🟡", "Low": "🟢"}.get(risk, "🔵")
+                    st.markdown(f"**{colour} {a.get('disease', 'Signal')}** — {a.get('location_text', 'Unknown')}")
+                    st.write(a.get("text", "")[:200])
+                    st.caption(f"Source: {a.get('source')} | Risk: {risk}")
+                    url = a.get('url')
+                    if url:
+                        st.link_button("🔗 View Original Source", url, use_container_width=True)
         else:
             st.write("No active signals in the feed.")
 
-    # --- FOOTER: AI TRANSPARENCY ---
-    with st.expander("🛠️ System Trace & AI Resilience"):
-        model_status = api_client.get_model_status()
-        st.json(model_status)
-        st.info("ADIPHAS universal fallback is active. Priority: Gemini Flash → OpenRouter Multi-Tier.")
+
+def _render_briefing_sources(briefing, alerts):
+    """Renders the intelligence sources that informed the StAMP briefing."""
+    with st.expander("📚 Intelligence Sources & Transparency", expanded=False):
+        st.caption("Sources that informed this briefing:")
+        
+        # Extract sources from alerts that fed the briefing
+        if isinstance(alerts, list) and alerts:
+            source_urls = {}
+            for a in alerts[:15]:  # Briefing uses top 15 alerts
+                source = a.get('source', 'Unknown')
+                url = a.get('url')
+                if source not in source_urls:
+                    source_urls[source] = url
+            
+            if source_urls:
+                st.markdown("**📡 EBS Alert Sources:**")
+                for source, url in source_urls.items():
+                    if url:
+                        st.markdown(f"- [{source}]({url})")
+                    else:
+                        st.markdown(f"- {source}")
+        
+        # Check if briefing content itself contains source URLs
+        content = briefing.get("content", "")
+        if "Intelligence Sources:" in content:
+            st.markdown("**🌐 Web & AI Sources:**")
+            # Sources are already embedded in the briefing footer by the orchestrator
+            import re
+            urls = re.findall(r'\[([^\]]+)\]\((https?://[^\)]+)\)', content)
+            for name, url in urls:
+                st.markdown(f"- [{name}]({url})")
+        
+        st.caption("💡 ADIPHAS consolidates from scraped news, government portals, Tavily web intelligence, and local RAG knowledge base.")

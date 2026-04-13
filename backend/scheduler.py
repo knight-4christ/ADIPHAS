@@ -307,6 +307,37 @@ async def start_scheduler():
     
     threading.Thread(target=_generate_startup_insight, daemon=True, name="StartupInsight").start()
     
+    # Periodic briefing watchdog — ensures StAMP briefing always exists
+    def _briefing_watchdog():
+        """Checks every 15 minutes if a valid briefing exists. If not, triggers generation."""
+        time.sleep(120)  # Initial delay: wait for first monitoring cycle
+        while True:
+            try:
+                db_check = database.SessionLocal()
+                last_briefing = db_check.query(models.AutonomousSnapshot)\
+                    .filter(models.AutonomousSnapshot.snapshot_type == "daily_briefing")\
+                    .order_by(models.AutonomousSnapshot.generated_at.desc()).first()
+                
+                needs_briefing = False
+                if not last_briefing:
+                    needs_briefing = True
+                    logger.info("[BriefingWatchdog] No briefing found in DB. Triggering generation...")
+                elif (datetime.utcnow() - last_briefing.generated_at).total_seconds() > 86400:
+                    needs_briefing = True
+                    logger.info("[BriefingWatchdog] Briefing expired (>24h). Triggering regeneration...")
+                
+                if needs_briefing:
+                    orchestrator.run_briefing_cycle(db_check, force=True)
+                    log_activity("BriefingWatchdog", "Forced briefing generation (watchdog).")
+                
+                db_check.close()
+            except Exception as e:
+                logger.warning(f"[BriefingWatchdog] Check failed: {e}")
+            
+            time.sleep(900)  # Check every 15 minutes
+    
+    threading.Thread(target=_briefing_watchdog, daemon=True, name="BriefingWatchdog").start()
+    
     def delayed_monitoring():
         logger.info("[Scheduler] Monitoring cycle deferred for 60s to allow StartupInsight to clear...")
         time.sleep(60) # Wait for StartupInsight to clear initial RAG check

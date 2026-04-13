@@ -47,7 +47,7 @@ def get_user_location(key="geolocation"):
                 {
                     enableHighAccuracy: true,
                     timeout: 10000,
-                    maximumAge: 300000  // Cache for 5 minutes
+                    maximumAge: 0  // Always get fresh position
                 }
             );
         } else {
