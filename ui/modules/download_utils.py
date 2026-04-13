@@ -34,14 +34,14 @@ def _generate_pdf_bytes(content: str, title: str = "ADIPHAS Intelligence Report"
     
     def _s(text: str) -> str:
         # FPDF core fonts only support latin-1. Emojis and other Unicode characters crash it.
-        # Also split any extremely long words (like raw URLs) that exceed 80 chars
-        # because fpdf2 multi_cell crashes if a word is longer than the page width.
+        # Also split any extremely long words (like raw URLs) that exceed 45 chars
+        # because fpdf2 multi_cell crashes if a word is longer than the cell width.
         safe_text = text.encode('latin-1', 'replace').decode('latin-1')
         words = []
         for w in safe_text.split():
-            if len(w) > 75:
-                # Insert spaces into the long word so fpdf can wrap it
-                words.append(" ".join(w[i:i+75] for i in range(0, len(w), 75)))
+            if len(w) > 40:
+                # Insert spaces into the long word so fpdf can wrap it safely
+                words.append(" ".join(w[i:i+40] for i in range(0, len(w), 40)))
             else:
                 words.append(w)
         return " ".join(words) if safe_text.strip() else safe_text
@@ -96,7 +96,7 @@ def _generate_pdf_bytes(content: str, title: str = "ADIPHAS Intelligence Report"
     pdf.set_text_color(128, 128, 128)
     pdf.cell(0, 6, "ADIPHAS Critical Disclaimer: This is an advisory support tool and does not provide medical diagnoses.", ln=True, align="C")
     
-    return pdf.output()
+    return bytes(pdf.output())
 
 
 def _render_copy_button(content: str, key: str):
