@@ -173,11 +173,23 @@ def main():
         
         /* === MOBILE RESPONSIVE === */
         @media (max-width: 768px) {{
-            /* Stack columns vertically on mobile */
-            [data-testid="stHorizontalBlock"] {{
+            /* 4-Column Layouts (like the top metrics) become a 2x2 Grid */
+            [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"]:nth-child(4)) {{
+                display: grid !important;
+                grid-template-columns: 1fr 1fr !important;
+                gap: 10px;
+            }}
+            [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"]:nth-child(4)) > [data-testid="stColumn"] {{
+                width: 100% !important;
+                min-width: 100% !important;
+                padding: 0 !important;
+            }}
+            
+            /* Stack all other columns vertically on mobile */
+            [data-testid="stHorizontalBlock"]:not(:has(> [data-testid="stColumn"]:nth-child(4))) {{
                 flex-direction: column !important;
             }}
-            [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {{
+            [data-testid="stHorizontalBlock"]:not(:has(> [data-testid="stColumn"]:nth-child(4))) > [data-testid="stColumn"] {{
                 width: 100% !important;
                 min-width: 100% !important;
             }}

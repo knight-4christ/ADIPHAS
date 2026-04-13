@@ -32,9 +32,13 @@ def _generate_pdf_bytes(content: str, title: str = "ADIPHAS Intelligence Report"
     pdf.set_auto_page_break(auto=True, margin=20)
     pdf.add_page()
     
+    def _s(text: str) -> str:
+        # FPDF core fonts only support latin-1. Emojis and other Unicode characters crash it.
+        return text.encode('latin-1', 'replace').decode('latin-1')
+        
     # Header
     pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(0, 12, title, ln=True, align="C")
+    pdf.cell(0, 12, _s(title), ln=True, align="C")
     pdf.set_font("Helvetica", "", 9)
     pdf.set_text_color(128, 128, 128)
     pdf.cell(0, 8, f"Generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}", ln=True, align="C")
@@ -60,18 +64,18 @@ def _generate_pdf_bytes(content: str, title: str = "ADIPHAS Intelligence Report"
         if line.startswith("- ") or line.startswith("• "):
             pdf.set_font("Helvetica", "", 10)
             pdf.cell(8)  # Indent
-            pdf.multi_cell(0, 6, f"• {line[2:]}")
+            pdf.multi_cell(0, 6, _s(f"• {line[2:]}"))
         elif line.startswith("─"):
             pdf.set_draw_color(200, 200, 200)
             pdf.line(10, pdf.get_y(), 200, pdf.get_y())
             pdf.ln(4)
         else:
-            # Check if it looks like a heading (ALL CAPS or starts with emoji)
-            if line.isupper() or (len(line) < 60 and line[0] not in "abcdefghijklmnopqrstuvwxyz"):
+            # Check if it looks like a heading (ALL CAPS or starts with emoji/special)
+            if line.isupper() or (len(line) < 60 and (line[0] < 'A' or line[0] > 'z')):
                 pdf.set_font("Helvetica", "B", 11)
             else:
                 pdf.set_font("Helvetica", "", 10)
-            pdf.multi_cell(0, 6, line)
+            pdf.multi_cell(0, 6, _s(line))
     
     # Footer
     pdf.ln(10)
