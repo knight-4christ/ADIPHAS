@@ -23,100 +23,101 @@ def render():
 
     st.divider()
 
-    # --- TOP CONTENT: StAMP BRIEFING ---
-    st.subheader("🧠 StAMP Intelligence Briefing")
+    # --- MAIN CONTENT TABS ---
+    tab1, tab2 = st.tabs(["🧠 StAMP Intelligence Briefing", "📍 Geolocation Health Map"])
     
-    # Personalized Insight — ALWAYS show for authenticated users (fallback to profile LGA)
-    if st.session_state.get("authenticated"):
-        user = st.session_state.get("user", {})
-        user_name = user.get("username", "User")
-        # Priority: detected location → profile LGA → default
-        user_location = st.session_state.get("user_location") or user.get("location_lga") or "Lagos"
-        
-        st.markdown(f"##### 🧬 Personalized Briefing for **{user_name}** — 📍 {user_location}")
-        
-        if "dashboard_insight" not in st.session_state:
-            with st.spinner(f"Generating tailored insight for {user_name} in {user_location}..."):
-                res = api_client.get_dashboard_insight(
-                    st.session_state.token,
-                    user_location,
-                    f"User: {user_name}. Current StAMP Alert Count: {num_alerts}"
-                )
-                st.session_state.dashboard_insight = res.get("insight", "No insights available.")
-        
-        st.info(f"📍 **{user_location}**: {st.session_state.dashboard_insight}")
-        
-        # Download/Copy for personalized insight
-        from .download_utils import render_download_buttons
-        render_download_buttons(
-            st.session_state.dashboard_insight, 
-            filename_prefix=f"adiphas_insight_{user_name}",
-            title=f"ADIPHAS Personalized Insight — {user_name}",
-            key_suffix="dash_insight"
-        )
+    with tab1:
+        # --- TOP CONTENT: StAMP BRIEFING ---
+        # Personalized Insight — ALWAYS show for authenticated users (fallback to profile LGA)
+        if st.session_state.get("authenticated"):
+            user = st.session_state.get("user", {})
+            user_name = user.get("username", "User")
+            # Priority: detected location → profile LGA → default
+            user_location = st.session_state.get("user_location") or user.get("location_lga") or "Lagos"
+            
+            st.markdown(f"##### 🧬 Personalized Briefing for **{user_name}** — 📍 {user_location}")
+            
+            if "dashboard_insight" not in st.session_state:
+                with st.spinner(f"Generating tailored insight for {user_name} in {user_location}..."):
+                    res = api_client.get_dashboard_insight(
+                        st.session_state.token,
+                        user_location,
+                        f"User: {user_name}. Current StAMP Alert Count: {num_alerts}"
+                    )
+                    st.session_state.dashboard_insight = res.get("insight", "No insights available.")
+            
+            st.info(f"📍 **{user_location}**: {st.session_state.dashboard_insight}")
+            
+            # Download/Copy for personalized insight
+            from .download_utils import render_download_buttons
+            render_download_buttons(
+                st.session_state.dashboard_insight, 
+                filename_prefix=f"adiphas_insight_{user_name}",
+                title=f"ADIPHAS Personalized Insight — {user_name}",
+                key_suffix="dash_insight"
+            )
+            st.divider()
+
+        # System-wide StAMP Briefing
+        briefing = api_client.get_latest_briefing()
+        if briefing and "content" in briefing:
+            st.markdown(briefing["content"])
+            try:
+                # Convert ISO string to friendly format
+                dt = pd.to_datetime(briefing.get('generated_at', ''))
+                st.caption(f"Generated at: {dt.strftime('%b %d, %Y - %I:%M %p')}")
+            except Exception:
+                st.caption(f"Generated at: {briefing.get('generated_at', 'N/A')}")
+            
+            # Download/Copy for StAMP briefing
+            from .download_utils import render_download_buttons
+            render_download_buttons(
+                briefing["content"],
+                filename_prefix="adiphas_stamp_briefing",
+                title="ADIPHAS StAMP Intelligence Briefing",
+                key_suffix="stamp_main"
+            )
+            
+            # Intelligence Sources section
+            _render_briefing_sources(briefing, alerts)
+        else:
+            st.info("🛰️ Generating next autonomous briefing... check back in a few minutes.")
+            
+        if st.button("🔄 Force Real-time StAMP Sweep", key="manual_insight", use_container_width=True):
+            with st.spinner("Executing StAMP Intelligence Sweep (Tavily + AI Synthesis)..."):
+                res = api_client.trigger_manual_briefing()
+                if res and not res.get("error"):
+                    st.success("Briefing generated! Refreshing...")
+                    st.rerun()
+                else:
+                    st.error("Manual trigger failed. Check logs or quota.")
+
+    with tab2:
+        # --- MAP ---
+        st.subheader("📍 Lagos Health Heatmap")
+        try:
+            from .health_map import render as render_map
+            render_map()
+        except Exception as e:
+            st.error(f"Error loading map: {e}")
+
         st.divider()
 
-    # System-wide StAMP Briefing
-    briefing = api_client.get_latest_briefing()
-    if briefing and "content" in briefing:
-        st.markdown(briefing["content"])
-        try:
-            # Convert ISO string to friendly format
-            dt = pd.to_datetime(briefing.get('generated_at', ''))
-            st.caption(f"Generated at: {dt.strftime('%b %d, %Y - %I:%M %p')}")
-        except Exception:
-            st.caption(f"Generated at: {briefing.get('generated_at', 'N/A')}")
-        
-        # Download/Copy for StAMP briefing
-        from .download_utils import render_download_buttons
-        render_download_buttons(
-            briefing["content"],
-            filename_prefix="adiphas_stamp_briefing",
-            title="ADIPHAS StAMP Intelligence Briefing",
-            key_suffix="stamp_main"
-        )
-        
-        # Intelligence Sources section
-        _render_briefing_sources(briefing, alerts)
-    else:
-        st.info("🛰️ Generating next autonomous briefing... check back in a few minutes.")
-        
-    if st.button("🔄 Force Real-time StAMP Sweep", key="manual_insight", use_container_width=True):
-        with st.spinner("Executing StAMP Intelligence Sweep (Tavily + AI Synthesis)..."):
-            res = api_client.trigger_manual_briefing()
-            if res and not res.get("error"):
-                st.success("Briefing generated! Refreshing...")
-                st.rerun()
+        # --- LIVE INTELLIGENCE STREAM (Dropdown/Expander) ---
+        with st.expander("📡 Live Intelligence Stream Feed", expanded=True):
+            if num_alerts > 0:
+                for a in alerts[:8]:
+                    with st.container(border=True):
+                        risk = a.get('risk_level', 'Low')
+                        colour = {"Critical": "🔴", "High": "🟠", "Moderate": "🟡", "Low": "🟢"}.get(risk, "🔵")
+                        st.markdown(f"**{colour} {a.get('disease', 'Signal')}** — {a.get('location_text', 'Unknown')}")
+                        st.write(a.get("text", "")[:200])
+                        st.caption(f"Source: {a.get('source')} | Risk: {risk}")
+                        url = a.get('url')
+                        if url:
+                            st.link_button("🔗 View Original Source", url, use_container_width=True)
             else:
-                st.error("Manual trigger failed. Check logs or quota.")
-
-    st.divider()
-
-    # --- MAP ---
-    st.subheader("📍 Lagos Health Heatmap")
-    try:
-        from .health_map import render as render_map
-        render_map()
-    except Exception as e:
-        st.error(f"Error loading map: {e}")
-
-    st.divider()
-
-    # --- LIVE INTELLIGENCE STREAM (Dropdown/Expander) ---
-    with st.expander("📡 Live Intelligence Stream", expanded=False):
-        if num_alerts > 0:
-            for a in alerts[:8]:
-                with st.container(border=True):
-                    risk = a.get('risk_level', 'Low')
-                    colour = {"Critical": "🔴", "High": "🟠", "Moderate": "🟡", "Low": "🟢"}.get(risk, "🔵")
-                    st.markdown(f"**{colour} {a.get('disease', 'Signal')}** — {a.get('location_text', 'Unknown')}")
-                    st.write(a.get("text", "")[:200])
-                    st.caption(f"Source: {a.get('source')} | Risk: {risk}")
-                    url = a.get('url')
-                    if url:
-                        st.link_button("🔗 View Original Source", url, use_container_width=True)
-        else:
-            st.write("No active signals in the feed.")
+                st.write("No active signals in the feed.")
 
 
 def _render_briefing_sources(briefing, alerts):
