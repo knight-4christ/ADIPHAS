@@ -25,6 +25,7 @@ def _generate_pdf_bytes(content: str, title: str = "ADIPHAS Intelligence Report"
     """Generates a PDF from text content using fpdf2."""
     try:
         from fpdf import FPDF
+        from fpdf.enums import WrapMode
     except ImportError:
         return b""  # fpdf2 not installed — fallback handled by caller
     
@@ -74,18 +75,31 @@ def _generate_pdf_bytes(content: str, title: str = "ADIPHAS Intelligence Report"
         if line.startswith("- ") or line.startswith("• "):
             pdf.set_font("Helvetica", "", 10)
             pdf.cell(8)  # Indent
-            pdf.multi_cell(0, 6, _s(f"• {line[2:]}"))
+            try:
+                pdf.multi_cell(0, 6, _s(f"• {line[2:]}"), wrapmode=WrapMode.CHAR)
+            except Exception:
+                try:
+                    pdf.multi_cell(0, 6, _s(f"• {line[2:]}"))
+                except Exception:
+                    pdf.cell(0, 6, _s(f"• {line[2:]}")[:80] + "...", ln=True)
         elif line.startswith("─") or line.startswith("="):
             pdf.set_draw_color(200, 200, 200)
             pdf.line(10, pdf.get_y(), 200, pdf.get_y())
             pdf.ln(4)
         else:
-            # Check if it looks like a heading (ALL CAPS or starts with emoji/special)
             if line.isupper() or (len(line) < 60 and (line[0] < 'A' or line[0] > 'z')):
                 pdf.set_font("Helvetica", "B", 11)
             else:
                 pdf.set_font("Helvetica", "", 10)
-            pdf.multi_cell(0, 6, _s(line))
+            
+            try:
+                pdf.multi_cell(0, 6, _s(line), wrapmode=WrapMode.CHAR)
+            except Exception:
+                try:
+                    pdf.multi_cell(0, 6, _s(line))
+                except Exception:
+                    # FPDF2 cell crash fallback - render truncated safe string
+                    pdf.cell(0, 6, _s(line)[:80] + "...", ln=True)
     
     # Footer
     pdf.ln(10)
