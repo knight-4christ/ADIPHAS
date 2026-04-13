@@ -190,15 +190,6 @@ def render(force_completion: bool = False):
                     if ai_insight:
                         st.success(f"🩺 **AI Clinical Insight**: {ai_insight}")
                         
-                        # Download/Copy buttons for AI insight
-                        from .download_utils import render_download_buttons
-                        render_download_buttons(
-                            ai_insight,
-                            filename_prefix="adiphas_clinical_insight",
-                            title="ADIPHAS Clinical Advisory",
-                            key_suffix="symptom_ai"
-                        )
-                        
                     st.write("**Personalized Advisory:**")
                     for sug in result.get("suggestions", []):
                         st.markdown(f"- {sug}")
