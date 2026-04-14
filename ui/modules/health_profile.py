@@ -109,7 +109,7 @@ def render(force_completion: bool = False):
             if force_completion:
                 st.info("💡 All fields marked with * are mandatory. Click 'Detect My Location' above to set your location. Enter 'None' for health conditions if you have no underlying conditions.")
             
-            submitted = st.form_submit_button("Update Profile", use_container_width=True)
+            submitted = st.form_submit_button("Update Profile", width="stretch")
             if submitted:
                 # Validate all required fields
                 validation_errors = []

@@ -166,6 +166,7 @@ def render():
             center_lat, center_lon = first_lga_coords["lat"], first_lga_coords["lon"]
             map_zoom = 13
         elif user_lat and user_lon:
+            # FORCE center on the newly geocoded user coordinates
             center_lat, center_lon = user_lat, user_lon
             map_zoom = 12
         else:
@@ -207,7 +208,7 @@ def render():
             ).add_to(m)
 
         # Render folium map into Streamlit gracefully
-        st_folium(m, use_container_width=True, height=650, returned_objects=[])
+        st_folium(m, width="stretch", height=650, returned_objects=[])
 
         if live_data:
             st.success(f"✅ Map rendered from **{len(alerts)} live EBS signals** across {len(map_data)} LGAs.")

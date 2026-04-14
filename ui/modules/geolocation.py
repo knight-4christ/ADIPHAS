@@ -210,17 +210,19 @@ def extract_and_geocode():
                 logger.info(f"[Geolocation] IP-based fallback resolved: {ip_loc}")
                 return ip_loc
         
-        # Already attempted IP — use cached or profile fallback
+        # Skip stale or server-side cached locations
         cached = st.session_state.get("user_location")
-        if cached:
-            return cached
+        if cached and not any(x in str(cached).lower() for x in ["oregon", "dalles", "unknown"]):
+            # If we have a valid city string but NO coordinates, continue to profile geocoding
+            if st.session_state.get("user_lat") and st.session_state.get("user_lon"):
+                return cached
         
         # Last resort: user profile location
         if st.session_state.get("authenticated") and st.session_state.get("user"):
             profile_loc = st.session_state.user.get("location_lga")
-            if profile_loc:
+            if profile_loc and not any(x in str(profile_loc).lower() for x in ["oregon", "dalles", "unknown"]):
                 st.session_state.user_location = profile_loc
-                # NEW: Geocode the profile location string if coords are missing
+                # Geocode the profile location string if coords are missing or still at Oregon
                 if not st.session_state.get("user_lat") or not st.session_state.get("user_lon"):
                     coords = _forward_geocode_nominatim(profile_loc)
                     if coords:
