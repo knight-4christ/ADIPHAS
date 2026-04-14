@@ -1,7 +1,7 @@
 import streamlit as st
 import api_client
 import time
-
+from . import geolocation
 def render_login_modal():
     """
     Renders the authentication interface. 
@@ -56,8 +56,7 @@ def render_login_modal():
                                     # If no detected location yet, try IP-based fallback
                                     if not detected_loc:
                                         try:
-                                            from modules.geolocation import _geolocate_by_ip
-                                            detected_loc = _geolocate_by_ip()
+                                            detected_loc = geolocation._geolocate_by_ip()
                                         except Exception:
                                             pass
                                     
