@@ -97,6 +97,8 @@ def render(force_completion: bool = False):
             
             address = st.text_input("Residential Address", value=user.get('address', ''))
             
+            manual_lga = st.text_input("Location (LGA or City) *", value=user.get('location_lga', ''), placeholder="e.g., Yaba, Ikeja, Lagos Mainland")
+            
             conditions = st.text_area(
                 "Underlying Health Conditions *", 
                 value=user.get('health_conditions', ''),
@@ -115,8 +117,8 @@ def render(force_completion: bool = False):
                     validation_errors.append("Blood Group is required")
                 if not gt:
                     validation_errors.append("Genotype is required")
-                if not user.get('location_lga') and not detected_loc:
-                    validation_errors.append("Location is required — click 'Detect My Location' above")
+                if not manual_lga.strip() and not detected_loc:
+                    validation_errors.append("Location is required — enter it manually or click 'Detect My Location' above")
                 if not conditions or not conditions.strip():
                     validation_errors.append("Health Conditions is required (enter 'None' if healthy)")
                 
@@ -128,11 +130,9 @@ def render(force_completion: bool = False):
                         "username": new_username,
                         "blood_group": bg,
                         "genotype": gt,
-                        "health_conditions": conditions.strip()
+                        "health_conditions": conditions.strip(),
+                        "location_lga": manual_lga.strip() if manual_lga.strip() else detected_loc
                     }
-                    # Only update location if detected and not already set
-                    if detected_loc and not user.get('location_lga'):
-                        update_data["location_lga"] = detected_loc
                     
                     with st.spinner("Updating..."):
                         res = api_client.update_profile(st.session_state.token, update_data)
