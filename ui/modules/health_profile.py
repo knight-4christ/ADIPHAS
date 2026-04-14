@@ -59,7 +59,10 @@ def render(force_completion: bool = False):
             if st.button("📍 Detect My Location", use_container_width=True, type="primary"):
                 if detected_loc:
                     # Save detected browser location to profile
-                    res = api_client.update_profile(st.session_state.token, {"location_lga": detected_loc})
+                    res = api_client.update_profile(st.session_state.token, {
+                        "username": user.get("username", "Unknown"),
+                        "location_lga": detected_loc
+                    })
                     if res and "username" in res:
                         st.session_state.user = res
                         st.success(f"✅ Location saved: **{detected_loc}**")

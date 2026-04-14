@@ -66,7 +66,10 @@ def render_login_modal():
                                     # Auto-update profile location if detected and different/missing
                                     if detected_loc and detected_loc != profile_loc:
                                         try:
-                                            updated = api_client.update_profile(token, {"location_lga": detected_loc})
+                                            updated = api_client.update_profile(token, {
+                                                "username": me.get("username", "Unknown"), 
+                                                "location_lga": detected_loc
+                                            })
                                             if updated and "username" in updated:
                                                 st.session_state.user = updated
                                                 me = updated

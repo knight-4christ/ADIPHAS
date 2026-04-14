@@ -31,13 +31,30 @@ def inject_geolocation_js():
                 }
             },
             (error) => {
-                console.warn("Geolocation denied or unavailable: ", error);
-                // Signal to Streamlit that browser geo was denied
-                const url = new URL(window.parent.location.href);
-                if (!url.searchParams.has('geo_denied')) {
-                    url.searchParams.set('geo_denied', '1');
-                    window.parent.location.search = url.search;
-                }
+                console.warn("Geolocation denied, engaging Client IP fallback...");
+                fetch('https://ipapi.co/json/')
+                    .then(r => r.json())
+                    .then(data => {
+                        const url = new URL(window.parent.location.href);
+                        if (data.latitude && data.longitude) {
+                            url.searchParams.set('lat', data.latitude.toFixed(4));
+                            url.searchParams.set('lon', data.longitude.toFixed(4));
+                            url.searchParams.set('ip_loc', data.city + ", " + data.region);
+                            window.parent.location.search = url.search;
+                        } else {
+                            if (!url.searchParams.has('geo_denied')) {
+                                url.searchParams.set('geo_denied', '1');
+                                window.parent.location.search = url.search;
+                            }
+                        }
+                    })
+                    .catch(e => {
+                        const url = new URL(window.parent.location.href);
+                        if (!url.searchParams.has('geo_denied')) {
+                            url.searchParams.set('geo_denied', '1');
+                            window.parent.location.search = url.search;
+                        }
+                    });
             },
             { enableHighAccuracy: true, timeout: 8000, maximumAge: 300000 }
         );
@@ -55,7 +72,8 @@ def _reverse_geocode_nominatim(lat: str, lon: str) -> str | None:
         if response.status_code == 200:
             data = response.json()
             address = data.get("address", {})
-            local_area = address.get("city") or address.get("town") or address.get("county") or "Unknown Area"
+            # Prioritize granular suburbs/neighborhoods for accurate Lagos clustering
+            local_area = address.get("suburb") or address.get("neighbourhood") or address.get("county") or address.get("city") or address.get("town") or "Unknown Area"
             state = address.get("state") or "Unknown State"
             return f"{local_area}, {state}"
     except Exception as e:
