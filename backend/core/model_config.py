@@ -16,27 +16,27 @@ UNIFIED_MODEL_POOL = [
     {"id": "gemini-2.0-flash",                              "provider": "gemini",     "tier": 1},
     {"id": "gemini-2.5-flash",                              "provider": "gemini",     "tier": 1},
     
-    # --- OpenRouter Tier 1: Large/Premium (6 models) ---
-    {"id": "google/gemma-4-31b-it:free",                    "provider": "openrouter", "tier": 1},
-    {"id": "nvidia/nemotron-3-super-120b-a12b:free",        "provider": "openrouter", "tier": 1},
-    {"id": "qwen/qwen3-coder:free",                         "provider": "openrouter", "tier": 1},
-    {"id": "openai/gpt-oss-120b:free",                      "provider": "openrouter", "tier": 1},
+    # --- OpenRouter Tier 1: Large/Premium ---
     {"id": "nousresearch/hermes-3-llama-3.1-405b:free",     "provider": "openrouter", "tier": 1},
+    {"id": "nvidia/nemotron-3-super-120b-a12b:free",        "provider": "openrouter", "tier": 1},
+    {"id": "openai/gpt-oss-120b:free",                      "provider": "openrouter", "tier": 1},
+    {"id": "qwen/qwen3-next-80b-a3b-instruct:free",         "provider": "openrouter", "tier": 1},
+    {"id": "meta-llama/llama-3.3-70b-instruct:free",        "provider": "openrouter", "tier": 1},
     
-    # --- OpenRouter Tier 2: Mid-range (5 models) ---
+    # --- OpenRouter Tier 2: Mid-range ---
+    {"id": "google/gemma-4-31b-it:free",                    "provider": "openrouter", "tier": 2},
     {"id": "google/gemma-3-27b-it:free",                    "provider": "openrouter", "tier": 2},
-    {"id": "meta-llama/llama-3.3-70b-instruct:free",        "provider": "openrouter", "tier": 2},
+    {"id": "qwen/qwen3-coder:free",                         "provider": "openrouter", "tier": 2},
     {"id": "nvidia/nemotron-3-nano-30b-a3b:free",           "provider": "openrouter", "tier": 2},
     {"id": "openai/gpt-oss-20b:free",                       "provider": "openrouter", "tier": 2},
     {"id": "minimax/minimax-m2.5:free",                     "provider": "openrouter", "tier": 2},
     
-    # --- OpenRouter Tier 3: Lightweight Fallbacks (6 models) ---
-    {"id": "meta-llama/llama-3.2-3b-instruct:free",         "provider": "openrouter", "tier": 3},
-    {"id": "nvidia/nemotron-nano-12b-2-vl:free",            "provider": "openrouter", "tier": 3},
+    # --- OpenRouter Tier 3: Lightweight Fallbacks ---
+    {"id": "google/gemma-3-12b-it:free",                    "provider": "openrouter", "tier": 3},
     {"id": "nvidia/nemotron-nano-9b-v2:free",               "provider": "openrouter", "tier": 3},
-    {"id": "arcee-ai/arcee-trinity-large-preview:free",     "provider": "openrouter", "tier": 3},
-    {"id": "qwen/qwen3-30b-a3b:free",                       "provider": "openrouter", "tier": 3},
-    {"id": "qwen/qwen3-4b:free",                             "provider": "openrouter", "tier": 3},
+    {"id": "meta-llama/llama-3.2-3b-instruct:free",         "provider": "openrouter", "tier": 3},
+    {"id": "google/gemma-3-4b-it:free",                     "provider": "openrouter", "tier": 3},
+    {"id": "liquid/lfm-2.5-1.2b-instruct:free",             "provider": "openrouter", "tier": 3},
 ]
 
 # ══════════════════════════════════════════════════════════════════════════════
