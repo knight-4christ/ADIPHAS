@@ -102,17 +102,31 @@ def _geolocate_by_ip() -> str | None:
         if hasattr(st, "context"):
             forwarded = st.context.headers.get("X-Forwarded-For")
             if forwarded:
-                # X-Forwarded-For can be a comma separated list, first is the originating client IP
-                client_ip = forwarded.split(",")[0].strip()
+                # X-Forwarded-For can be a comma separated list. Find the first Public IP.
+                for ip in forwarded.split(","):
+                    ip = ip.strip()
+                    if not (ip.startswith("10.") or ip.startswith("192.168.") or ip.startswith("127.") or ip.startswith("172.")):
+                        client_ip = ip
+                        break
                 
         api_url = f"https://ipapi.co/{client_ip}/json/" if client_ip else "https://ipapi.co/json/"
-        response = requests.get(api_url, timeout=3, headers={"User-Agent": "ADIPHAS/1.0"})
+        response = requests.get(api_url, timeout=5, headers={"User-Agent": "ADIPHAS/1.0"})
         if response.status_code == 200:
             data = response.json()
-            city = data.get("city") or "Unknown Area"
-            region = data.get("region") or "Unknown State"
+            
+            # API might return {"error": true} for unresolvable IPs
+            if data.get("error"):
+                logger.warning(f"[Geolocation] IPAPI error: {data.get('reason')}")
+                return None
+                
+            city = data.get("city")
+            region = data.get("region")
             lat_ip = data.get("latitude")
             lon_ip = data.get("longitude")
+            
+            # Reject garbage payloads
+            if not city or not region:
+                return None
             
             # Store IP-derived coordinates as backup
             if lat_ip and lon_ip:
@@ -142,13 +156,28 @@ def extract_and_geocode():
     lat = st.query_params.get("lat")
     lon = st.query_params.get("lon")
     geo_denied = st.query_params.get("geo_denied")
+    ip_loc_param = st.query_params.get("ip_loc")
     
-    # --- Path A: Browser geolocation was denied → use IP fallback ---
+    # Nuke corrupted "Unknown Area" cache to allow the engine to retry
+    curr_loc = st.session_state.get("user_location")
+    if curr_loc and "Unknown Area" in curr_loc:
+        st.session_state.user_location = None
+        st.session_state._ip_geo_attempted = False
+        
+    # --- Path 0: JS Client IP Fallback Succeeded ---
+    if ip_loc_param:
+        st.session_state.user_location = ip_loc_param
+        if lat and lon:
+            st.session_state.user_lat = float(lat)
+            st.session_state.user_lon = float(lon)
+        return ip_loc_param
+    
+    # --- Path A: Browser geolocation was denied → use server IP fallback ---
     if geo_denied and not lat:
         if not st.session_state.get("_ip_geo_attempted"):
             st.session_state._ip_geo_attempted = True
             ip_loc = _geolocate_by_ip()
-            if ip_loc:
+            if ip_loc and "Unknown Area" not in ip_loc:
                 st.session_state.user_location = ip_loc
                 logger.info(f"[Geolocation] IP-based fallback resolved: {ip_loc}")
                 return ip_loc
