@@ -90,31 +90,40 @@ def render():
                     st.error("Manual trigger failed. Check logs or quota.")
 
     with tab2:
-        # --- MAP ---
-        st.subheader("📍 Lagos Health Heatmap")
-        try:
-            from .health_map import render as render_map
-            render_map()
-        except Exception as e:
-            st.error(f"Error loading map: {e}")
+        # Deferred via @st.fragment so the StAMP tab renders immediately
+        @st.fragment
+        def _render_map_tab():
+            st.subheader("📍 Lagos Health Heatmap")
+            try:
+                from .health_map import render as render_map
+                render_map()
+            except Exception as e:
+                st.error(f"Error loading map: {e}")
 
-        st.divider()
+            st.divider()
 
-        # --- LIVE INTELLIGENCE STREAM (Dropdown/Expander) ---
-        with st.expander("📡 Live Intelligence Stream Feed", expanded=True):
-            if num_alerts > 0:
-                for a in alerts[:8]:
-                    with st.container(border=True):
-                        risk = a.get('risk_level', 'Low')
-                        colour = {"Critical": "🔴", "High": "🟠", "Moderate": "🟡", "Low": "🟢"}.get(risk, "🔵")
-                        st.markdown(f"**{colour} {a.get('disease', 'Signal')}** — {a.get('location_text', 'Unknown')}")
-                        st.write(a.get("text", "")[:200])
-                        st.caption(f"Source: {a.get('source')} | Risk: {risk}")
-                        url = a.get('url')
-                        if url:
-                            st.link_button("🔗 View Original Source", url, use_container_width=True)
-            else:
-                st.write("No active signals in the feed.")
+            # --- LIVE INTELLIGENCE STREAM ---
+            with st.expander("📡 Live Intelligence Stream Feed", expanded=True):
+                if num_alerts > 0:
+                    for a in alerts[:8]:
+                        with st.container(border=True):
+                            risk = a.get('risk_level', 'Low')
+                            colour = {"Critical": "🔴", "High": "🟠", "Moderate": "🟡", "Low": "🟢"}.get(risk, "🔵")
+                            st.markdown(f"**{colour} {a.get('disease', 'Signal')}** — {a.get('location_text', 'Unknown')}")
+                            st.write(a.get("text", "")[:200])
+                            
+                            # Show actual source URL instead of generic label
+                            source_name = a.get('source', 'Unknown')
+                            url = a.get('url')
+                            if url:
+                                st.caption(f"Source: [{source_name}]({url}) | Risk: {risk}")
+                                st.link_button("🔗 View Original Source", url, use_container_width=True)
+                            else:
+                                st.caption(f"Source: {source_name} | Risk: {risk}")
+                else:
+                    st.write("No active signals in the feed.")
+        
+        _render_map_tab()
 
 
 def _render_briefing_sources(briefing, alerts):
@@ -135,9 +144,10 @@ def _render_briefing_sources(briefing, alerts):
                 st.markdown("**📡 EBS Alert Sources:**")
                 for source, url in source_urls.items():
                     if url:
+                        # Always link to the actual source URL
                         st.markdown(f"- [{source}]({url})")
                     else:
-                        st.markdown(f"- {source}")
+                        st.markdown(f"- {source} *(no external link)*")
         
         # Check if briefing content itself contains source URLs
         content = briefing.get("content", "")
