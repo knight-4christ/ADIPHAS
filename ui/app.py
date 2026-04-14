@@ -1,17 +1,29 @@
+import sys
+import os
+# --- BOOT SHIELD: Force parent directory into sys.path to prevent Streamlit KeyError: 'modules' ---
+base_dir = os.path.dirname(os.path.abspath(__file__))
+if base_dir not in sys.path:
+    sys.path.insert(0, base_dir)
+
 import streamlit as st
 import api_client
 from datetime import datetime
 from dotenv import load_dotenv
-import os
 load_dotenv()  # Loads .env for UI process (e.g. GEMINI_API_KEY for chat)
 
-# Import new modules
-from modules import (
-    auth, local_feed, idsr_analytics, 
-    ebs_alerts, health_map, personal_alerts, 
-    health_profile, admin, chat, evaluation,
-    situational_awareness, geolocation
-)
+# Import new modules - Hardened Absolute Package Imports
+import modules.auth as auth
+import modules.local_feed as local_feed
+import modules.idsr_analytics as idsr_analytics
+import modules.ebs_alerts as ebs_alerts
+import modules.health_map as health_map
+import modules.personal_alerts as personal_alerts
+import modules.health_profile as health_profile
+import modules.admin as admin
+import modules.chat as chat
+import modules.evaluation as evaluation
+import modules.situational_awareness as situational_awareness
+import modules.geolocation as geolocation
 
 def is_profile_complete(user: dict) -> bool:
     """Checks if the user has completed all mandatory bio-data fields."""
@@ -405,7 +417,12 @@ def main():
             st.session_state.global_location = loc_val if loc_val else "Unknown Location"
             
             st.caption(f"Role: {user_role} | ID: {st.session_state.user.get('id', 'Unknown')[:8]}")
-            st.caption(f"📍 {st.session_state.global_location}")
+            
+            # Display coordinates alongside location for transparency
+            user_lat = st.session_state.get("user_lat")
+            user_lon = st.session_state.get("user_lon")
+            coord_str = f" [{user_lat}, {user_lon}]" if user_lat and user_lon else ""
+            st.caption(f"📍 {st.session_state.global_location}{coord_str}")
             st.divider()
             
             if st.button("Logout", key="logout_btn", use_container_width=True):
@@ -540,8 +557,8 @@ def main():
         if "_fab_toast" in st.session_state:
             st.toast(st.session_state.pop("_fab_toast"))
 
-    from modules import render_footer
-    render_footer()
+    import modules as modules_pkg
+    modules_pkg.render_footer()
 
 if __name__ == "__main__":
     main()

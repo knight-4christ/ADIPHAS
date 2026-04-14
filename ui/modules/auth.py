@@ -100,6 +100,7 @@ def render_login_modal():
                 new_pass = st.text_input("Password", type="password")
                 new_full_name = st.text_input("Full Name")
                 new_role = st.selectbox("I am a...", ["CITIZEN", "EXPERT"])
+                new_loc_input = st.text_input("Home Location (LGA)", help="Enter your LGA in Lagos (e.g. Ikeja, Yaba, Surulere)")
                 
                 signup_btn = st.form_submit_button("Create Account", width='stretch')
                 
@@ -108,8 +109,17 @@ def render_login_modal():
                         st.error("Please fill in all required fields.")
                     else:
                         with st.spinner("Creating account & fetching location..."):
-                            user_loc = st.session_state.get('user_location')
-                            res = api_client.register(new_user, new_pass, new_email, new_full_name, new_role, user_loc)
+                            # Logic: Use manual input if provided, otherwise fallback to auto-detected location
+                            final_loc = new_loc_input if new_loc_input else st.session_state.get('user_location')
+                            
+                            # Immediate geocoding to ensure map marker is ready
+                            if final_loc:
+                                coords = geolocation._forward_geocode_nominatim(final_loc)
+                                if coords:
+                                    st.session_state.user_lat, st.session_state.user_lon = coords
+                                    st.session_state.user_location = final_loc
+                            
+                            res = api_client.register(new_user, new_pass, new_email, new_full_name, new_role, final_loc)
                             if "id" in res:
                                 st.success("Account created successfully! Please switch to the Login tab.")
                             else:

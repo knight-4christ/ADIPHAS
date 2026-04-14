@@ -211,7 +211,8 @@ def render():
         st_folium(m, width="stretch", height=650, returned_objects=[])
 
         if live_data:
-            st.success(f"✅ Map rendered from **{len(alerts)} live EBS signals** across {len(map_data)} LGAs.")
+            coord_info = f" ({user_lat}, {user_lon})" if user_lat and user_lon else ""
+            st.success(f"✅ Map centered on your location{coord_info} from **{len(alerts)} live EBS signals** across {len(map_data)} LGAs.")
         st.info("💡 **Tip:** Hover over circles for signal details. Circle size = signal intensity.")
     
     _render_map()
