@@ -52,6 +52,12 @@ def render():
             
             st.markdown(f"##### 🧬 Personalized Briefing for **{user_name}** — 📍 {user_location}")
             
+            # Invalidate cache if location changed
+            last_insight_loc = st.session_state.get("dashboard_insight_loc")
+            if last_insight_loc != user_location:
+                if "dashboard_insight" in st.session_state:
+                    del st.session_state["dashboard_insight"]
+            
             if "dashboard_insight" not in st.session_state:
                 with st.spinner(f"Generating tailored insight for {user_name} in {user_location}..."):
                     # Determine local context
@@ -67,6 +73,7 @@ def render():
                         context_str
                     )
                     st.session_state.dashboard_insight = res.get("insight", "No insights available.")
+                    st.session_state.dashboard_insight_loc = user_location
             
             st.info(f"📍 **{user_location}**: {st.session_state.dashboard_insight}")
             st.divider()

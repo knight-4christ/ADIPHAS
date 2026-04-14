@@ -62,6 +62,22 @@ def inject_geolocation_js():
     </script>
     """
     st.html(js_code)
+    
+def _forward_geocode_nominatim(query: str) -> tuple[float, float] | None:
+    """Converts a location string (e.g. 'Yaba, Lagos') into coordinates."""
+    if not query:
+        return None
+    try:
+        url = f"https://nominatim.openstreetmap.org/search?q={query}, Nigeria&format=json&limit=1"
+        headers = {"User-Agent": "ADIPHAS_Health_App/1.0"}
+        response = requests.get(url, headers=headers, timeout=4)
+        if response.status_code == 200:
+            data = response.json()
+            if data:
+                return float(data[0]['lat']), float(data[0]['lon'])
+    except Exception as e:
+        logger.warning(f"[Geolocation] Forward geocoding failed for {query}: {e}")
+    return None
 
 def _reverse_geocode_nominatim(lat: str, lon: str) -> str | None:
     """Primary reverse geocoder using OpenStreetMap Nominatim."""
@@ -204,6 +220,11 @@ def extract_and_geocode():
             profile_loc = st.session_state.user.get("location_lga")
             if profile_loc:
                 st.session_state.user_location = profile_loc
+                # NEW: Geocode the profile location string if coords are missing
+                if not st.session_state.get("user_lat") or not st.session_state.get("user_lon"):
+                    coords = _forward_geocode_nominatim(profile_loc)
+                    if coords:
+                        st.session_state.user_lat, st.session_state.user_lon = coords
                 return profile_loc
         
         return None

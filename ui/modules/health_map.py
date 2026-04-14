@@ -155,6 +155,11 @@ def render():
             st.warning("No LGAs match the current filter.")
             return
 
+        # Re-fetch from session state inside fragment to avoid closure-stale-state bugs
+        user_lat = st.session_state.get("user_lat")
+        user_lon = st.session_state.get("user_lon")
+        user_loc = st.session_state.get("user_location")
+        
         # Determine map center: Priority 1: LGA Filter, Priority 2: User Location, Priority 3: Default Lagos
         if lga_filter and lga_filter[0] in LAGOS_LGAS:
             first_lga_coords = LAGOS_LGAS[lga_filter[0]]

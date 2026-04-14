@@ -138,6 +138,22 @@ def render(force_completion: bool = False):
                         res = api_client.update_profile(st.session_state.token, update_data)
                         if "username" in res:
                             st.session_state.user = res
+                            # Forcefully purge Streamlit's global geocache to adopt the user's manual override immediately
+                            new_loc = update_data["location_lga"]
+                            st.session_state.user_location = new_loc
+                            
+                            # Hard-reset the latitude and longitude caches so the Map moves from Oregon!
+                            try:
+                                import requests
+                                # Ping OpenStreetMap to mathematically geocode the typed string
+                                geocode_url = f"https://nominatim.openstreetmap.org/search?q={new_loc}, Nigeria&format=json&limit=1"
+                                resp = requests.get(geocode_url, headers={"User-Agent": "ADIPHAS/1.0"}, timeout=4)
+                                if resp.status_code == 200 and len(resp.json()) > 0:
+                                    st.session_state.user_lat = float(resp.json()[0]['lat'])
+                                    st.session_state.user_lon = float(resp.json()[0]['lon'])
+                            except Exception:
+                                pass
+                                
                             st.success("✅ Profile Updated Successfully!")
                             if force_completion:
                                 st.balloons()
