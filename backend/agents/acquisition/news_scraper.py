@@ -275,11 +275,26 @@ class NewsScraperAgent:
             )
             
             if res.status != 200:
-                logger.warning(f"[Scraper] {source['name']} returned status {res.status}")
-                return []
-                
-            # Scrapling v0.4: use html_content for raw HTML string
-            page = BeautifulSoup(res.html_content, "lxml")
+                if res.status in (403, 401, 406):
+                    # Cloudflare / Imperva Fallback Bypass
+                    logger.info(f"Target {source['name']} blocked connection ({res.status}). Engaging TLS Impersonation Bypass...")
+                    try:
+                        from curl_cffi import requests as c_req
+                        # Impersonating a modern MacOS Safari/Chrome handshake perfectly bypasses Cloudflare
+                        fallback = c_req.get(source["url"], impersonate="chrome110", timeout=20)
+                        if fallback.status_code == 200:
+                            page = BeautifulSoup(fallback.text, "lxml")
+                            logger.info(f"[Scraper] Successfully bypassed firewall for {source['name']}!")
+                        else:
+                            return []
+                    except Exception as bypass_err:
+                        logger.warning(f"[Scraper] Bypass failed for {source['name']}: {bypass_err}")
+                        return []
+                else:
+                    logger.warning(f"[Scraper] {source['name']} returned status {res.status}")
+                    return []
+            else:
+                page = BeautifulSoup(res.html_content, "lxml")
             
         except Exception as err:
             logger.warning(f"[Scraper] Failed to fetch {source['name']} via Scrapling: {err}")
