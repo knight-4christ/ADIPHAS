@@ -90,22 +90,29 @@ def render():
                     st.error("Manual trigger failed. Check logs or quota.")
 
     with tab2:
-        # Deferred via @st.fragment so the StAMP tab renders immediately
-        @st.fragment
-        def _render_map_tab():
-            st.subheader("📍 Lagos Health Heatmap")
-            try:
-                from .health_map import render as render_map
-                render_map()
-            except Exception as e:
-                st.error(f"Error loading map: {e}")
+        st.subheader("📍 Lagos Health Heatmap")
+        st.caption("Geospatial Folium maps require heavy parsing. Enable the toggle below to render.")
+        
+        # True Lazy Loading: Prevent map from rendering until requested, instantly freeing up Tab 1
+        if st.toggle("🌍 Load Interactive Geospatial Map"):
+            # Deferred via @st.fragment so it handles its own internal re-runs
+            @st.fragment
+            def _render_map_tab():
+                try:
+                    from .health_map import render as render_map
+                    with st.spinner("Compiling geographic data..."):
+                        render_map()
+                except Exception as e:
+                    st.error(f"Error loading map: {e}")
+            
+            _render_map_tab()
+        
+        st.divider()
 
-            st.divider()
-
-            # --- LIVE INTELLIGENCE STREAM ---
-            with st.expander("📡 Live Intelligence Stream Feed", expanded=True):
-                if num_alerts > 0:
-                    for a in alerts[:8]:
+        # --- LIVE INTELLIGENCE STREAM ---
+        with st.expander("📡 Live Intelligence Stream Feed", expanded=True):
+            if num_alerts > 0:
+                for a in alerts[:8]:
                         with st.container(border=True):
                             risk = a.get('risk_level', 'Low')
                             colour = {"Critical": "🔴", "High": "🟠", "Moderate": "🟡", "Low": "🟢"}.get(risk, "🔵")
