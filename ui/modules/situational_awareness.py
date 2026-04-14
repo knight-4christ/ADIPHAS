@@ -99,9 +99,9 @@ def render():
             @st.fragment
             def _render_map_tab():
                 try:
-                    from .health_map import render as render_map
+                    from . import health_map
                     with st.spinner("Compiling geographic data..."):
-                        render_map()
+                        health_map.render()
                 except Exception as e:
                     st.error(f"Error loading map: {e}")
             
