@@ -22,6 +22,8 @@ UNIFIED_MODEL_POOL = [
     {"id": "openai/gpt-oss-120b:free",                      "provider": "openrouter", "tier": 1},
     {"id": "qwen/qwen3-next-80b-a3b-instruct:free",         "provider": "openrouter", "tier": 1},
     {"id": "meta-llama/llama-3.3-70b-instruct:free",        "provider": "openrouter", "tier": 1},
+    {"id": "openrouter/elephant-alpha",                     "provider": "openrouter", "tier": 1},
+    {"id": "google/gemma-4-26b-a4b-it:free",                "provider": "openrouter", "tier": 1},
     
     # --- OpenRouter Tier 2: Mid-range ---
     {"id": "google/gemma-4-31b-it:free",                    "provider": "openrouter", "tier": 2},
@@ -30,6 +32,7 @@ UNIFIED_MODEL_POOL = [
     {"id": "nvidia/nemotron-3-nano-30b-a3b:free",           "provider": "openrouter", "tier": 2},
     {"id": "openai/gpt-oss-20b:free",                       "provider": "openrouter", "tier": 2},
     {"id": "minimax/minimax-m2.5:free",                     "provider": "openrouter", "tier": 2},
+    {"id": "cognitivecomputations/dolphin-mistral-24b-venice-edition:free", "provider": "openrouter", "tier": 2},
     
     # --- OpenRouter Tier 3: Lightweight Fallbacks ---
     {"id": "google/gemma-3-12b-it:free",                    "provider": "openrouter", "tier": 3},
@@ -37,6 +40,10 @@ UNIFIED_MODEL_POOL = [
     {"id": "meta-llama/llama-3.2-3b-instruct:free",         "provider": "openrouter", "tier": 3},
     {"id": "google/gemma-3-4b-it:free",                     "provider": "openrouter", "tier": 3},
     {"id": "liquid/lfm-2.5-1.2b-instruct:free",             "provider": "openrouter", "tier": 3},
+    {"id": "google/gemma-3n-e2b-it:free",                   "provider": "openrouter", "tier": 3},
+    {"id": "google/gemma-3n-e4b-it:free",                   "provider": "openrouter", "tier": 3},
+    {"id": "z-ai/glm-4.5-air:free",                         "provider": "openrouter", "tier": 3},
+    {"id": "liquid/lfm-2.5-1.2b-thinking:free",             "provider": "openrouter", "tier": 3},
 ]
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -44,20 +51,20 @@ UNIFIED_MODEL_POOL = [
 # so no single model handles all requests at once
 # ══════════════════════════════════════════════════════════════════════════════
 AGENT_MODEL_ASSIGNMENTS = {
-    "ForecastNarrative":    {"start_offset": 0,  "max_tries": 10},  # gemini-2.0-flash first
-    "BriefingAgent":        {"start_offset": 0,  "max_tries": 12},  # gemini-2.0-flash first (must try native Gemini)
-    "RealtimeIntel":        {"start_offset": 5,  "max_tries": 10},  # gpt-oss-120b first
-    "KnowledgeFusion":      {"start_offset": 8,  "max_tries": 10},  # gemma-3-27b first
-    "NLP_EntityExtraction": {"start_offset": 0,  "max_tries": 5},   # gemini-2.0-flash (fast)
-    "NLP_BatchExtraction":  {"start_offset": 1,  "max_tries": 5},   # gemini-2.5-flash (fast)
-    "RiskSummary":          {"start_offset": 3,  "max_tries": 10},  # nemotron-120b first
-    "IntelligenceBriefing": {"start_offset": 6,  "max_tries": 10},  # hermes-405b first
-    "StartupInsight":       {"start_offset": 10, "max_tries": 10},  # llama-3.3-70b first
-    "AdvisoryChat":         {"start_offset": 0,  "max_tries": 10},  # user-facing, best first
+    "ForecastNarrative":    {"start_offset": 0,  "max_tries": 20},  # gemini-2.0-flash first
+    "BriefingAgent":        {"start_offset": 0,  "max_tries": 25},  # gemini-2.0-flash first (core)
+    "RealtimeIntel":        {"start_offset": 4,  "max_tries": 15},  # gpt-oss-120b first
+    "KnowledgeFusion":      {"start_offset": 6,  "max_tries": 15},  # llama-3.3-70b first
+    "NLP_EntityExtraction": {"start_offset": 0,  "max_tries": 10},  # gemini-2.0-flash (fast)
+    "NLP_BatchExtraction":  {"start_offset": 1,  "max_tries": 10},  # gemini-2.5-flash (fast)
+    "RiskSummary":          {"start_offset": 3,  "max_tries": 15},  # nemotron-120b first
+    "IntelligenceBriefing": {"start_offset": 2,  "max_tries": 15},  # hermes-405b first
+    "StartupInsight":       {"start_offset": 9,  "max_tries": 15},  # gemma-4-31b-it first
+    "AdvisoryChat":         {"start_offset": 0,  "max_tries": 25},  # user-facing, maximum resilience
 }
 
 # Default fallback for unknown contexts
-_DEFAULT_ASSIGNMENT = {"start_offset": 0, "max_tries": 6}
+_DEFAULT_ASSIGNMENT = {"start_offset": 0, "max_tries": 15}
 
 # ══════════════════════════════════════════════════════════════════════════════
 # RATE LIMIT TRACKING — per-model 429 cooldown (60s auto-skip)

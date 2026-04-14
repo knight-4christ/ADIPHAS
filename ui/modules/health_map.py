@@ -58,9 +58,9 @@ def render():
 
     col1, col2, col3 = st.columns(3)
     with col1:
-        view_mode = st.selectbox("Layer Logic", ["Disease Outbreaks", "Risk Heatmap", "All Monitored Zones"])
+        view_mode = st.selectbox("Layer Logic", ["Disease Outbreaks", "Risk Heatmap", "All Monitored Zones"], key="health_map_layer_view")
     with col2:
-        lga_filter = st.multiselect("Filter LGA", list(LAGOS_LGAS.keys()))
+        lga_filter = st.multiselect("Filter LGA", list(LAGOS_LGAS.keys()), key="health_map_lga_filter")
     with col3:
         if live_data:
             active_lgas = set()

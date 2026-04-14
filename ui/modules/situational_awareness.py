@@ -129,9 +129,6 @@ def render():
                                 st.caption(f"Source: {source_name} | Risk: {risk}")
                 else:
                     st.write("No active signals in the feed.")
-        
-        _render_map_tab()
-
 
 def _render_briefing_sources(briefing, alerts):
     """Renders the intelligence sources that informed the StAMP briefing."""
