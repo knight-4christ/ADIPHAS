@@ -13,6 +13,7 @@ ADIPHAS runs on a **split-cloud architecture** with two independently hosted ser
 | **Backend API** | [Render](https://render.com) (Native Python 3.11) | `https://adiphas.onrender.com` |
 | **Frontend UI** | [Streamlit Community Cloud](https://streamlit.io/cloud) | `https://adiphas.streamlit.app` |
 | **Database** | [Neon PostgreSQL](https://neon.tech) | Connected via `DATABASE_URL` |
+| **Geocoding Chain** | Nominatim, BigDataCloud, ipapi.co | Zero-config free APIs for location resilience |
 
 ### How It Works
 1. The **Streamlit frontend** reads the `BACKEND_URL` from Streamlit Secrets (`st.secrets`).

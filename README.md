@@ -27,8 +27,9 @@ The system leverages **Dempster-Shafer Theory of Evidence** to combine conflicti
 - **🧠 Knowledge Fusion**: Mathematical reconciliation of multi-source signals using the **Dempster-Shafer Framework**.
 - **🌐 Real-Time Intelligence**: Live global health event tracking powered by the **Tavily Search API**.
 - **📊 IDSR Analytics**: Deep statistical analysis of historical **Verified NCDC Data** with anomaly flagging and predictive forecasting.
-- **🛡️ Advisory Chat**: A High-Dimensional Hybrid RAG-powered clinical assistant for citizens and health experts.
-- **📍 Personalized Risk Scoring**: Genotype-aware health scoring integrated with local environmental alerts.
+- **🛡️ Advisory Engine**: A Hybrid clinical assistant backed by an OpenRouter Tiered Model Rotation (exponential rate-limit backoff).
+- **📍 Resilient Geolocation**: Multi-provider fallback chain (Nominatim → BigDataCloud → IP → Profile) ensuring seamless locational tracking without GPS drift.
+- **⚡ Micro-Frontend UI Architecture**: Fully modularized dashboard leveraging lazy-loading (`@st.fragment`) to ensure instant page-shell rendering even under heavy AI computation.
 
 ---
 

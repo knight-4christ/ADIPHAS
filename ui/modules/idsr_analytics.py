@@ -31,158 +31,162 @@ def render():
                 st.error(f"Error reading CSV: {e}")
 
     with tab2:
-        st.subheader("Disease Forecasting Model")
+        @st.fragment
+        def _render_predictive_modeling():
+            st.subheader("Disease Forecasting Model")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                # LGA selection — codes must match the lga_code column in IDSRRecord table
+                lga_input = st.selectbox("Select LGA", ["Surulere", "Ikeja", "Eti-Osa", "Alimosho", "Lagos Mainland", "Kosofe", "Shomolu"])
+                # Direct LGA code (matches what script seeds into DB: "SURULERE", etc.)
+                lga_map = {
+                    "Surulere": "SURULERE", "Ikeja": "IKEJA", "Eti-Osa": "ETI-OSA",
+                    "Alimosho": "ALIMOSHO", "Lagos Mainland": "MAINLAND",
+                    "Kosofe": "KOSOFE", "Shomolu": "SHOMOLU"
+                }
+                lga_code = lga_map.get(lga_input, lga_input.upper())
+                
+            with col2:
+                disease = st.selectbox("Target Disease", ["Cholera", "Lassa Fever", "Measles", "Meningitis"])
+                
+            if st.button("Run Forecast Model"):
+                with st.spinner(f"Running Weighted Moving Average + Trend model for {disease} in {lga_input}..."):
+                    forecast = api_client.get_forecast(lga_code, disease)
+                    
+                if forecast and not forecast.get("error"):
+                    # Handle Insufficient Data Fallback
+                    if forecast.get("forecast") == []:
+                        st.info(f"📊 **Insufficient Historical Data**")
+                        st.write(forecast.get("policy_recommendation_plan", "Need at least 4 weeks of data to generate a forecast."))
+                        st.caption("The system is actively monitoring real-time intelligence for this LGA.")
+                    else:
+                        # Accuracy Metrics (SECTION 2: Evaluation Framework requirements)
+                        st.markdown("### 🧬 Model Performance Metrics")
+                        m1, m2, m3 = st.columns(3)
+                        mae = forecast.get('mae', 0)
+                        m1.metric("MAE (Mean Absolute Error)", f"{mae:.2f}")
+                        m2.metric("RMSE", f"{forecast.get('rmse', 0):.2f}")
+                        
+                        data_points = forecast.get('data_points_used', 0)
+                        m3.metric("Validation Period", f"2 Weeks ({data_points} wks data)")
+
+                        # Prominent Anomaly Banner (Flagging Feature)
+                        if forecast.get("anomaly_flag"):
+                            st.error(f"🚨 **EPIDEMIC ANOMALY DETECTED**: Statistical surge detected for {disease} in {lga_input}. Z-score exceeds safety threshold (2.0). Escalating surveillance priority.")
+
+                        st.info(f"💡 Low MAE ({mae:.2f}) indicates high historical accuracy for {disease} in {lga_input}.")
+                        
+                        # AI Epidemiological Narrative
+                        narrative = forecast.get("epidemiological_narrative")
+                        if narrative:
+                            st.success(f"🧠 **AI Epidemiological Narrative**: {narrative}")
+
+                        # Visualizing multi-week forecast
+                        st.subheader("Forecast Trajectory (4 Weeks)")
+                        
+                        preds = forecast.get('forecast', [10, 10, 10, 10])
+                        ci_low = forecast.get('ci_lower', [5, 5, 5, 5])
+                        ci_high = forecast.get('ci_upper', [15, 15, 15, 15])
+
+                        # --- Real IDSR historical baseline ---
+                        hist_res = api_client.get_idsr_history(lga_code=lga_code, disease=disease)
+                        if isinstance(hist_res, list) and hist_res:
+                            hist_df = pd.DataFrame(hist_res)
+                            hist_df["week_start"] = pd.to_datetime(hist_df["week_start"])
+                            hist_df = hist_df.sort_values("week_start")
+                            # Take up to last 8 weeks
+                            hist_df = hist_df.tail(8)
+                            hist_dates = hist_df["week_start"].tolist()
+                            hist_vals = hist_df["cases"].tolist()
+                        else:
+                            st.caption("ℹ️ No IDSR records for this LGA/disease yet.")
+                            hist_dates = pd.date_range(end=pd.Timestamp.now(), periods=4, freq='W').tolist()
+                            hist_vals = [0] * 4
+
+                        hist_len = len(hist_dates)
+                        fcst_len = len(preds)
+                        
+                        # Generate exact number of future dates based on forecast length
+                        forecast_dates = pd.date_range(start=hist_dates[-1], periods=fcst_len + 1, freq='W')[1:].tolist()
+
+                        # Only chart if we have valid data
+                        if hist_vals and preds:
+                            fig = go.Figure()
+                            
+                            # Add Historical Line
+                            fig.add_trace(go.Scatter(
+                                x=hist_dates,
+                                y=hist_vals,
+                                name="Historical",
+                                mode="lines+markers",
+                                line=dict(color="#94a3b8"),
+                                marker=dict(size=6)
+                            ))
+                            
+                            # Add Forecast Line
+                            fig.add_trace(go.Scatter(
+                                x=forecast_dates,
+                                y=preds,
+                                name="Forecast",
+                                mode="lines+markers",
+                                line=dict(color="#0ea5e9"),
+                                marker=dict(size=6)
+                            ))
+                            
+                            # Add Confidence Intervals
+                            if ci_low and ci_high:
+                                fig.add_trace(go.Scatter(
+                                    x=forecast_dates,
+                                    y=ci_high,
+                                    fill=None, mode="lines", line_color="rgba(14, 165, 233, 0)", showlegend=False
+                                ))
+                                fig.add_trace(go.Scatter(
+                                    x=forecast_dates,
+                                    y=ci_low,
+                                    fill="tonexty", mode="lines", line_color="rgba(14, 165, 233, 0)",
+                                    fillcolor="rgba(14, 165, 233, 0.2)", name="95% Confidence Interval"
+                                ))
+                            
+                            fig.update_layout(
+                                template="plotly_dark",
+                                margin=dict(l=20, r=20, t=40, b=20),
+                                paper_bgcolor="rgba(0,0,0,0)",
+                                plot_bgcolor="rgba(0,0,0,0)",
+                                font=dict(family="Inter, sans-serif", size=12, color="#94a3b8"),
+                                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                            )
+                            st.plotly_chart(fig, width='stretch')
+                        else:
+                            st.info("📊 Insufficient data points to render forecast chart.")
+                    
+                    # --- Hybrid RAG Intelligence Section ---
+                    st.markdown("---")
+                    st.subheader("🌐 Hybrid RAG Intelligence")
+                    st.caption("Searching local knowledge base (verified alerts) with fallback to global news...")
+                    
+                    search_query = f"Latest outbreaks and protocols for {disease} in {lga_input} Nigeria"
+                    with st.spinner("Retrieving intelligence context..."):
+                        rag_res = api_client.advisory_search(search_query)
+                        
+                    if rag_res and not rag_res.get("error"):
+                        source = rag_res.get("source", "unknown")
+                        results = rag_res.get("results", [])
+                        
+                        if source == "local_rag":
+                            st.info("✅ Found relevant context in local verified alerts database.")
+                        elif source == "web_search":
+                            st.warning("🔍 Local database sparse. Fetched live global intelligence via Tavily.")
+                        
+                        if results:
+                            for i, r in enumerate(results[:2]): # Show top 2
+                                content = r.get("content") or r.get("snippet") or str(r)
+                                with st.expander(f"Intelligence Insight #{i+1}"):
+                                    st.write(content)
+                    else:
+                        st.write("No additional intelligence context found for this query.")
+                    
+                elif forecast and forecast.get("error"):
+                    st.error(f"API Error: {forecast.get('detail')}")
         
-        col1, col2 = st.columns(2)
-        with col1:
-            # LGA selection — codes must match the lga_code column in IDSRRecord table
-            lga_input = st.selectbox("Select LGA", ["Surulere", "Ikeja", "Eti-Osa", "Alimosho", "Lagos Mainland", "Kosofe", "Shomolu"])
-            # Direct LGA code (matches what script seeds into DB: "SURULERE", etc.)
-            lga_map = {
-                "Surulere": "SURULERE", "Ikeja": "IKEJA", "Eti-Osa": "ETI-OSA",
-                "Alimosho": "ALIMOSHO", "Lagos Mainland": "MAINLAND",
-                "Kosofe": "KOSOFE", "Shomolu": "SHOMOLU"
-            }
-            lga_code = lga_map.get(lga_input, lga_input.upper())
-            
-        with col2:
-            disease = st.selectbox("Target Disease", ["Cholera", "Lassa Fever", "Measles", "Meningitis"])
-            
-        if st.button("Run Forecast Model"):
-            with st.spinner(f"Running Weighted Moving Average + Trend model for {disease} in {lga_input}..."):
-                forecast = api_client.get_forecast(lga_code, disease)
-                
-            if forecast and not forecast.get("error"):
-                # Handle Insufficient Data Fallback
-                if forecast.get("forecast") == []:
-                    st.info(f"📊 **Insufficient Historical Data**")
-                    st.write(forecast.get("policy_recommendation_plan", "Need at least 4 weeks of data to generate a forecast."))
-                    st.caption("The system is actively monitoring real-time intelligence for this LGA.")
-                else:
-                    # Accuracy Metrics (SECTION 2: Evaluation Framework requirements)
-                    st.markdown("### 🧬 Model Performance Metrics")
-                    m1, m2, m3 = st.columns(3)
-                    mae = forecast.get('mae', 0)
-                    m1.metric("MAE (Mean Absolute Error)", f"{mae:.2f}")
-                    m2.metric("RMSE", f"{forecast.get('rmse', 0):.2f}")
-                    
-                    data_points = forecast.get('data_points_used', 0)
-                    m3.metric("Validation Period", f"2 Weeks ({data_points} wks data)")
-
-                    # Prominent Anomaly Banner (Flagging Feature)
-                    if forecast.get("anomaly_flag"):
-                        st.error(f"🚨 **EPIDEMIC ANOMALY DETECTED**: Statistical surge detected for {disease} in {lga_input}. Z-score exceeds safety threshold (2.0). Escalating surveillance priority.")
-
-                    st.info(f"💡 Low MAE ({mae:.2f}) indicates high historical accuracy for {disease} in {lga_input}.")
-                    
-                    # AI Epidemiological Narrative
-                    narrative = forecast.get("epidemiological_narrative")
-                    if narrative:
-                        st.success(f"🧠 **AI Epidemiological Narrative**: {narrative}")
-
-                    # Visualizing multi-week forecast
-                    st.subheader("Forecast Trajectory (4 Weeks)")
-                    
-                    preds = forecast.get('forecast', [10, 10, 10, 10])
-                    ci_low = forecast.get('ci_lower', [5, 5, 5, 5])
-                    ci_high = forecast.get('ci_upper', [15, 15, 15, 15])
-
-                    # --- Real IDSR historical baseline ---
-                    hist_res = api_client.get_idsr_history(lga_code=lga_code, disease=disease)
-                    if isinstance(hist_res, list) and hist_res:
-                        hist_df = pd.DataFrame(hist_res)
-                        hist_df["week_start"] = pd.to_datetime(hist_df["week_start"])
-                        hist_df = hist_df.sort_values("week_start")
-                        # Take up to last 8 weeks
-                        hist_df = hist_df.tail(8)
-                        hist_dates = hist_df["week_start"].tolist()
-                        hist_vals = hist_df["cases"].tolist()
-                    else:
-                        st.caption("ℹ️ No IDSR records for this LGA/disease yet.")
-                        hist_dates = pd.date_range(end=pd.Timestamp.now(), periods=4, freq='W').tolist()
-                        hist_vals = [0] * 4
-
-                    hist_len = len(hist_dates)
-                    fcst_len = len(preds)
-                    
-                    # Generate exact number of future dates based on forecast length
-                    forecast_dates = pd.date_range(start=hist_dates[-1], periods=fcst_len + 1, freq='W')[1:].tolist()
-
-                    # Only chart if we have valid data
-                    if hist_vals and preds:
-                        fig = go.Figure()
-                        
-                        # Add Historical Line
-                        fig.add_trace(go.Scatter(
-                            x=hist_dates,
-                            y=hist_vals,
-                            name="Historical",
-                            mode="lines+markers",
-                            line=dict(color="#94a3b8"),
-                            marker=dict(size=6)
-                        ))
-                        
-                        # Add Forecast Line
-                        fig.add_trace(go.Scatter(
-                            x=forecast_dates,
-                            y=preds,
-                            name="Forecast",
-                            mode="lines+markers",
-                            line=dict(color="#0ea5e9"),
-                            marker=dict(size=6)
-                        ))
-                        
-                        # Add Confidence Intervals
-                        if ci_low and ci_high:
-                            fig.add_trace(go.Scatter(
-                                x=forecast_dates,
-                                y=ci_high,
-                                fill=None, mode="lines", line_color="rgba(14, 165, 233, 0)", showlegend=False
-                            ))
-                            fig.add_trace(go.Scatter(
-                                x=forecast_dates,
-                                y=ci_low,
-                                fill="tonexty", mode="lines", line_color="rgba(14, 165, 233, 0)",
-                                fillcolor="rgba(14, 165, 233, 0.2)", name="95% Confidence Interval"
-                            ))
-                        
-                        fig.update_layout(
-                            template="plotly_dark",
-                            margin=dict(l=20, r=20, t=40, b=20),
-                            paper_bgcolor="rgba(0,0,0,0)",
-                            plot_bgcolor="rgba(0,0,0,0)",
-                            font=dict(family="Inter, sans-serif", size=12, color="#94a3b8"),
-                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-                        )
-                        st.plotly_chart(fig, width='stretch')
-                    else:
-                        st.info("📊 Insufficient data points to render forecast chart.")
-                
-                # --- Hybrid RAG Intelligence Section ---
-                st.markdown("---")
-                st.subheader("🌐 Hybrid RAG Intelligence")
-                st.caption("Searching local knowledge base (verified alerts) with fallback to global news...")
-                
-                search_query = f"Latest outbreaks and protocols for {disease} in {lga_input} Nigeria"
-                with st.spinner("Retrieving intelligence context..."):
-                    rag_res = api_client.advisory_search(search_query)
-                    
-                if rag_res and not rag_res.get("error"):
-                    source = rag_res.get("source", "unknown")
-                    results = rag_res.get("results", [])
-                    
-                    if source == "local_rag":
-                        st.info("✅ Found relevant context in local verified alerts database.")
-                    elif source == "web_search":
-                        st.warning("🔍 Local database sparse. Fetched live global intelligence via Tavily.")
-                    
-                    if results:
-                        for i, r in enumerate(results[:2]): # Show top 2
-                            content = r.get("content") or r.get("snippet") or str(r)
-                            with st.expander(f"Intelligence Insight #{i+1}"):
-                                st.write(content)
-                else:
-                    st.write("No additional intelligence context found for this query.")
-                
-            elif forecast and forecast.get("error"):
-                st.error(f"API Error: {forecast.get('detail')}")
+        _render_predictive_modeling()

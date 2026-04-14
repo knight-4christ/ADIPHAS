@@ -74,25 +74,59 @@ def render():
 
     map_data = []
 
-    # Build LGA alert buckets (used by all view modes)
-    lga_buckets = {}
-    if live_data:
-        for a in alerts:
-            lga, coords = _match_lga(a.get("location_text", ""))
-            if not lga:
-                continue
-            if lga not in lga_buckets:
-                lga_buckets[lga] = {"coords": coords, "alerts": []}
-            lga_buckets[lga]["alerts"].append(a)
+    # Deferred via @st.fragment — map builds lazily so page shell renders instantly
+    @st.fragment
+    def _render_map():
+        nonlocal map_data
+        
+        # Build LGA alert buckets (used by all view modes)
+        lga_buckets = {}
+        if live_data:
+            for a in alerts:
+                lga, coords = _match_lga(a.get("location_text", ""))
+                if not lga:
+                    continue
+                if lga not in lga_buckets:
+                    lga_buckets[lga] = {"coords": coords, "alerts": []}
+                lga_buckets[lga]["alerts"].append(a)
 
-    if view_mode == "All Monitored Zones":
-        # Show ALL 20 LGAs regardless of alert status
-        for lga, coords in LAGOS_LGAS.items():
-            if lga_filter and lga not in lga_filter:
-                continue
+        if view_mode == "All Monitored Zones":
+            # Show ALL 20 LGAs regardless of alert status
+            for lga, coords in LAGOS_LGAS.items():
+                if lga_filter and lga not in lga_filter:
+                    continue
+                
+                if lga in lga_buckets:
+                    bucket_alerts = lga_buckets[lga]["alerts"]
+                    risk_priorities = ["Critical", "High", "Moderate", "Low"]
+                    risk_levels = [a.get("risk_level", "Low") for a in bucket_alerts]
+                    top_risk = next((r for r in risk_priorities if r in risk_levels), "Low")
+                    diseases = ", ".join(set(a.get("disease", "Unknown") for a in bucket_alerts if a.get("disease")))
+                    map_data.append({
+                        "LGA": lga,
+                        "lat": coords["lat"],
+                        "lon": coords["lon"],
+                        "Value": RISK_WEIGHT.get(top_risk, 12) + (len(bucket_alerts) * 3),
+                        "Status": top_risk,
+                        "Signals": len(bucket_alerts),
+                        "Diseases": diseases or "General Health"
+                    })
+                else:
+                    # No alerts — show as green/nominal
+                    map_data.append({
+                        "LGA": lga, "lat": coords["lat"], "lon": coords["lon"],
+                        "Value": 8, "Status": "Normal", "Signals": 0, "Diseases": "No active signals"
+                    })
             
-            if lga in lga_buckets:
-                bucket_alerts = lga_buckets[lga]["alerts"]
+            st.success(f"📡 Showing all **{len(map_data)}** monitored zones across Lagos State.")
+        
+        elif live_data:
+            for lga, bucket in lga_buckets.items():
+                if lga_filter and lga not in lga_filter:
+                    continue
+                coords = bucket["coords"]
+                bucket_alerts = bucket["alerts"]
+                # Use highest risk level present
                 risk_priorities = ["Critical", "High", "Moderate", "Low"]
                 risk_levels = [a.get("risk_level", "Low") for a in bucket_alerts]
                 top_risk = next((r for r in risk_priorities if r in risk_levels), "Low")
@@ -106,99 +140,72 @@ def render():
                     "Signals": len(bucket_alerts),
                     "Diseases": diseases or "General Health"
                 })
-            else:
-                # No alerts — show as green/nominal
+        else:
+            st.info("🛰️ No live signals yet — agents are scanning. Map will populate automatically.")
+            # Still render an empty Lagos-centred map
+            for lga, coords in LAGOS_LGAS.items():
+                if lga_filter and lga not in lga_filter:
+                    continue
                 map_data.append({
                     "LGA": lga, "lat": coords["lat"], "lon": coords["lon"],
-                    "Value": 8, "Status": "Normal", "Signals": 0, "Diseases": "No active signals"
+                    "Value": 5, "Status": "Normal", "Signals": 0, "Diseases": "-"
                 })
-        
-        st.success(f"📡 Showing all **{len(map_data)}** monitored zones across Lagos State.")
+
+        if not map_data:
+            st.warning("No LGAs match the current filter.")
+            return
+
+        # Determine map center: Priority 1: LGA Filter, Priority 2: User Location, Priority 3: Default Lagos
+        if lga_filter and lga_filter[0] in LAGOS_LGAS:
+            first_lga_coords = LAGOS_LGAS[lga_filter[0]]
+            center_lat, center_lon = first_lga_coords["lat"], first_lga_coords["lon"]
+            map_zoom = 13
+        elif user_lat and user_lon:
+            center_lat, center_lon = user_lat, user_lon
+            map_zoom = 12
+        else:
+            center_lat, center_lon = 6.5244, 3.3792
+            map_zoom = 10
+
+        m = folium.Map(location=[center_lat, center_lon], zoom_start=map_zoom, tiles="CartoDB positron")
+        plugins.Fullscreen().add_to(m)
+
+        if user_lat and user_lon:
+            folium.Marker(
+                [user_lat, user_lon],
+                popup=f"📍 You ({user_loc or 'Your Location'})",
+                tooltip="Your Location",
+                icon=folium.Icon(color="blue", icon="user")
+            ).add_to(m)
+
+        for item in map_data:
+            color = COLOR_MAP.get(item["Status"], "green")
+            # Scale radius for folium display natively
+            radius = max((item["Value"] / 3) + 4, 6)
+            
+            # HTML Popup content
+            html_content = f"<b>{item['LGA']}</b><br/>" \
+                           f"Risk Level: {item['Status']}<br/>" \
+                           f"Active Signals: {item['Signals']}<br/>" \
+                           f"Identified Pathogens: {item['Diseases']}"
+                           
+            folium.CircleMarker(
+                location=[item["lat"], item["lon"]],
+                radius=radius,
+                color=color,
+                weight=1,
+                fill=True,
+                fill_color=color,
+                fill_opacity=0.6,
+                tooltip=f"{item['LGA']} - {item['Status']}",
+                popup=folium.Popup(html_content, max_width=350)
+            ).add_to(m)
+
+        # Render folium map into Streamlit gracefully
+        st_folium(m, use_container_width=True, height=650, returned_objects=[])
+
+        if live_data:
+            st.success(f"✅ Map rendered from **{len(alerts)} live EBS signals** across {len(map_data)} LGAs.")
+        st.info("💡 **Tip:** Hover over circles for signal details. Circle size = signal intensity.")
     
-    elif live_data:
-        for lga, bucket in lga_buckets.items():
-            if lga_filter and lga not in lga_filter:
-                continue
-            coords = bucket["coords"]
-            bucket_alerts = bucket["alerts"]
-            # Use highest risk level present
-            risk_priorities = ["Critical", "High", "Moderate", "Low"]
-            risk_levels = [a.get("risk_level", "Low") for a in bucket_alerts]
-            top_risk = next((r for r in risk_priorities if r in risk_levels), "Low")
-            diseases = ", ".join(set(a.get("disease", "Unknown") for a in bucket_alerts if a.get("disease")))
-            map_data.append({
-                "LGA": lga,
-                "lat": coords["lat"],
-                "lon": coords["lon"],
-                "Value": RISK_WEIGHT.get(top_risk, 12) + (len(bucket_alerts) * 3),
-                "Status": top_risk,
-                "Signals": len(bucket_alerts),
-                "Diseases": diseases or "General Health"
-            })
-    else:
-        st.info("🛰️ No live signals yet — agents are scanning. Map will populate automatically.")
-        # Still render an empty Lagos-centred map
-        for lga, coords in LAGOS_LGAS.items():
-            if lga_filter and lga not in lga_filter:
-                continue
-            map_data.append({
-                "LGA": lga, "lat": coords["lat"], "lon": coords["lon"],
-                "Value": 5, "Status": "Normal", "Signals": 0, "Diseases": "-"
-            })
-
-    if not map_data:
-        st.warning("No LGAs match the current filter.")
-        return
-
-    # Determine map center: Priority 1: LGA Filter, Priority 2: User Location, Priority 3: Default Lagos
-    if lga_filter and lga_filter[0] in LAGOS_LGAS:
-        first_lga_coords = LAGOS_LGAS[lga_filter[0]]
-        center_lat, center_lon = first_lga_coords["lat"], first_lga_coords["lon"]
-        map_zoom = 13
-    elif user_lat and user_lon:
-        center_lat, center_lon = user_lat, user_lon
-        map_zoom = 12
-    else:
-        center_lat, center_lon = 6.5244, 3.3792
-        map_zoom = 10
-
-    m = folium.Map(location=[center_lat, center_lon], zoom_start=map_zoom, tiles="CartoDB positron")
-    plugins.Fullscreen().add_to(m)
-
-    if user_lat and user_lon:
-        folium.Marker(
-            [user_lat, user_lon],
-            popup=f"📍 You ({user_loc or 'Your Location'})",
-            tooltip="Your Location",
-            icon=folium.Icon(color="blue", icon="user")
-        ).add_to(m)
-
-    for item in map_data:
-        color = COLOR_MAP.get(item["Status"], "green")
-        # Scale radius for folium display natively
-        radius = max((item["Value"] / 3) + 4, 6)
-        
-        # HTML Popup content
-        html_content = f"<b>{item['LGA']}</b><br/>" \
-                       f"Risk Level: {item['Status']}<br/>" \
-                       f"Active Signals: {item['Signals']}<br/>" \
-                       f"Identified Pathogens: {item['Diseases']}"
-                       
-        folium.CircleMarker(
-            location=[item["lat"], item["lon"]],
-            radius=radius,
-            color=color,
-            weight=1,
-            fill=True,
-            fill_color=color,
-            fill_opacity=0.6,
-            tooltip=f"{item['LGA']} - {item['Status']}",
-            popup=folium.Popup(html_content, max_width=350)
-        ).add_to(m)
-
-    # Render folium map into Streamlit gracefully
-    st_folium(m, use_container_width=True, height=650, returned_objects=[])
-
-    if live_data:
-        st.success(f"✅ Map rendered from **{len(alerts)} live EBS signals** across {len(map_data)} LGAs.")
-    st.info("💡 **Tip:** Hover over circles for signal details. Circle size = signal intensity.")
+    _render_map()

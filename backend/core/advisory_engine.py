@@ -43,9 +43,12 @@ class AdvisoryEngine:
         Recent Conversation:
         {history_str}
         
-        Provide the next response following the guidelines of NCDC and WHO. 
-        Be professional, comprehensive, detailed, and simple to understand.
-        CRITICAL RULE: DO NOT use markdown tables. Provide output as text and bullet points only.
+        Provide the next response following NCDC and WHO guidelines. 
+        CRITICAL OUTPUT RULES:
+        - Be professional, comprehensive, and simple to understand.
+        - Keep responses under 200 words — concise but actionable.
+        - Use bullet points for multiple items. DO NOT use markdown tables.
+        - Every sentence must add value — avoid filler phrases.
         """
         try:
             from backend.core.model_config import smart_generate  # type: ignore[import-untyped]
@@ -79,13 +82,13 @@ class AdvisoryEngine:
         {bio_block}
         {context_block}
         
-        Provide a highly professional, comprehensive, detailed yet simple-to-understand actionable advisory tailored to {user_metadata.get('name', 'the user') if user_metadata else 'them'}. 
-        Focus on: 
-        1. Specific Clinical Protocol.
-        2. Public Health Action.
-        
-        IMPORTANT: Use their Biological Profile to tailor the advice. 
-        CRITICAL RULE: DO NOT use markdown tables under any circumstances. Use bullet points and paragraphs.
+        Provide a professional, actionable advisory tailored to the patient.
+        CRITICAL OUTPUT RULES:
+        - Keep the ENTIRE response under 250 words.
+        - Focus on: 1) Specific Clinical Protocol 2) Public Health Action.
+        - Use their Biological Profile to tailor the advice.
+        - Use bullet points. DO NOT use markdown tables.
+        - Every sentence must be actionable — no filler.
         """
         try:
             from backend.core.model_config import smart_generate  # type: ignore[import-untyped]
@@ -238,8 +241,8 @@ class AdvisoryEngine:
         User Biodata: {bio_block}
         Recent Local Alerts context: {alerts_summary}
         
-        Provide a highly personalized, comprehensive, detailed and professional situational briefing tailored specifically to {user_name}'s location ({location}) and biological profile. Address {user_name} directly.
-        CRITICAL RULE: DO NOT use tables. Output simple, easy-to-read prose. Keep it under 3-4 sentences total so it fits on a dashboard.
+        Provide a personalized situational briefing tailored to {user_name}'s location ({location}) and biological profile. Address {user_name} directly.
+        CRITICAL RULES: Keep it to exactly 2-3 sentences. No tables. No filler. Every word must be actionable intelligence.
         """
         try:
             from backend.core.model_config import smart_generate # type: ignore[import-untyped]

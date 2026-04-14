@@ -49,11 +49,30 @@ def render_login_modal():
                                 if "username" in me:
                                     st.session_state.user = me
                                     
-                                    # Get user location (detected or profile)
+                                    # --- Resilient location detection on sign-in ---
                                     detected_loc = st.session_state.get('user_location')
                                     profile_loc = me.get('location_lga') or me.get('state')
+                                    
+                                    # If no detected location yet, try IP-based fallback
+                                    if not detected_loc:
+                                        try:
+                                            from modules.geolocation import _geolocate_by_ip
+                                            detected_loc = _geolocate_by_ip()
+                                        except Exception:
+                                            pass
+                                    
                                     loc = detected_loc if detected_loc else profile_loc
                                     loc_msg = f" | Location: {loc}" if loc else ""
+                                    
+                                    # Auto-update profile location if detected and different/missing
+                                    if detected_loc and detected_loc != profile_loc:
+                                        try:
+                                            updated = api_client.update_profile(token, {"location_lga": detected_loc})
+                                            if updated and "username" in updated:
+                                                st.session_state.user = updated
+                                                me = updated
+                                        except Exception:
+                                            pass  # Non-critical — profile update can happen later
                                     
                                     if not me.get('location_lga'):
                                         st.session_state.active_nav_cat = "Account"

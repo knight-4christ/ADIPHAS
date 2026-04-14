@@ -87,65 +87,69 @@ def render():
         render_live_alerts()
             
     with tab2:
-        st.subheader("Knowledge Fusion Simulator")
-        st.write("Simulate conflicting reports to see how the agent resolves them using **Dempster-Shafer Logic**.")
+        @st.fragment
+        def _render_fusion_simulator():
+            st.subheader("Knowledge Fusion Simulator")
+            st.write("Simulate conflicting reports to see how the agent resolves them using **Dempster-Shafer Logic**.")
+            
+            # Fetch Real Sources from Backend
+            source_registry = api_client.get_intelligence_sources()
+            if not isinstance(source_registry, dict) or "error" in source_registry:
+                # Fallback to defaults if backend offline
+                source_registry = {"NCDC": 0.95, "Punch Health": 0.7, "SOCIAL_MEDIA": 0.3}
+                
+            source_list = sorted(list(source_registry.keys()))
+            
+            c1, c2 = st.columns(2)
+            with c1:
+                st.markdown("### Source A")
+                src_a = st.selectbox("Select Source A", source_list, index=source_list.index("NCDC") if "NCDC" in source_list else 0)
+                weight_a = source_registry.get(src_a, 0.5)
+                st.caption(f"Reliability Weight: **{weight_a}**")
+                cases_a = st.number_input("Reported Cases (A)", value=50, key="cases_a_sim")
+                loc_a = st.text_input("Location (A)", value="Ikeja", key="loc_a_sim")
+                
+            with c2:
+                st.markdown("### Source B")
+                src_b = st.selectbox("Select Source B", source_list, index=source_list.index("Punch Health") if "Punch Health" in source_list else 0)
+                weight_b = source_registry.get(src_b, 0.5)
+                st.caption(f"Reliability Weight: **{weight_b}**")
+                cases_b = st.number_input("Reported Cases (B)", value=10, key="cases_b_sim")
+                loc_b = st.text_input("Location (B)", value="Ikeja", key="loc_b_sim")
+                
+            if st.button("Run Fusion Algorithm", use_container_width=True):
+                with st.spinner("Calculating Dempster-Shafer Consensus..."):
+                    reports = [
+                        {"source": src_a, "cases": cases_a, "location": loc_a, "disease": "Cholera"},
+                        {"source": src_b, "cases": cases_b, "location": loc_b, "disease": "Cholera"}
+                    ]
+                    try:
+                        result = api_client.fuse_intelligence(reports)
+                        st.success("Mathematical Fusion Complete")
+                        
+                        # Report View
+                        st.markdown("### 📄 Intelligence Report")
+                        st.markdown(f"**Consensus Location:** {result.get('location')}")
+                        st.markdown(f"**Confidence Score:** {result.get('confidence_score')}")
+                        st.markdown(f"**Resolved Case Count:** `{result.get('estimated_cases')}`")
+                        
+                        # AI Semantic Synopsis & Advisory
+                        ai_synopsis = result.get("ai_synopsis")
+                        fused_advisory = result.get("fused_advisory")
+                        
+                        if ai_synopsis:
+                            st.subheader("🧠 Intelligence Fusion")
+                            st.info(f"**Synopsis**: {ai_synopsis}")
+                            if fused_advisory:
+                                st.warning(f"💊 **Fused Advisory**: {fused_advisory}")
+                        else:
+                            st.info(f"**Status**: {result.get('status')}")
+                        
+                        with st.expander("View Logic Trace"):
+                            for step in result.get("trace", []):
+                                st.text(f"[{step['timestamp']}] {step['step']}")
+                                
+                    except Exception as e:
+                        st.error(f"Fusion Error: {e}")
         
-        # Fetch Real Sources from Backend
-        source_registry = api_client.get_intelligence_sources()
-        if not isinstance(source_registry, dict) or "error" in source_registry:
-            # Fallback to defaults if backend offline
-            source_registry = {"NCDC": 0.95, "Punch Health": 0.7, "SOCIAL_MEDIA": 0.3}
-            
-        source_list = sorted(list(source_registry.keys()))
-        
-        c1, c2 = st.columns(2)
-        with c1:
-            st.markdown("### Source A")
-            src_a = st.selectbox("Select Source A", source_list, index=source_list.index("NCDC") if "NCDC" in source_list else 0)
-            weight_a = source_registry.get(src_a, 0.5)
-            st.caption(f"Reliability Weight: **{weight_a}**")
-            cases_a = st.number_input("Reported Cases (A)", value=50, key="cases_a_sim")
-            loc_a = st.text_input("Location (A)", value="Ikeja", key="loc_a_sim")
-            
-        with c2:
-            st.markdown("### Source B")
-            src_b = st.selectbox("Select Source B", source_list, index=source_list.index("Punch Health") if "Punch Health" in source_list else 0)
-            weight_b = source_registry.get(src_b, 0.5)
-            st.caption(f"Reliability Weight: **{weight_b}**")
-            cases_b = st.number_input("Reported Cases (B)", value=10, key="cases_b_sim")
-            loc_b = st.text_input("Location (B)", value="Ikeja", key="loc_b_sim")
-            
-        if st.button("Run Fusion Algorithm", use_container_width=True):
-            with st.spinner("Calculating Dempster-Shafer Consensus..."):
-                reports = [
-                    {"source": src_a, "cases": cases_a, "location": loc_a, "disease": "Cholera"},
-                    {"source": src_b, "cases": cases_b, "location": loc_b, "disease": "Cholera"}
-                ]
-                try:
-                    result = api_client.fuse_intelligence(reports)
-                    st.success("Mathematical Fusion Complete")
-                    
-                    # Report View
-                    st.markdown("### 📄 Intelligence Report")
-                    st.markdown(f"**Consensus Location:** {result.get('location')}")
-                    st.markdown(f"**Confidence Score:** {result.get('confidence_score')}")
-                    st.markdown(f"**Resolved Case Count:** `{result.get('estimated_cases')}`")
-                    
-                    # AI Semantic Synopsis & Advisory
-                    ai_synopsis = result.get("ai_synopsis")
-                    fused_advisory = result.get("fused_advisory")
-                    
-                    if ai_synopsis:
-                        st.subheader("🧠 Intelligence Fusion")
-                        st.info(f"**Synopsis**: {ai_synopsis}")
-                        if fused_advisory:
-                            st.warning(f"💊 **Fused Advisory**: {fused_advisory}")
-                    else:
-                        st.info(f"**Status**: {result.get('status')}")
-                    
-                    with st.expander("View Logic Trace"):
-                        for step in result.get("trace", []):
-                            st.text(f"[{step['timestamp']}] {step['step']}")
-                            
-                except Exception as e:
-                    st.error(f"Fusion Error: {e}")
+        _render_fusion_simulator()

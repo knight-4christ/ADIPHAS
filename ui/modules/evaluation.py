@@ -11,25 +11,29 @@ def render():
     tab1, tab2, tab3 = st.tabs(["📊 Performance Metrics", "✍️ Manual Annotation", "📜 History"])
 
     with tab1:
-        st.subheader("Global NLP Metrics")
-        metrics = api_client.get_evaluation_metrics()
+        @st.fragment
+        def _render_metrics():
+            st.subheader("Global NLP Metrics")
+            metrics = api_client.get_evaluation_metrics()
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("Average F1-Score", f"{metrics.get('avg_f1', 0.0):.4f}")
+            with col2:
+                st.metric("Total Samples", metrics.get("total_samples", 0))
+
+            st.info("💡 F1-Score is a harmonic mean of Precision and Recall. A score above 0.8 is considered publication-grade for prototype health intelligence systems.")
+
+            # Confusion Matrix Logic (Derived from existing samples)
+            samples = api_client.get_evaluation_samples()
+            if samples:
+                st.subheader("Confusion Matrix Component")
+                # In a real implementation, we'd aggregate TP, FP, FN across all samples.
+                # For this UI, we show a summary table.
+                df = pd.DataFrame(samples)
+                st.dataframe(df[['id', 'f1_score', 'created_at']].head(10), width='stretch')
         
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("Average F1-Score", f"{metrics.get('avg_f1', 0.0):.4f}")
-        with col2:
-            st.metric("Total Samples", metrics.get("total_samples", 0))
-
-        st.info("💡 F1-Score is a harmonic mean of Precision and Recall. A score above 0.8 is considered publication-grade for prototype health intelligence systems.")
-
-        # Confusion Matrix Logic (Derived from existing samples)
-        samples = api_client.get_evaluation_samples()
-        if samples:
-            st.subheader("Confusion Matrix Component")
-            # In a real implementation, we'd aggregate TP, FP, FN across all samples.
-            # For this UI, we show a summary table.
-            df = pd.DataFrame(samples)
-            st.dataframe(df[['id', 'f1_score', 'created_at']].head(10), width='stretch')
+        _render_metrics()
 
     with tab2:
         st.subheader("New Annotation Sample")
@@ -87,19 +91,23 @@ def render():
                     st.rerun()
 
     with tab3:
-        st.subheader("Audit Trail")
-        samples = api_client.get_evaluation_samples()
-        if samples:
-            for s in samples:
-                with st.expander(f"Sample #{s['id']} - F1: {s['f1_score']:.4f} ({s['created_at'][:19]})"):
-                    st.write("**Raw Text:**")
-                    st.text(s['raw_text'])
-                    c1, c2 = st.columns(2)
-                    with c1:
-                        st.markdown("**Expected (Ground Truth):**")
-                        st.json(json.loads(s['expected_entities']))
-                    with c2:
-                        st.markdown("**Actual (System Output):**")
-                        st.json(json.loads(s['actual_entities']))
-        else:
-            st.write("No evaluation history found.")
+        @st.fragment
+        def _render_audit():
+            st.subheader("Audit Trail")
+            samples = api_client.get_evaluation_samples()
+            if samples:
+                for s in samples:
+                    with st.expander(f"Sample #{s['id']} - F1: {s['f1_score']:.4f} ({s['created_at'][:19]})"):
+                        st.write("**Raw Text:**")
+                        st.text(s['raw_text'])
+                        c1, c2 = st.columns(2)
+                        with c1:
+                            st.markdown("**Expected (Ground Truth):**")
+                            st.json(json.loads(s['expected_entities']))
+                        with c2:
+                            st.markdown("**Actual (System Output):**")
+                            st.json(json.loads(s['actual_entities']))
+            else:
+                st.write("No evaluation history found.")
+        
+        _render_audit()

@@ -166,9 +166,13 @@ class OrchestratorAgent:
         alert_ctx = "\n".join([f"- {a.disease} in {a.location_text} (Risk: {a.risk_level})" for a in recent_alerts]) if recent_alerts else "None"
         anom_ctx = "\n".join([f"- ANOMALY: {s.disease} in {s.lga_code}" for s in active_anomalies]) if active_anomalies else "None"
         rt_ctx = realtime_snap.content[:500] if realtime_snap else "No web intelligence available"
-        prompt = f"""Generate a highly professional, detailed, and comprehensive situational briefing (Markdown) for public health officials.
-CRITICAL MOBILE UX RULE: While the content must be detailed and analytical, YOU MUST use bullet points, bold text, and short paragraphs (max 2 sentences per paragraph) to prevent massive walls of text and ensure readability on mobile devices.
-CRITICAL RULE: DO NOT use markdown tables under any circumstances.
+        prompt = f"""Generate a professional situational briefing (Markdown) for public health officials.
+CRITICAL OUTPUT RULES:
+- Keep the ENTIRE briefing under 400 words (readable in under 1 minute).
+- Use bullet points, bold text, and short paragraphs (max 2 sentences each).
+- DO NOT use markdown tables under any circumstances.
+- Be detailed and analytical but NEVER verbose — every sentence must carry actionable intelligence.
+- Focus on WHAT matters, WHY it matters, and WHAT to do about it.
 Today's Date: {datetime.now().strftime('%B %d, %Y')}
 DB Signals:
 {alert_ctx}
@@ -176,7 +180,7 @@ Anomalies:
 {anom_ctx}
 Live Web Intelligence:
 {rt_ctx}
-Include: 1) Executive Landscape 2) Critical Geo-Hotspots 3) Epidemiological Analysis 4) Actionable Recommendations"""
+Include: 1) Executive Landscape (2-3 bullets) 2) Critical Geo-Hotspots (top 3 only) 3) Key Epidemiological Pattern (1 paragraph) 4) Actionable Recommendations (3-4 bullets)"""
         
         import re
         import time as _time

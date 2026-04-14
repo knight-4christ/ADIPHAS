@@ -104,3 +104,11 @@ Aligning with the core mission of "tailored insights," the advisory engine injec
 To prevent "Echo Chamber" signals (where one news release is syndicated across 50 sites), ADIPHAS applies **MD5 Content Hashing**:
 - Normalized Text Hash = `MD5(lower(trim(records)))`
 - Fused signals only include content with unique hashes within a 7-day window.
+
+---
+
+## 8. Prompt Engineering for UX Brevity
+Given ADIPHAS's role in delivering critical intelligence to mobile devices in real-time, the system employs strict Prompt Engineering constraints for all generative AI outputs (Briefing Agent & Advisory Engine):
+- **Hard Word Limits**: The briefing prompt strictly enforces a 400-word limit, ensuring field reports can be comprehended in under 60 seconds.
+- **Structural Guardrails**: All generative outputs are hard-coded to avoid Markdown tables (which break on small screens) in favor of bullet points, bold text, and 2-sentence maximum paragraphs.
+- **Information Density**: Prompts explicitly forbid "filler" or "hallucinated narrative," restricting the model to actionable points: WHAT matters, WHY it matters, and WHAT to do.

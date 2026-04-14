@@ -23,9 +23,8 @@ UNIFIED_MODEL_POOL = [
     {"id": "openai/gpt-oss-120b:free",                      "provider": "openrouter", "tier": 1},
     {"id": "nousresearch/hermes-3-llama-3.1-405b:free",     "provider": "openrouter", "tier": 1},
     
-    # --- OpenRouter Tier 2: Mid-range (6 models) ---
+    # --- OpenRouter Tier 2: Mid-range (5 models) ---
     {"id": "google/gemma-3-27b-it:free",                    "provider": "openrouter", "tier": 2},
-    {"id": "google/gemma-4-26b-a4b:free",                   "provider": "openrouter", "tier": 2},
     {"id": "meta-llama/llama-3.3-70b-instruct:free",        "provider": "openrouter", "tier": 2},
     {"id": "nvidia/nemotron-3-nano-30b-a3b:free",           "provider": "openrouter", "tier": 2},
     {"id": "openai/gpt-oss-20b:free",                       "provider": "openrouter", "tier": 2},
@@ -46,7 +45,7 @@ UNIFIED_MODEL_POOL = [
 # ══════════════════════════════════════════════════════════════════════════════
 AGENT_MODEL_ASSIGNMENTS = {
     "ForecastNarrative":    {"start_offset": 0,  "max_tries": 10},  # gemini-2.0-flash first
-    "BriefingAgent":        {"start_offset": 2,  "max_tries": 10},  # gemma-4-31b first
+    "BriefingAgent":        {"start_offset": 0,  "max_tries": 12},  # gemini-2.0-flash first (must try native Gemini)
     "RealtimeIntel":        {"start_offset": 5,  "max_tries": 10},  # gpt-oss-120b first
     "KnowledgeFusion":      {"start_offset": 8,  "max_tries": 10},  # gemma-3-27b first
     "NLP_EntityExtraction": {"start_offset": 0,  "max_tries": 5},   # gemini-2.0-flash (fast)
@@ -64,7 +63,7 @@ _DEFAULT_ASSIGNMENT = {"start_offset": 0, "max_tries": 6}
 # RATE LIMIT TRACKING — per-model 429 cooldown (60s auto-skip)
 # ══════════════════════════════════════════════════════════════════════════════
 _rate_limit_tracker: dict[str, float] = {}  # model_id -> timestamp of last 429
-_RATE_LIMIT_COOLDOWN = 60  # seconds to skip a model after it returns 429
+_RATE_LIMIT_COOLDOWN = 90  # seconds to skip a model after it returns 429
 _tracker_lock = threading.Lock()
 
 

@@ -17,16 +17,16 @@ Nigeria's Integrated Disease Surveillance and Response (IDSR) framework is large
 1.  **Autonomous Pipeline:** Harvest disease signals from 20+ authoritative sources using **Scrapling v0.4** with anti-bot bypass.
 2.  **Hybrid NLP & Sanitization:** Implement a local-first **spaCy** pipeline for high-speed extraction, refined by **Gemini 2.5 Flash** for deep semantic analysis, guarded by a deep regex sanitization layer to prevent AI reasoning trace (`<think>`) leakage.
 3.  **Knowledge Fusion:** Reconcile conflicting multi-source signals using the **Dempster-Shafer Theory of Evidence**.
-4.  **Role-Specific & Location-Aware Intelligence:** Deliver actionable insights grounded by HTML5 Browser Geolocation (reverse-geocoding `lat`/`lon` to local LGAs) to dynamically generate personalised geo-health insights.
+4.  **Role-Specific & Location-Aware Intelligence:** Deliver actionable insights grounded by a resilient multi-provider Geolocation pipeline (Browser GPS → BigDataCloud → IP Fallback → Profile) to dynamically generate personalized insights while preventing GPS drift.
 5.  **Hybrid-RAG Advisory:** Ground AI responses in both local verified alerts (**Titan Vector Engine**) and global real-time context (**Tavily Search API**).
-6.  **AI Resilience:** Implement a **Universal Fallback Tier** (Gemini -> OpenRouter) to ensure 24/7 intelligence availability during API quota exhaustion.
+6.  **AI Resilience:** Implement a tiered model rotation pool (exponential backoff) to ensure 24/7 intelligence availability during OpenRouter/Gemini API quota exhaustion.
 
 ---
 
 ## 2. System Architecture
 ### 2.1 High-Level Design
 ADIPHAS utilizes a four-layer architecture:
-1.  **Presentation Layer:** Streamlit-based dashboard featuring real-time log streaming, interactive heatmaps dynamically centered via HTML5 Browser Geolocation, and an explicit manual real-time bypass for StAMP sweeps.
+1.  **Presentation Layer:** Streamlit-based micro-frontend completely modularized via `@st.fragment`. This enforces lazy-loading of heavy algorithmic components (Folium mapping, Mathematical Fusion) preventing UI lock-ups and guaranteeing instant page-shell renders.
 2.  **Application Layer:** FastAPI backend managing JWT authentication, Resilient AI Failover, data sanitization, and Hybrid-RAG retrieval.
 3.  **Intelligence Agent Layer:** Multithreaded fleet (Scout, NLP, Fusion, StAMP Briefing Agent) running continuously on a **2-hour APScheduler** background cycle, optimised to maximise intelligence coverage within free-tier API rate limits.
 4.  **Persistence Layer:** Hosted physically on **Neon Cloud PostgreSQL**, offering robust connection pooling (`pool_size=10`, `max_overflow=20`, `pool_pre_ping=True`) to efficiently handle massive parallel read/writes from the multithreaded AI extractors, entirely eliminating the concurrency locks associated with embedded SQLite.
