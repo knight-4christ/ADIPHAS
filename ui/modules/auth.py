@@ -1,7 +1,7 @@
 import streamlit as st
 import api_client
 import time
-from . import geolocation
+import modules.geolocation as geolocation
 def render_login_modal():
     """
     Renders the authentication interface. 
