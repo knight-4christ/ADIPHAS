@@ -134,8 +134,17 @@ class OrchestratorAgent:
             content=content,
             expires_at=datetime.utcnow() + timedelta(hours=6)
         )
-        db.add(snapshot)
-        db.commit()
+        
+        from sqlalchemy.exc import SQLAlchemyError
+        try:
+            db.add(snapshot)
+            db.commit()
+        except SQLAlchemyError as e:
+            logger.warning(f"DB Connection lost during realtime AI generation: {e}. Recovering...")
+            db.rollback()
+            db.add(snapshot)
+            db.commit()
+            
         logger.info(f"Realtime intelligence snapshot saved ({len(all_results)} web signals).")
 
     def run_briefing_cycle(self, db: Session, force: bool = False):
@@ -227,8 +236,15 @@ Include: 1) Executive Landscape (2-3 bullets) 2) Critical Geo-Hotspots (top 3 on
                 content=generated_text,
                 expires_at=datetime.utcnow() + timedelta(hours=24)
             )
-            db.add(snapshot)
-            db.commit()
+            from sqlalchemy.exc import SQLAlchemyError
+            try:
+                db.add(snapshot)
+                db.commit()
+            except SQLAlchemyError as e:
+                logger.warning(f"DB Connection lost during AI briefing generation: {e}. Recovering...")
+                db.rollback()
+                db.add(snapshot)
+                db.commit()
             logger.info(f"System-wide briefing generated successfully via {model_used}.")
         else:
             # Rule-based fallback — users must NEVER see an empty briefing
@@ -265,8 +281,15 @@ Include: 1) Executive Landscape (2-3 bullets) 2) Critical Geo-Hotspots (top 3 on
                 content=fallback_content,
                 expires_at=datetime.utcnow() + timedelta(hours=24)
             )
-            db.add(snapshot)
-            db.commit()
+            from sqlalchemy.exc import SQLAlchemyError
+            try:
+                db.add(snapshot)
+                db.commit()
+            except SQLAlchemyError as e:
+                logger.warning(f"DB Connection lost during AI fallback generation: {e}. Recovering...")
+                db.rollback()
+                db.add(snapshot)
+                db.commit()
             logger.info("Rule-based fallback briefing stored.")
 
     def run_auto_verification_cycle(self, db: Session):
