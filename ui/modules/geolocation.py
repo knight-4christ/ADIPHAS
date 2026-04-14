@@ -97,7 +97,16 @@ def _reverse_geocode_bigdatacloud(lat: str, lon: str) -> str | None:
 def _geolocate_by_ip() -> str | None:
     """IP-based geolocation fallback using ipapi.co (free, no API key)."""
     try:
-        response = requests.get("https://ipapi.co/json/", timeout=3, headers={"User-Agent": "ADIPHAS/1.0"})
+        # Securely extract the true Client IP traversing through the Streamlit Cloud Proxies
+        client_ip = ""
+        if hasattr(st, "context"):
+            forwarded = st.context.headers.get("X-Forwarded-For")
+            if forwarded:
+                # X-Forwarded-For can be a comma separated list, first is the originating client IP
+                client_ip = forwarded.split(",")[0].strip()
+                
+        api_url = f"https://ipapi.co/{client_ip}/json/" if client_ip else "https://ipapi.co/json/"
+        response = requests.get(api_url, timeout=3, headers={"User-Agent": "ADIPHAS/1.0"})
         if response.status_code == 200:
             data = response.json()
             city = data.get("city") or "Unknown Area"
