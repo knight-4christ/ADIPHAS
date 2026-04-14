@@ -44,7 +44,7 @@ def inject_geolocation_js():
     }
     </script>
     """
-    components.html(js_code, height=0, width=0)
+    st.html(js_code)
 
 def _reverse_geocode_nominatim(lat: str, lon: str) -> str | None:
     """Primary reverse geocoder using OpenStreetMap Nominatim."""

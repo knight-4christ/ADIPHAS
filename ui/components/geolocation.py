@@ -59,7 +59,8 @@ def get_user_location(key="geolocation"):
     <div id="geo-result" style="display:none;"></div>
     """
     
-    components.html(geolocation_js, height=0)
+    import streamlit as st
+    st.html(geolocation_js)
     
     # Note: Due to Streamlit's architecture, the JS result isn't directly
     # returned in the same render cycle. The coordinates are stored in
@@ -125,4 +126,4 @@ def render_location_picker():
     </script>
     """
     
-    components.html(location_js, height=70)
+    st.html(location_js)
