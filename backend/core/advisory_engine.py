@@ -235,14 +235,17 @@ class AdvisoryEngine:
         
         user_name = user_metadata.get('name', 'User')
         prompt = f"""
-        Act as the ADIPHAS public health command center AI. 
+        Act as the ADIPHAS public health intelligence director.
         User Name: {user_name}
         User Location: {location}
         User Biodata: {bio_block}
-        Recent Local Alerts context: {alerts_summary}
+        Local Health Signals: {alerts_summary}
         
-        Provide a personalized situational briefing tailored to {user_name}'s location ({location}) and biological profile. Address {user_name} directly.
-        CRITICAL RULES: Keep it to exactly 2-3 sentences. No tables. No filler. Every word must be actionable intelligence.
+        Write a hyper-personalized, 3-sentence situation report addressing {user_name} directly regarding the Local Health Signals.
+        CRITICAL RULES:
+        1. DESCRIBE the specific diseases or outbreaks mentioned in 'Local Health Signals' (e.g., 'There are Cholera signals near you') so the user knows exactly what the threat is. If there are no signals, explicitly tell them their area is clear.
+        2. Provide concrete, practical health advice tailored strictly to their biological profile if relevant.
+        3. Break down the jargon. Do not use generic militaristic terms like 'route recalibration', 'cognitive load', or 'operational continuity'. Speak like an expert medical advisor.
         """
         try:
             from backend.core.model_config import smart_generate # type: ignore[import-untyped]

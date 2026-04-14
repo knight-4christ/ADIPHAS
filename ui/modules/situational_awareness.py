@@ -54,10 +54,17 @@ def render():
             
             if "dashboard_insight" not in st.session_state:
                 with st.spinner(f"Generating tailored insight for {user_name} in {user_location}..."):
+                    # Determine local context
+                    local_diseases = list(set([a.get('disease') for a in alerts if a.get('disease') and (user_location.lower() in str(a.get('location_text', '')).lower() or user_location.lower() in str(a.get('location_lga', '')).lower())]))
+                    if local_diseases:
+                        context_str = f"Specific outbreak signals active near {user_location}: {', '.join(local_diseases)}."
+                    else:
+                        context_str = f"No localized outbreak signals in {user_location}. Area is currently clear."
+                        
                     res = api_client.get_dashboard_insight(
                         st.session_state.token,
                         user_location,
-                        f"User: {user_name}. Current StAMP Alert Count: {num_alerts}"
+                        context_str
                     )
                     st.session_state.dashboard_insight = res.get("insight", "No insights available.")
             

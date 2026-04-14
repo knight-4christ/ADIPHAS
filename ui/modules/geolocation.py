@@ -100,16 +100,28 @@ def _geolocate_by_ip() -> str | None:
         # Securely extract the true Client IP traversing through the Streamlit Cloud Proxies
         client_ip = ""
         if hasattr(st, "context"):
-            forwarded = st.context.headers.get("X-Forwarded-For")
-            if forwarded:
-                # X-Forwarded-For can be a comma separated list. Find the first Public IP.
-                for ip in forwarded.split(","):
-                    ip = ip.strip()
-                    if not (ip.startswith("10.") or ip.startswith("192.168.") or ip.startswith("127.") or ip.startswith("172.")):
-                        client_ip = ip
-                        break
+            headers = st.context.headers
+            # Check multiple standard proxy headers
+            header_keys = ["X-Forwarded-For", "X-Real-Ip", "True-Client-Ip", "X-Appengine-User-Ip"]
+            for key in header_keys:
+                header_val = headers.get(key)
+                if header_val:
+                    for ip in header_val.split(","):
+                        ip = ip.strip()
+                        # Ignore common private/reserved subnets
+                        if not (ip.startswith("10.") or ip.startswith("192.168.") or ip.startswith("127.") or ip.startswith("172.")):
+                            client_ip = ip
+                            break
+                if client_ip:
+                    break
+        
+        # FATAL GUARD: If no public client IP is extracted, ABORT!
+        # Do not allow it to query `https://ipapi.co/json/` natively, because that will resolve to the Streamlit Server in Oregon!
+        if not client_ip:
+            logger.warning("[Geolocation] Blocked Streamlit from assigning Server IP (Oregon). Aborting IP geolocator.")
+            return None
                 
-        api_url = f"https://ipapi.co/{client_ip}/json/" if client_ip else "https://ipapi.co/json/"
+        api_url = f"https://ipapi.co/{client_ip}/json/"
         response = requests.get(api_url, timeout=5, headers={"User-Agent": "ADIPHAS/1.0"})
         if response.status_code == 200:
             data = response.json()
