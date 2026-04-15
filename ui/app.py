@@ -368,6 +368,17 @@ def main():
             key=f"nav_cat_sb_{user_role}"
         )
         st.session_state.active_nav_cat = cat_choice
+        
+        # --- COORDINATE RESOLUTION SHIELD: Resolve before sidebar is drawn ---
+        if auth_status:
+            user_lat = st.session_state.get("user_lat")
+            if not user_lat or user_lat == 0:
+                # Trigger the multi-provider geocoding chain immediately
+                with st.spinner("Synchronizing location data..."):
+                    geolocation.extract_and_geocode()
+                    # If it resolved correctly, rerun once to force the sidebar to show it
+                    if st.session_state.get("user_lat"):
+                        st.rerun()
 
         # Display Section Icon
         icon_map = {
@@ -421,7 +432,7 @@ def main():
             # Display coordinates alongside location for transparency
             user_lat = st.session_state.get("user_lat")
             user_lon = st.session_state.get("user_lon")
-            coord_str = f" [{user_lat}, {user_lon}]" if user_lat and user_lon else ""
+            coord_str = f" [{user_lat}, {user_lon}]" if user_lat and user_lon else " [Resolving...]"
             st.caption(f"📍 {st.session_state.global_location}{coord_str}")
             st.divider()
             

@@ -37,9 +37,16 @@ def inject_geolocation_js():
                     .then(data => {
                         const url = new URL(window.parent.location.href);
                         if (data.latitude && data.longitude) {
-                            url.searchParams.set('lat', data.latitude.toFixed(4));
-                            url.searchParams.set('lon', data.longitude.toFixed(4));
-                            url.searchParams.set('ip_loc', data.city + ", " + data.region);
+                            const city = (data.city || "").toLowerCase();
+                            // FATAL ROUTE GUARD: Reject server-side locations (Render/Streamlit Cloud)
+                            if (city.includes("dallas") || city.includes("dalles") || city.includes("boardman") || city.includes("oregon")) {
+                                console.warn("Rejected server-side IP location, falling back to profile.");
+                                url.searchParams.set('geo_denied', '1');
+                            } else {
+                                url.searchParams.set('lat', data.latitude.toFixed(4));
+                                url.searchParams.set('lon', data.longitude.toFixed(4));
+                                url.searchParams.set('ip_loc', data.city + ", " + data.region);
+                            }
                             window.parent.location.search = url.search;
                         } else {
                             if (!url.searchParams.has('geo_denied')) {
@@ -152,8 +159,8 @@ def _geolocate_by_ip() -> str | None:
             lat_ip = data.get("latitude")
             lon_ip = data.get("longitude")
             
-            # Reject garbage payloads
-            if not city or not region:
+            # Reject garbage or server-side payloads (The Dalles, Dallas, Oregon)
+            if not city or not region or any(x in city.lower() or x in region.lower() for x in ["oregon", "dalles", "dallas", "boardman"]):
                 return None
             
             # Store IP-derived coordinates as backup
@@ -163,7 +170,31 @@ def _geolocate_by_ip() -> str | None:
             
             return f"{city}, {region}"
     except Exception as e:
-        logger.warning(f"[Geolocation] IP fallback failed: {e}")
+        logger.warning(f"[Geolocation] IPAPI fallback failed: {e}")
+        
+    # --- REDUNDANT FALLBACK: ip-api.com (Free, Open Source API) ---
+    try:
+        url = "http://ip-api.com/json/?fields=status,message,country,regionName,city,lat,lon"
+        response = requests.get(url, timeout=4)
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("status") == "success":
+                city = data.get("city")
+                region = data.get("regionName")
+                lat_ip = data.get("lat")
+                lon_ip = data.get("lon")
+                
+                # Reject server-side locations
+                if city and any(x in city.lower() for x in ["oregon", "dalles", "dallas", "boardman"]):
+                    return None
+                    
+                if lat_ip and lon_ip:
+                    st.session_state.user_lat = float(lat_ip)
+                    st.session_state.user_lon = float(lon_ip)
+                return f"{city}, {region}"
+    except Exception as e:
+        logger.warning(f"[Geolocation] IP-API fallback failed: {e}")
+        
     return None
 
 

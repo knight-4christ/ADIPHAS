@@ -80,14 +80,18 @@ def render():
 
         # System-wide StAMP Briefing
         briefing = api_client.get_latest_briefing()
+        
+        st.markdown("### 🧠 Strategic Intelligence Briefing")
         if briefing and "content" in briefing:
-            st.markdown(briefing["content"])
             try:
                 # Convert ISO string to friendly format
                 dt = pd.to_datetime(briefing.get('generated_at', ''))
-                st.caption(f"Generated at: {dt.strftime('%b %d, %Y - %I:%M %p')}")
+                st.caption(f"📅 **Cycle Date:** {dt.strftime('%b %d, %Y - %I:%M %p')}")
             except Exception:
-                st.caption(f"Generated at: {briefing.get('generated_at', 'N/A')}")
+                st.caption(f"📅 **Cycle Date:** {briefing.get('generated_at', 'N/A')}")
+            
+            st.markdown("---")
+            st.markdown(briefing["content"])
             
             # Intelligence Sources section
             _render_briefing_sources(briefing, alerts)
