@@ -5,6 +5,32 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# --- DEFINITIVE LAGOS LGA REGISTRY: Instant local geocoding for all 20 LGAs ---
+LAGOS_LGA_REGISTRY = {
+    "agege": (6.6358, 3.3242),
+    "ajeromi-ifelodun": (6.4566, 3.3323),
+    "alimosho": (6.6025, 3.2949),
+    "amuwo-odofin": (6.4526, 3.2844),
+    "apapa": (6.4449, 3.3523),
+    "badagry": (6.4173, 2.8833),
+    "epe": (6.5794, 3.9822),
+    "eti-osa": (6.4463, 3.5350),
+    "ibeju-lekki": (6.4950, 4.0200),
+    "ifako-ijaiye": (6.6800, 3.3000),
+    "ikeja": (6.5965, 3.3420),
+    "ikorodu": (6.6194, 3.5105),
+    "kosofe": (6.5772, 3.3915),
+    "lagos island": (6.4550, 3.3942),
+    "lagos mainland": (6.4944, 3.3667),
+    "mushin": (6.5294, 3.3486),
+    "ojo": (6.4674, 3.1894),
+    "oshodi-isolo": (6.5273, 3.3214),
+    "shomolu": (6.5367, 3.3853),
+    "somolu": (6.5367, 3.3853),
+    "surulere": (6.4975, 3.3475),
+}
+
+
 def inject_geolocation_js():
     """
     Injects a hidden HTML block with JS that reads navigator.geolocation
@@ -74,6 +100,13 @@ def _forward_geocode_nominatim(query: str) -> tuple[float, float] | None:
     """Converts a location string (e.g. 'Yaba, Lagos') into coordinates."""
     if not query:
         return None
+        
+    # Phase 0: Instant Local Registry Lookup (High-Reliability Fallback)
+    clean_q = query.lower().replace("lga", "").replace("local government", "").replace(", lagos", "").replace(", nigeria", "").strip()
+    if clean_q in LAGOS_LGA_REGISTRY:
+        logger.info(f"[Geolocation] Instant Registry matched: {clean_q}")
+        return LAGOS_LGA_REGISTRY[clean_q]
+        
     try:
         url = f"https://nominatim.openstreetmap.org/search?q={query}, Nigeria&format=json&limit=1"
         headers = {"User-Agent": "ADIPHAS_Health_App/1.0"}
