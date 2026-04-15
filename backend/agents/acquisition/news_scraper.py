@@ -178,7 +178,7 @@ SOURCES = [
     {
         "name": "ThisDay Health",
         "category": "Health Journalism",
-        "url": "https://www.thisdaylive.com/index.php/category/health-wellness/",
+        "url": "https://www.thisdaylive.com/health-wellbeing",
         "method": "html",
         "priority": 2,
         "keywords": [],
