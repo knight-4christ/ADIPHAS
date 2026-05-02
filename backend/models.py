@@ -16,6 +16,9 @@ class User(Base):
     gender = Column(String)
     state = Column(String)
     email = Column(String, unique=True, index=True)
+    is_email_verified = Column(Boolean, default=False)
+    email_verification_token = Column(String, nullable=True)
+    password_reset_token = Column(String, nullable=True)
     hashed_password = Column(String)
     role = Column(String, default="CITIZEN") # CITIZEN or EXPERT
     

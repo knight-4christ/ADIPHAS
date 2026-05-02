@@ -120,6 +120,30 @@ def autonomous_monitoring_job():
                     db.flush() # Flush to get IDs
                     log_activity("AlertingEngine", f"Fused alert: {result['disease']} in {result['location']} (confidence={result['confidence_score']:.2f})")
                     
+                    # --- Dispatch Email Notifications for High/Critical Alerts ---
+                    if alert.risk_level in ["High", "Critical"]:
+                        try:
+                            from backend.core.email_utils import send_alert_notification
+                            import threading
+                            
+                            # Find verified users in the affected LGA or globally if not specified
+                            query = db.query(models.User).filter(models.User.is_email_verified == True)
+                            if result['location'] and result['location'].lower() != "lagos":
+                                query = query.filter(models.User.location_lga.ilike(f"%{result['location']}%"))
+                            
+                            notified_users = query.all()
+                            for user in notified_users:
+                                action = f"Please remain vigilant regarding {result['disease']}. Follow NCDC protocols."
+                                threading.Thread(
+                                    target=send_alert_notification, 
+                                    args=(user.email, user.username, result['disease'], result['location'], alert.risk_level, action)
+                                ).start()
+                                
+                            if notified_users:
+                                log_activity("NotificationEngine", f"Dispatched {len(notified_users)} email alerts for {result['disease']}.")
+                        except Exception as e:
+                            logger.error(f"Failed to dispatch email alerts: {e}")
+                            
         else:
             # No dual-entity headlines — save disease-only articles as raw signals
             saved_raw = 0
@@ -179,15 +203,35 @@ def autonomous_monitoring_job():
             
             time.sleep(10)  # Cooldown between AI-heavy phases
             
-            # Briefing run once per day (checks for existing within 24h)
+            # Briefing run every 2 hours
             last_briefing = db.query(models.AutonomousSnapshot)\
                 .filter(models.AutonomousSnapshot.snapshot_type == "daily_briefing")\
                 .order_by(models.AutonomousSnapshot.generated_at.desc()).first()
             
-            if not last_briefing or (datetime.utcnow() - last_briefing.generated_at).total_seconds() > 86400:
-                orchestrator.run_briefing_cycle(db)
-                log_activity("BriefingAgent", "New Daily Briefing generated.")
+            if not last_briefing or (datetime.utcnow() - last_briefing.generated_at).total_seconds() > 7200:
+                cit_brief, exp_brief = orchestrator.run_briefing_cycle(db)
+                log_activity("BriefingAgent", "New 2-hour StAMP Briefing generated.")
                 
+                # Dispatch briefing emails to verified users
+                if cit_brief or exp_brief:
+                    try:
+                        from backend.core.email_utils import send_situational_briefing
+                        import threading
+                        verified_users = db.query(models.User).filter(models.User.is_email_verified == True).all()
+                        
+                        for user in verified_users:
+                            is_expert = user.role.upper() in ["EXPERT", "ADMIN"]
+                            content = exp_brief if is_expert and exp_brief else cit_brief
+                            if content:
+                                threading.Thread(
+                                    target=send_situational_briefing,
+                                    args=(user.email, user.username, content, is_expert)
+                                ).start()
+                                
+                        if verified_users:
+                            log_activity("NotificationEngine", f"Dispatched {len(verified_users)} situational briefing emails.")
+                    except Exception as e:
+                        logger.error(f"Failed to dispatch briefing emails: {e}")
         except Exception as e:
             logger.error(f"Error in Phase 2 Autonomous cycles: {e}")
 

@@ -151,18 +151,18 @@ class OrchestratorAgent:
         logger.info(f"Realtime intelligence snapshot saved ({len(all_results)} web signals).")
 
     def run_briefing_cycle(self, db: Session, force: bool = False):
-        """Autonomously generates a system-wide intelligence briefing. Runs every 24h unless forced."""
+        """Autonomously generates role-specific intelligence briefings. Runs every 2h unless forced."""
         if not force:
-            # Check for today's briefing
+            # Check for today's briefing (interval reduced to 2 hours / 7200s)
             last_briefing = db.query(models.AutonomousSnapshot)\
                 .filter(models.AutonomousSnapshot.snapshot_type == "daily_briefing")\
                 .order_by(models.AutonomousSnapshot.generated_at.desc()).first()
             
-            if last_briefing and (datetime.utcnow() - last_briefing.generated_at).total_seconds() < 86400:
-                logger.info("Daily StAMP briefing is already generated. Skipping.")
-                return
+            if last_briefing and (datetime.utcnow() - last_briefing.generated_at).total_seconds() < 7200:
+                logger.info("2-hour StAMP briefing is already generated. Skipping.")
+                return None, None
 
-        logger.info("Starting Autonomous Briefing Cycle...")
+        logger.info("Starting Autonomous Briefing Cycle (Citizen + Expert)...")
         
         recent_alerts = db.query(models.EBSAlert).order_by(models.EBSAlert.created_at.desc()).limit(15).all()
         active_anomalies = db.query(models.PredictiveSnapshot).filter(models.PredictiveSnapshot.is_anomaly.is_(True)).all()
@@ -173,27 +173,42 @@ class OrchestratorAgent:
             .order_by(models.AutonomousSnapshot.generated_at.desc()).first()
         
         if not recent_alerts and not active_anomalies and not realtime_snap:
-            return
+            return None, None
 
         alert_ctx = "\n".join([f"- {a.disease} in {a.location_text} (Risk: {a.risk_level})" for a in recent_alerts]) if recent_alerts else "None"
         anom_ctx = "\n".join([f"- ANOMALY: {s.disease} in {s.lga_code}" for s in active_anomalies]) if active_anomalies else "None"
         rt_ctx = realtime_snap.content[:500] if realtime_snap else "No web intelligence available"
-        prompt = f"""Generate a professional situational briefing (Markdown) for public health officials.
-CRITICAL OUTPUT RULES:
-- Keep the ENTIRE briefing under 400 words (readable in under 1 minute).
-- Use bullet points, bold text, and short paragraphs (max 2 sentences each).
-- DO NOT use markdown tables under any circumstances.
-- Be detailed and analytical but NEVER verbose — every sentence must carry actionable intelligence.
-- Focus on WHAT matters, WHY it matters, and WHAT to do about it.
-Today's Date: {datetime.now(_WAT).strftime('%B %d, %Y')}
+        
+        data_block = f"""Today's Date: {datetime.now(_WAT).strftime('%B %d, %Y')}
 DB Signals:
 {alert_ctx}
 Anomalies:
 {anom_ctx}
 Live Web Intelligence:
-{rt_ctx}
+{rt_ctx}"""
+        
+        citizen_prompt = f"""Generate a professional situational briefing (Markdown) for the general public and community health workers.
+CRITICAL OUTPUT RULES:
+- Keep the ENTIRE briefing under 400 words.
+- Use bullet points, bold text, and short paragraphs. DO NOT use markdown tables.
+- Use simple, non-technical language that any citizen can understand.
+- Focus on WHAT matters, WHY it matters, and WHAT to do about it.
+{data_block}
 Include: 1) Executive Landscape (2-3 bullets) 2) Critical Geo-Hotspots (top 3 only) 3) Key Epidemiological Pattern (1 paragraph) 4) Actionable Recommendations (3-4 bullets)"""
         
+        expert_prompt = f"""Generate a comprehensive, expert-grade epidemiological intelligence briefing (Markdown) for public health officials and epidemiologists.
+CRITICAL OUTPUT RULES:
+- This briefing should be between 800-1200 words.
+- Use technical epidemiological terminology where appropriate.
+- DO NOT use markdown tables. Every claim must reference the underlying signal data.
+{data_block}
+Include ALL of the following sections:
+1) Situation Overview & Threat Assessment
+2) Signal Decomposition & Source Analysis
+3) Epidemiological Risk Analysis
+4) Geographic Hotspot Deep-Dive
+5) Strategic Recommendations"""
+
         import re
         import time as _time
         
@@ -204,96 +219,74 @@ Include: 1) Executive Landscape (2-3 bullets) 2) Critical Geo-Hotspots (top 3 on
                 if a.url:
                     source_urls.append(f"- [{a.source}]({a.url})")
         if realtime_snap and realtime_snap.content:
-            # Extract URLs from realtime snapshot content
             import re as _re
             urls_found = _re.findall(r'\(https?://[^\)]+\)', realtime_snap.content)
             for u in urls_found[:5]:
-                source_urls.append(f"- Web: {u.strip('()')}") 
+                source_urls.append(f"- Web: {u.strip('()')}")
         
         sources_footer = ""
         if source_urls:
             sources_footer = "\n\n---\n**📚 Intelligence Sources:**\n" + "\n".join(list(set(source_urls))[:10])
         
-        # Retry AI generation up to 3 times with cooldowns
-        generated_text = None
-        model_used = None
-        for attempt in range(3):
-            try:
-                from backend.core.model_config import smart_generate  # type: ignore[import-untyped]
-                text, model_used = smart_generate(self.gemini_model, prompt, context="BriefingAgent")
-                
-                if text:
-                    # Sanitize: strip any leaked reasoning traces before storing
-                    text = re.sub(r'\[Reasoning\].*?\[Response\]\s*', '', text, flags=re.DOTALL)
-                    text = re.sub(r"\[?\{['\"]type['\"]:\s*['\"]reasoning\.text['\"].*?\}\]?", '', text, flags=re.DOTALL)
-                    generated_text = text.strip() + sources_footer
-                    break
-            except Exception as e:
-                wait_time = 15 * (attempt + 1)
-                logger.warning(f"[BriefingAgent] Attempt {attempt+1}/3 failed ({e}). Retrying in {wait_time}s...")
-                _time.sleep(wait_time)
+        briefing_configs = [
+            ("daily_briefing", citizen_prompt, "CitizenBriefing"),
+            ("daily_briefing_expert", expert_prompt, "ExpertBriefing"),
+        ]
         
-        if generated_text:
-            snapshot = models.AutonomousSnapshot(
-                snapshot_type="daily_briefing",
-                content=generated_text,
-                expires_at=datetime.utcnow() + timedelta(hours=24)
-            )
-            from sqlalchemy.exc import SQLAlchemyError
-            try:
-                db.add(snapshot)
-                db.commit()
-            except SQLAlchemyError as e:
-                logger.warning(f"DB Connection lost during AI briefing generation: {e}. Recovering...")
-                db.rollback()
-                db.add(snapshot)
-                db.commit()
-            logger.info(f"System-wide briefing generated successfully via {model_used}.")
-        else:
-            # Rule-based fallback — users must NEVER see an empty briefing
-            logger.warning("[BriefingAgent] All AI retries failed. Generating rule-based fallback briefing.")
+        final_briefings = {}
+        
+        for snapshot_type, prompt, agent_label in briefing_configs:
+            generated_text = None
+            model_used = None
+            for attempt in range(3):
+                try:
+                    from backend.core.model_config import smart_generate  # type: ignore[import-untyped]
+                    text, model_used = smart_generate(self.gemini_model, prompt, context=agent_label)
+                    
+                    if text:
+                        text = re.sub(r'\[Reasoning\].*?\[Response\]\s*', '', text, flags=re.DOTALL)
+                        text = re.sub(r"\[?\{['\"]type['\"]:\s*['\"]reasoning\.text['\"].*?\}\]?", '', text, flags=re.DOTALL)
+                        generated_text = text.strip() + sources_footer
+                        break
+                except Exception as e:
+                    wait_time = 15 * (attempt + 1)
+                    logger.warning(f"[{agent_label}] Attempt {attempt+1}/3 failed ({e}). Retrying in {wait_time}s...")
+                    _time.sleep(wait_time)
             
-            alert_count = len(recent_alerts) if recent_alerts else 0
-            anomaly_count = len(active_anomalies) if active_anomalies else 0
-            diseases_seen = set(a.disease for a in recent_alerts if a.disease) if recent_alerts else set()
-            locations_seen = set(a.location_text for a in recent_alerts if a.location_text) if recent_alerts else set()
-            high_risk = [a for a in recent_alerts if a.risk_level in ('High', 'Critical')] if recent_alerts else []
-            
-            fallback_content = f"""## 🛰️ ADIPHAS Intelligence Briefing — {datetime.now(_WAT).strftime('%B %d, %Y')}
-
-**⚠️ AI-powered analysis temporarily unavailable. This is a data-driven summary.**
-
-### Executive Landscape
-- **{alert_count}** active disease signals across **{len(locations_seen)}** locations
-- **{anomaly_count}** anomalies flagged by predictive engine
-- Active diseases under surveillance: **{', '.join(diseases_seen) if diseases_seen else 'None detected'}**
-
-### Critical Signals
-"""
-            if high_risk:
-                for a in high_risk[:5]:
-                    fallback_content += f"- 🔴 **{a.disease}** in {a.location_text} — Risk: {a.risk_level}\n"
+            if generated_text:
+                final_briefings[snapshot_type] = generated_text
             else:
-                fallback_content += "- No critical-risk signals at this time.\n"
-            
-            fallback_content += f"\n### Recommendations\n- Continue monitoring local health feeds for emerging patterns.\n- Report unusual symptoms to your nearest health facility.\n- Next AI-powered briefing will be generated in the next monitoring cycle."
-            fallback_content += sources_footer
-            
+                logger.warning(f"[{agent_label}] All AI retries failed. Generating rule-based fallback.")
+                alert_count = len(recent_alerts) if recent_alerts else 0
+                anomaly_count = len(active_anomalies) if active_anomalies else 0
+                diseases_seen = set(a.disease for a in recent_alerts if a.disease) if recent_alerts else set()
+                locations_seen = set(a.location_text for a in recent_alerts if a.location_text) if recent_alerts else set()
+                high_risk = [a for a in recent_alerts if a.risk_level in ('High', 'Critical')] if recent_alerts else []
+                
+                fallback_content = f"## 🛰️ ADIPHAS Intelligence Briefing — {datetime.now(_WAT).strftime('%B %d, %Y')}\n**⚠️ AI-powered analysis temporarily unavailable. This is a data-driven summary.**\n### Executive Landscape\n- **{alert_count}** active disease signals across **{len(locations_seen)}** locations\n- **{anomaly_count}** anomalies flagged\n- Active diseases: **{', '.join(diseases_seen) if diseases_seen else 'None detected'}**\n### Critical Signals\n"
+                if high_risk:
+                    for a in high_risk[:5]: fallback_content += f"- 🔴 **{a.disease}** in {a.location_text} — Risk: {a.risk_level}\n"
+                else:
+                    fallback_content += "- No critical-risk signals at this time.\n"
+                fallback_content += f"\n### Recommendations\n- Continue monitoring local health feeds.\n- Report unusual symptoms.\n{sources_footer}"
+                final_briefings[snapshot_type] = fallback_content
+                
             snapshot = models.AutonomousSnapshot(
-                snapshot_type="daily_briefing",
-                content=fallback_content,
-                expires_at=datetime.utcnow() + timedelta(hours=24)
+                snapshot_type=snapshot_type,
+                content=final_briefings[snapshot_type],
+                expires_at=datetime.utcnow() + timedelta(hours=2) # expires in 2h
             )
             from sqlalchemy.exc import SQLAlchemyError
             try:
                 db.add(snapshot)
                 db.commit()
             except SQLAlchemyError as e:
-                logger.warning(f"DB Connection lost during AI fallback generation: {e}. Recovering...")
                 db.rollback()
                 db.add(snapshot)
                 db.commit()
-            logger.info("Rule-based fallback briefing stored.")
+            logger.info(f"{agent_label} generated and stored successfully.")
+            
+        return final_briefings.get("daily_briefing"), final_briefings.get("daily_briefing_expert")
 
     def run_auto_verification_cycle(self, db: Session):
         """Autonomously verifies alerts using multi-source cross-referencing."""

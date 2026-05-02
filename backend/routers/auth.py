@@ -95,6 +95,10 @@ def register(request: Request, user: schemas.UserCreate, db: Session = Depends(g
         allowed_roles = {"CITIZEN", "EXPERT"}
         assigned_role = user.role.upper() if user.role and user.role.upper() in allowed_roles else "CITIZEN"
         
+        # Generate Verification Token
+        import uuid
+        verification_token = str(uuid.uuid4()) if user.email else None
+        
         new_user = models.User(
             username=user.username,
             email=user.email,
@@ -103,11 +107,26 @@ def register(request: Request, user: schemas.UserCreate, db: Session = Depends(g
             location_lga=user.location_lga,
             genotype=user.genotype,
             blood_group=user.blood_group,
-            hashed_password=hashed_pwd
+            hashed_password=hashed_pwd,
+            email_verification_token=verification_token,
+            is_email_verified=False
         )
         db.add(new_user)
         db.commit()
         db.refresh(new_user)
+        
+        if user.email and verification_token:
+            from backend.core.email_utils import send_verification_email
+            import os
+            backend_url = os.getenv("BACKEND_URL", "http://localhost:8000")
+            # Fire and forget email dispatch
+            try:
+                import threading
+                threading.Thread(target=send_verification_email, args=(user.email, user.username, verification_token, backend_url)).start()
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(f"Could not dispatch verification email: {e}")
+                
         return new_user
     except HTTPException:
         raise  # Re-raise known HTTP errors (400 username taken, etc.)
@@ -115,6 +134,87 @@ def register(request: Request, user: schemas.UserCreate, db: Session = Depends(g
         import logging, traceback
         logging.getLogger(__name__).error(f"Registration error: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
+
+@router.get("/api/auth/verify-email")
+def verify_email(token: str, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.email_verification_token == token).first()
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid or expired verification token.")
+    
+    user.is_email_verified = True
+    user.email_verification_token = None
+    db.commit()
+    
+    from fastapi.responses import HTMLResponse
+    html_content = """
+    <html>
+        <head><title>Email Verified</title></head>
+        <body style="text-align: center; font-family: sans-serif; padding-top: 50px;">
+            <h1 style="color: #0284c7;">ADIPHAS</h1>
+            <h2>Email Successfully Verified! ✅</h2>
+            <p>You can now receive real-time outbreak alerts.</p>
+            <p>You may close this window and return to the app.</p>
+        </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content, status_code=200)
+
+from pydantic import BaseModel
+class PasswordResetRequest(BaseModel):
+    email_or_username: str
+
+class PasswordResetConfirm(BaseModel):
+    token: str
+    new_password: str
+
+@router.post("/api/auth/request-password-reset")
+def request_password_reset(payload: PasswordResetRequest, db: Session = Depends(get_db)):
+    """Generates a password reset token and sends an email."""
+    user = db.query(models.User).filter(
+        (models.User.email == payload.email_or_username) | 
+        (models.User.username == payload.email_or_username)
+    ).first()
+    
+    if not user:
+        # Return success anyway to prevent email enumeration attacks
+        return {"msg": "If an account exists, a reset link has been sent."}
+        
+    if not user.email:
+        raise HTTPException(status_code=400, detail="Account has no email address associated. Please contact admin.")
+        
+    import uuid
+    token = str(uuid.uuid4())
+    user.password_reset_token = token
+    db.commit()
+    
+    from backend.core.email_utils import send_password_reset_email
+    import os
+    backend_url = os.getenv("BACKEND_URL", "http://localhost:8000")
+    
+    try:
+        import threading
+        threading.Thread(
+            target=send_password_reset_email, 
+            args=(user.email, user.username, token, backend_url)
+        ).start()
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Could not dispatch reset email: {e}")
+        
+    return {"msg": "If an account exists, a reset link has been sent."}
+
+@router.post("/api/auth/reset-password")
+def reset_password(payload: PasswordResetConfirm, db: Session = Depends(get_db)):
+    """Verifies the reset token and updates the password."""
+    user = db.query(models.User).filter(models.User.password_reset_token == payload.token).first()
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token.")
+        
+    user.hashed_password = auth_utils.get_password_hash(payload.new_password)
+    user.password_reset_token = None
+    db.commit()
+    
+    return {"msg": "Password successfully reset."}
 
 @router.post("/api/auth/login", response_model=schemas.Token)
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):

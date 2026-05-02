@@ -112,6 +112,17 @@ def login(username, password):
     # Using data instead of json for OAuth2 form format
     return _safe_request("POST", f"{API_URL}/api/auth/login", data=payload)
 
+def request_password_reset(email_or_username: str):
+    return _safe_request("POST", f"{API_URL}/api/auth/request-password-reset", json={
+        "email_or_username": email_or_username
+    })
+
+def reset_password(token: str, new_password: str):
+    return _safe_request("POST", f"{API_URL}/api/auth/reset-password", json={
+        "token": token,
+        "new_password": new_password
+    })
+
 def get_me(token):
     headers = {"Authorization": f"Bearer {token}"}
     return _safe_request("GET", f"{API_URL}/api/users/me", headers=headers)
