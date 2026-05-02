@@ -549,17 +549,12 @@ def main():
         
         def handle_fab_click():
             authenticated = st.session_state.get("authenticated", False)
-            user_role = st.session_state.user.get("role", "CITIZEN") if authenticated and st.session_state.user else "GUEST"
             if authenticated:
                 st.session_state.active_nav_cat = "Intelligence"
                 st.session_state.active_nav_mod = "Advisory Chat"
-                st.session_state[f"nav_cat_sb_{user_role}"] = "Intelligence"
-                st.session_state[f"nav_mod_rd_{user_role}"] = "Advisory Chat"
             else:
                 st.session_state.active_nav_cat = "Surveillance"
                 st.session_state.active_nav_mod = "Login / Sign Up"
-                st.session_state[f"nav_cat_sb_{user_role}"] = "Surveillance"
-                st.session_state[f"nav_mod_rd_{user_role}"] = "Login / Sign Up"
                 st.session_state["_fab_toast"] = "⚠️ Please login to access the Advisory Chat."
 
         st.button("💬", key="fab_chat", help="Open Advisory Chat", on_click=handle_fab_click)
