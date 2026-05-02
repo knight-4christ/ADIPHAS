@@ -52,6 +52,34 @@ class NLPProcessor:
         if self.gemini_enabled:
             logger.info("NLP Processor: Gemini AI augmentation enabled (shared client).")
 
+    def _robust_json_parse(self, raw_text: str) -> Any:
+        """Cleans and extracts JSON from AI responses that might contain markdown or filler."""
+        if not raw_text: return None
+        
+        # 1. Remove Markdown code blocks if present
+        clean_text = re.sub(r'```json\s*|\s*```', '', raw_text).strip()
+        
+        # 2. Isolate the first [ or { and the last ] or } to ignore conversational filler
+        try:
+            start_idx = min(clean_text.find('['), clean_text.find('{'))
+            end_idx = max(clean_text.rfind(']'), clean_text.rfind('}'))
+            if start_idx != -1 and end_idx != -1:
+                clean_text = clean_text[start_idx:end_idx+1]
+        except Exception:
+            pass # Fallback to original text if slicing fails
+
+        try:
+            return json.loads(clean_text)
+        except json.JSONDecodeError as e:
+            # 3. Final attempt: basic string cleanup for trailing commas or common AI typos
+            try:
+                # Remove trailing commas in objects/arrays
+                clean_text = re.sub(r',\s*([\]}])', r'\1', clean_text)
+                return json.loads(clean_text)
+            except Exception:
+                logger.error(f"[NLP] Final JSON parse failed: {e}")
+                return None
+
     def analyze_with_gemini(self, text, baseline_entities):
         """Perform deep medical/epidemiological reasoning using AI, anchored by rule-based extraction."""
         if not self.gemini_enabled: return None
@@ -66,14 +94,13 @@ Refine baseline. Return JSON: {{"diseases":[], "locations":[], "severity_score":
             from backend.core.model_config import smart_generate  # type: ignore[import-untyped]
             raw_text, model_used = smart_generate(self.gemini_model, prompt, context="NLP_EntityExtraction")
             
-            if not raw_text:
+            result = self._robust_json_parse(raw_text)
+            if not result:
                 return {"diseases": [], "locations": [], "severity_score": 0.0}
-                
-            clean_json = re.sub(r'```json\s*|\s*```', '', raw_text).strip()
-            return json.loads(clean_json)
+            return result
             
         except Exception as e:
-            logger.error(f"[NLP] Parsing error or all models failed: {e}")
+            logger.error(f"[NLP] Process error: {e}")
             return {"diseases": [], "locations": [], "severity_score": 0.0}
 
     def analyze_batch_with_gemini(self, articles_batch):
@@ -98,12 +125,9 @@ Return JSON array: [{{"id":int, "diseases":[], "locations":[], "severity_score":
             from backend.core.model_config import smart_generate  # type: ignore[import-untyped]
             raw_text, model_used = smart_generate(self.gemini_model, prompt, context="NLP_BatchExtraction")
             
-            if not raw_text: return None
-                
-            clean_json = re.sub(r'```json\s*|\s*```', '', raw_text).strip()
-            return json.loads(clean_json)
+            return self._robust_json_parse(raw_text)
         except Exception as e:
-            logger.error(f"[NLP_BATCH] Parsing error: {e}")
+            logger.error(f"[NLP_BATCH] Bulk process error: {e}")
             return None
 
     def extract_entities(self, text):
