@@ -54,17 +54,26 @@ def predict_forecast(request: schemas.PredictionRequest, db: Session = Depends(g
     # 2. Fallback: count EBSAlerts per week (real scraped intelligence)
     if not historical_data:
         from sqlalchemy import func, extract  # type: ignore[import-untyped]
+        from backend.database import is_sqlite  # type: ignore[import-untyped]
+        
+        # Use DB-appropriate week grouping (strftime is SQLite-only)
+        if is_sqlite:
+            week_expr = func.strftime('%Y-%W', models.EBSAlert.timestamp)
+        else:
+            # PostgreSQL: to_char with ISO week
+            week_expr = func.to_char(models.EBSAlert.timestamp, 'IYYY-IW')
+        
         weekly_counts = (
             db.query(
-                func.strftime('%Y-%W', models.EBSAlert.timestamp).label('week'),
+                week_expr.label('week'),
                 func.count(models.EBSAlert.alert_id).label('count')
             )
             .filter(
                 models.EBSAlert.disease == request.disease,
                 models.EBSAlert.location_text.ilike(f"%{request.lga_code}%")
             )
-            .group_by(func.strftime('%Y-%W', models.EBSAlert.timestamp))
-            .order_by(func.strftime('%Y-%W', models.EBSAlert.timestamp))
+            .group_by(week_expr)
+            .order_by(week_expr)
             .all()
         )
         if len(weekly_counts) >= 4:

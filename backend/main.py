@@ -3,6 +3,7 @@ import backend.logging_config  # noqa: F401 — must be first to configure loggi
 from fastapi import FastAPI, Depends, HTTPException  # type: ignore[import-untyped]
 from fastapi.responses import RedirectResponse  # type: ignore[import-untyped]
 from sqlalchemy.orm import Session  # type: ignore[import-untyped]
+from sqlalchemy import text  # type: ignore[import-untyped]
 from backend import models, database, schemas, auth_utils  # type: ignore[import-untyped]
 from backend.database import engine  # type: ignore[import-untyped]
 import sys
@@ -91,7 +92,6 @@ async def startup_event():
 
 # Apply missing columns for migrations (Safe to run on every boot)
 def migrate_database():
-    from sqlalchemy import text
     db = database.SessionLocal()
     
     # List of columns that might be missing in production

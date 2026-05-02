@@ -15,14 +15,17 @@ def submit_ebs(alert: schemas.EBSAlertCreate, db: Session = Depends(get_db)):
     db_alert = models.EBSAlert(
         source=alert.source,
         text=alert.text,
-        location_lga=alert.location_lga,
+        timestamp=alert.timestamp,
         location_text=alert.location_text,
         location_lat=alert.location_lat,
         location_lon=alert.location_lon,
         disease=alert.disease,
-        symptoms=",".join(alert.symptoms) if alert.symptoms else None,
-        risk_level=alert.risk_level,
-        verified=False # Requires expert validation
+        collected_by=alert.collected_by,
+        summary=alert.summary,
+        ai_powered=alert.ai_powered,
+        policy_alert=alert.policy_alert,
+        requires_hitl=alert.requires_hitl,
+        verified=False  # Requires expert validation
     )
     db.add(db_alert)
     db.commit()
@@ -67,10 +70,15 @@ def get_fusion_status(db: Session = Depends(get_db)):
     
     if snapshot:
         import json
+        # Parse content as JSON if possible, otherwise return as string
+        content_data = snapshot.content
+        try:
+            content_data = json.loads(snapshot.content) if snapshot.content else None
+        except (json.JSONDecodeError, TypeError):
+            pass
         return {
             "generated_at": snapshot.generated_at,
-            "data": snapshot.data,
-            "html_report": snapshot.html_report
+            "content": content_data
         }
     return {"status": "No fusion available yet. Waiting for background agent."}
 

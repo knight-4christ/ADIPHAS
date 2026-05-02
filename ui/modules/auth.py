@@ -164,21 +164,6 @@ def render_login_modal():
                 </script>
                 """, height=50)
                 st.markdown('</div>', unsafe_allow_html=True)
-
-                                        st.session_state.active_nav_cat = "Account"
-                                        st.session_state.active_nav_mod = "My Profile"
-                                        st.warning("Please complete your biodata first.")
-                                    else:
-                                        st.session_state.active_nav_cat = "Surveillance"
-                                        st.session_state.active_nav_mod = "Command Centre"
-                                        st.success(f"Welcome back, {me['username']}!{loc_msg}")
-                                        
-                                    time.sleep(1.2)
-                                    st.rerun()
-                                else:
-                                    st.error("Failed to load profile.")
-                            else:
-                                st.error("Invalid credentials.")
                 
                 with st.expander("Forgot Password?"):
                     st.write("Enter your email or username to receive a reset link.")
