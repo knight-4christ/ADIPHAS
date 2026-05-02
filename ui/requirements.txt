@@ -7,4 +7,5 @@ streamlit-autorefresh==1.0.1
 python-dotenv==1.0.1
 folium
 streamlit-folium
+streamlit-js-eval>=1.0.0
 

@@ -1,6 +1,7 @@
 import streamlit as st
 import requests
 import logging
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -30,71 +31,130 @@ LAGOS_LGA_REGISTRY = {
 }
 
 
+# ─── Browser Geolocation via streamlit-js-eval ──────────────────────────
+# This replaces the old st.html() JS injection approach.
+# streamlit-js-eval returns data directly to Python — no URL hacking,
+# no page reloads, no server-side IP confusion.
+
+def _extract_coords_from_payload(geo_payload) -> tuple:
+    """
+    Safely extracts (lat, lon) from the streamlit-js-eval geolocation payload.
+    Returns (lat, lon, error_string).
+    """
+    if geo_payload is None:
+        return None, None, ""
+    
+    try:
+        # Handle string payloads (some browsers return JSON string)
+        if isinstance(geo_payload, str):
+            geo_payload = json.loads(geo_payload)
+        
+        if not isinstance(geo_payload, dict):
+            return None, None, "Unexpected payload format"
+        
+        # Check for errors first
+        if "error" in geo_payload:
+            return None, None, str(geo_payload["error"])
+        if "code" in geo_payload and "message" in geo_payload:
+            return None, None, str(geo_payload.get("message", "Permission denied"))
+        
+        # Try top-level lat/lon
+        lat = geo_payload.get("latitude")
+        lon = geo_payload.get("longitude")
+        if lat is not None and lon is not None:
+            return float(lat), float(lon), ""
+        
+        # Try nested coords object (standard Geolocation API structure)
+        coords = geo_payload.get("coords", {})
+        if isinstance(coords, dict):
+            lat = coords.get("latitude")
+            lon = coords.get("longitude")
+            if lat is not None and lon is not None:
+                return float(lat), float(lon), ""
+        
+    except (json.JSONDecodeError, ValueError, TypeError) as e:
+        return None, None, str(e)
+    
+    return None, None, "No coordinates in payload"
+
+
 def inject_geolocation_js():
     """
-    Injects a hidden HTML block with JS that reads navigator.geolocation
-    and pushes the values into Streamlit's URL search parameters.
-    Coordinates are rounded to 4 decimal places (~11m) to prevent GPS drift loops.
-    """
-    js_code = """
-    <script>
-    if ("geolocation" in navigator) {
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const lat = position.coords.latitude.toFixed(4);
-                const lon = position.coords.longitude.toFixed(4);
-                
-                const url = new URL(window.parent.location.href);
-                const currentLat = url.searchParams.get('lat');
-                const currentLon = url.searchParams.get('lon');
-                
-                // Only push if coordinates differ (rounded to prevent drift loops)
-                if (currentLat !== lat || currentLon !== lon) {
-                    url.searchParams.set('lat', lat);
-                    url.searchParams.set('lon', lon);
-                    window.parent.location.search = url.search;
-                }
-            },
-            (error) => {
-                console.warn("Geolocation denied, engaging Client IP fallback...");
-                fetch('https://ipapi.co/json/')
-                    .then(r => r.json())
-                    .then(data => {
-                        const url = new URL(window.parent.location.href);
-                        if (data.latitude && data.longitude) {
-                            const city = (data.city || "").toLowerCase();
-                            // FATAL ROUTE GUARD: Reject server-side locations (Render/Streamlit Cloud)
-                            if (city.includes("dallas") || city.includes("dalles") || city.includes("boardman") || city.includes("oregon")) {
-                                console.warn("Rejected server-side IP location, falling back to profile.");
-                                url.searchParams.set('geo_denied', '1');
-                            } else {
-                                url.searchParams.set('lat', data.latitude.toFixed(4));
-                                url.searchParams.set('lon', data.longitude.toFixed(4));
-                                url.searchParams.set('ip_loc', data.city + ", " + data.region);
-                            }
-                            window.parent.location.search = url.search;
-                        } else {
-                            if (!url.searchParams.has('geo_denied')) {
-                                url.searchParams.set('geo_denied', '1');
-                                window.parent.location.search = url.search;
-                            }
-                        }
-                    })
-                    .catch(e => {
-                        const url = new URL(window.parent.location.href);
-                        if (!url.searchParams.has('geo_denied')) {
-                            url.searchParams.set('geo_denied', '1');
-                            window.parent.location.search = url.search;
-                        }
-                    });
-            },
-            { enableHighAccuracy: true, timeout: 8000, maximumAge: 300000 }
-        );
-    }
-    </script>
-    """
-    st.html(js_code)
+    Button-triggered geolocation using streamlit-js-eval.
+    Replaces the old auto-firing st.html() injection.
     
+    This is called once in app.py — it checks if a geolocation request
+    was triggered and processes the result.
+    """
+    # Only process if a fetch was requested via button click
+    if not st.session_state.get("_geo_fetch_requested"):
+        return
+    
+    try:
+        from streamlit_js_eval import get_geolocation
+        payload = get_geolocation(component_key="adiphas_device_geo")
+        
+        if payload is not None:
+            lat, lon, error = _extract_coords_from_payload(payload)
+            
+            if lat is not None and lon is not None:
+                st.session_state.user_lat = lat
+                st.session_state.user_lon = lon
+                st.session_state._geo_fetch_requested = False
+                st.session_state._geo_resolved = True
+                logger.info(f"[Geolocation] Browser GPS resolved: ({lat}, {lon})")
+                
+                # Reverse geocode the coordinates
+                loc_string = _reverse_geocode_nominatim(str(lat), str(lon))
+                if not loc_string:
+                    loc_string = _reverse_geocode_bigdatacloud(str(lat), str(lon))
+                if not loc_string:
+                    loc_string = _nearest_area_name(lat, lon)
+                
+                st.session_state.user_location = loc_string
+                logger.info(f"[Geolocation] Resolved location: {loc_string}")
+            elif error:
+                logger.warning(f"[Geolocation] Browser denied: {error}")
+                st.session_state._geo_fetch_requested = False
+                # Fall back to IP geolocation
+                _try_ip_fallback()
+    except ImportError:
+        logger.warning("[Geolocation] streamlit-js-eval not installed, falling back to IP")
+        st.session_state._geo_fetch_requested = False
+        _try_ip_fallback()
+    except Exception as e:
+        logger.warning(f"[Geolocation] JS eval error: {e}")
+        st.session_state._geo_fetch_requested = False
+
+
+def request_location_fetch():
+    """Call this from a button's on_click to trigger geolocation."""
+    st.session_state._geo_fetch_requested = True
+
+
+def _try_ip_fallback():
+    """Attempts IP-based geolocation as a fallback."""
+    if st.session_state.get("_ip_geo_attempted"):
+        return
+    st.session_state._ip_geo_attempted = True
+    ip_loc = _geolocate_by_ip()
+    if ip_loc and "Unknown" not in ip_loc:
+        st.session_state.user_location = ip_loc
+        logger.info(f"[Geolocation] IP fallback resolved: {ip_loc}")
+
+
+def _nearest_area_name(lat: float, lon: float) -> str:
+    """Returns the nearest Lagos area name via Euclidean distance."""
+    best_name = "Lagos"
+    best_dist = float("inf")
+    for name, (a_lat, a_lon) in LAGOS_LGA_REGISTRY.items():
+        dist = ((lat - a_lat) ** 2 + (lon - a_lon) ** 2) ** 0.5
+        if dist < best_dist:
+            best_dist = dist
+            best_name = name.title()
+    return best_name
+
+
 def _forward_geocode_nominatim(query: str) -> tuple[float, float] | None:
     """Converts a location string (e.g. 'Yaba, Lagos') into coordinates."""
     if not query:
@@ -232,100 +292,56 @@ def _geolocate_by_ip() -> str | None:
 
 def extract_and_geocode():
     """
-    Reads coordinates from query params, performs reverse geolocation via
-    multi-provider chain (Nominatim → BigDataCloud → IP-based), and returns
-    a formatted location string (e.g. "Lagos Mainland, Lagos").
+    Main geolocation orchestrator. Reads coordinates from session state
+    (populated by streamlit-js-eval or IP fallback), performs reverse
+    geolocation, and returns a formatted location string.
     
     Resilience chain:
-    1. Browser GPS → Nominatim reverse geocode
-    2. Browser GPS → BigDataCloud reverse geocode (fallback)
-    3. IP-based geolocation via ipapi.co (if browser denied)
-    4. User profile location_lga (last resort)
+    1. Browser GPS via streamlit-js-eval → reverse geocode
+    2. IP-based geolocation via ipapi.co / ip-api.com
+    3. User profile location_lga (last resort)
     """
-    import time
-    
-    lat = st.query_params.get("lat")
-    lon = st.query_params.get("lon")
-    geo_denied = st.query_params.get("geo_denied")
-    ip_loc_param = st.query_params.get("ip_loc")
+    # If we already have a valid location cached, return it
+    cached_loc = st.session_state.get("user_location")
+    if cached_loc and "Unknown" not in cached_loc:
+        return cached_loc
     
     # Nuke corrupted "Unknown Area" cache to allow the engine to retry
-    curr_loc = st.session_state.get("user_location")
-    if curr_loc and "Unknown Area" in curr_loc:
+    if cached_loc and "Unknown Area" in cached_loc:
         st.session_state.user_location = None
         st.session_state._ip_geo_attempted = False
+    
+    # Check if we have coordinates from GPS or IP
+    lat = st.session_state.get("user_lat")
+    lon = st.session_state.get("user_lon")
+    
+    if lat and lon:
+        # Reverse geocode the coordinates
+        loc_string = _reverse_geocode_nominatim(str(lat), str(lon))
+        if not loc_string:
+            loc_string = _reverse_geocode_bigdatacloud(str(lat), str(lon))
+        if not loc_string:
+            loc_string = _nearest_area_name(float(lat), float(lon))
         
-    # --- Path 0: JS Client IP Fallback Succeeded ---
-    if ip_loc_param:
-        st.session_state.user_location = ip_loc_param
-        if lat and lon:
-            st.session_state.user_lat = float(lat)
-            st.session_state.user_lon = float(lon)
-        return ip_loc_param
+        st.session_state.user_location = loc_string
+        return loc_string
     
-    # --- Path A: Browser geolocation was denied → use server IP fallback ---
-    if geo_denied and not lat:
-        if not st.session_state.get("_ip_geo_attempted"):
-            st.session_state._ip_geo_attempted = True
-            ip_loc = _geolocate_by_ip()
-            if ip_loc and "Unknown Area" not in ip_loc:
-                st.session_state.user_location = ip_loc
-                logger.info(f"[Geolocation] IP-based fallback resolved: {ip_loc}")
-                return ip_loc
-        
-        # Skip stale or server-side cached locations
-        cached = st.session_state.get("user_location")
-        if cached and not any(x in str(cached).lower() for x in ["oregon", "dalles", "unknown"]):
-            # If we have a valid city string but NO coordinates, continue to profile geocoding
-            if st.session_state.get("user_lat") and st.session_state.get("user_lon"):
-                return cached
-        
-        # Last resort: user profile location
-        if st.session_state.get("authenticated") and st.session_state.get("user"):
-            profile_loc = st.session_state.user.get("location_lga")
-            if profile_loc and not any(x in str(profile_loc).lower() for x in ["oregon", "dalles", "unknown"]):
-                st.session_state.user_location = profile_loc
-                # Geocode the profile location string if coords are missing or still at Oregon
-                if not st.session_state.get("user_lat") or not st.session_state.get("user_lon"):
-                    coords = _forward_geocode_nominatim(profile_loc)
-                    if coords:
-                        st.session_state.user_lat, st.session_state.user_lon = coords
-                return profile_loc
-        
-        return None
+    # Try IP-based fallback
+    if not st.session_state.get("_ip_geo_attempted"):
+        _try_ip_fallback()
+        if st.session_state.get("user_location"):
+            return st.session_state.user_location
     
-    # --- Path B: No coordinates yet (still loading) ---
-    if not lat or not lon:
-        return st.session_state.get("user_location")
+    # Last resort: user profile location
+    if st.session_state.get("authenticated") and st.session_state.get("user"):
+        profile_loc = st.session_state.user.get("location_lga")
+        if profile_loc and "Unknown" not in str(profile_loc):
+            st.session_state.user_location = profile_loc
+            # Geocode the profile location string if coords are missing
+            if not st.session_state.get("user_lat"):
+                coords = _forward_geocode_nominatim(profile_loc)
+                if coords:
+                    st.session_state.user_lat, st.session_state.user_lon = coords
+            return profile_loc
     
-    # --- Path C: Coordinates available → reverse geocode ---
-    # Check cache freshness (avoid re-geocoding on every rerun)
-    cached_lat = st.session_state.get("_geo_cached_lat")
-    cached_lon = st.session_state.get("_geo_cached_lon")
-    cached_time = st.session_state.get("_geo_cached_time", 0)
-    
-    coords_changed = (str(cached_lat) != str(lat)) or (str(cached_lon) != str(lon))
-    cache_stale = (time.time() - cached_time) > 300  # 5 minutes
-    
-    if not coords_changed and not cache_stale and st.session_state.get("user_location"):
-        return st.session_state.get("user_location")
-    
-    # Multi-provider reverse geocoding chain
-    loc_string = _reverse_geocode_nominatim(lat, lon)
-    
-    if not loc_string:
-        loc_string = _reverse_geocode_bigdatacloud(lat, lon)
-    
-    if not loc_string:
-        # Raw coordinate fallback
-        loc_string = f"Lat: {str(lat)[:7]}, Lon: {str(lon)[:7]}"
-    
-    # Store results
-    st.session_state.user_location = loc_string
-    st.session_state.user_lat = float(lat)
-    st.session_state.user_lon = float(lon)
-    st.session_state._geo_cached_lat = lat
-    st.session_state._geo_cached_lon = lon
-    st.session_state._geo_cached_time = time.time()
-    
-    return loc_string
+    return None

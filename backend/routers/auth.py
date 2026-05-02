@@ -90,11 +90,16 @@ def register(request: Request, user: schemas.UserCreate, db: Session = Depends(g
                 raise HTTPException(status_code=400, detail="Email already registered")
         
         hashed_pwd = auth_utils.get_password_hash(user.password)
+        # Validate role: only CITIZEN and EXPERT are self-assignable.
+        # ADMIN must be granted manually via the database or admin panel.
+        allowed_roles = {"CITIZEN", "EXPERT"}
+        assigned_role = user.role.upper() if user.role and user.role.upper() in allowed_roles else "CITIZEN"
+        
         new_user = models.User(
             username=user.username,
             email=user.email,
             full_name=user.full_name,
-            role="CITIZEN",
+            role=assigned_role,
             location_lga=user.location_lga,
             genotype=user.genotype,
             blood_group=user.blood_group,

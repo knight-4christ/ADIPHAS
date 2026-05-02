@@ -76,7 +76,7 @@ def render_login_modal():
                                         except Exception:
                                             pass  # Non-critical — profile update can happen later
                                     
-                                    if not me.get('location_lga'):
+                                    if not me.get('location_lga') and me.get('role', 'CITIZEN') != 'ADMIN':
                                         st.session_state.active_nav_cat = "Account"
                                         st.session_state.active_nav_mod = "My Profile"
                                         st.warning("Please complete your biodata first.")

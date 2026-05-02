@@ -65,6 +65,7 @@ def main():
     )
     
     # --- BROWSER GEOLOCATION INTEGRATION ---
+    # Process any pending geolocation request (button-triggered, not auto-fire)
     geolocation.inject_geolocation_js()
     current_loc = geolocation.extract_and_geocode()
     
@@ -369,16 +370,10 @@ def main():
         )
         st.session_state.active_nav_cat = cat_choice
         
-        # --- COORDINATE RESOLUTION SHIELD: Resolve before sidebar is drawn ---
+        # --- LOCATION RESOLUTION: Try IP/profile fallback for first load ---
         if auth_status:
-            user_lat = st.session_state.get("user_lat")
-            if not user_lat or user_lat == 0:
-                # Trigger the multi-provider geocoding chain immediately
-                with st.spinner("Synchronizing location data..."):
-                    geolocation.extract_and_geocode()
-                    # If it resolved correctly, rerun once to force the sidebar to show it
-                    if st.session_state.get("user_lat"):
-                        st.rerun()
+            if not st.session_state.get("user_location"):
+                geolocation.extract_and_geocode()
 
         # Display Section Icon
         icon_map = {
@@ -432,8 +427,12 @@ def main():
             # Display coordinates alongside location for transparency
             user_lat = st.session_state.get("user_lat")
             user_lon = st.session_state.get("user_lon")
-            coord_str = f" [{user_lat}, {user_lon}]" if user_lat and user_lon else " [Resolving...]"
+            coord_str = f" [{user_lat}, {user_lon}]" if user_lat and user_lon else ""
             st.caption(f"📍 {st.session_state.global_location}{coord_str}")
+            
+            # Button-triggered GPS detection (replaces auto-fire injection)
+            if not st.session_state.get("_geo_resolved"):
+                st.button("📍 Detect My Location", key="sidebar_geo_btn", on_click=geolocation.request_location_fetch, type="secondary")
             st.divider()
             
             if st.button("Logout", key="logout_btn", width="stretch"):

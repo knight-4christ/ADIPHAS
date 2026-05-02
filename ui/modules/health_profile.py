@@ -43,7 +43,7 @@ def render(force_completion: bool = False):
     with col2:
         st.subheader("Edit Bio-Data")
         
-        # --- LOCATION DETECTION (Button-based, not dropdown) ---
+        # --- LOCATION DETECTION (Button-based via streamlit-js-eval) ---
         st.markdown("**📍 Current Location**")
         current_loc = user.get('location_lga', '')
         detected_loc = st.session_state.get('user_location')
@@ -52,13 +52,15 @@ def render(force_completion: bool = False):
         with loc_col1:
             if current_loc:
                 st.success(f"📍 Location set: **{current_loc}**")
+            elif detected_loc:
+                st.info(f"🛰️ Detected: **{detected_loc}** — click 'Save Location' to apply")
             else:
                 st.warning("📍 No location set yet — click the button to detect →")
         
         with loc_col2:
-            if st.button("📍 Detect My Location", width="stretch", type="primary"):
-                if detected_loc:
-                    # Save detected browser location to profile
+            if detected_loc and detected_loc != current_loc:
+                # Location already detected — offer to save it to the profile
+                if st.button("💾 Save Location", width="stretch", type="primary"):
                     res = api_client.update_profile(st.session_state.token, {
                         "username": user.get("username", "Unknown"),
                         "location_lga": detected_loc
@@ -69,11 +71,13 @@ def render(force_completion: bool = False):
                         st.rerun()
                     else:
                         st.error("Failed to save location.")
-                else:
-                    st.warning("⚠️ Browser location not available. Please allow location access in your browser and refresh.")
-        
-        if detected_loc and detected_loc != current_loc:
-            st.info(f"🛰️ Browser detected you near **{detected_loc}**. Click 'Detect My Location' to update.")
+            else:
+                # No location detected yet — trigger GPS fetch
+                import modules.geolocation as geolocation
+                st.button("📍 Detect My Location", width="stretch", type="primary",
+                         key="profile_geo_btn", on_click=geolocation.request_location_fetch)
+                if st.session_state.get("_geo_fetch_requested"):
+                    st.caption("⏳ Requesting browser GPS... allow the permission prompt.")
         
         st.divider()
         
