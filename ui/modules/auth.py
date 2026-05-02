@@ -32,9 +32,15 @@ def render_login_modal():
     with col2:
         st.subheader("🔐 Access ADIPHAS")
         
-        tab1, tab2 = st.tabs(["Login", "Sign Up"])
+        if "auth_mode" not in st.session_state:
+            st.session_state.auth_mode = "Login"
+            
+        def set_forgot_password():
+            st.session_state.auth_mode = "Forgot Password"
+
+        st.radio("Authentication Mode", ["Login", "Sign Up", "Forgot Password"], horizontal=True, label_visibility="collapsed", key="auth_mode")
         
-        with tab1:
+        if st.session_state.auth_mode == "Login":
             # Check if user arrived via reset email link
             reset_token = st.query_params.get("reset_token")
             if reset_token:
@@ -163,28 +169,43 @@ def render_login_modal():
                         window.parent.location.href = url.toString();
                     }}
                 </script>
-                """, height=50)
+                """, height=80)
                 st.markdown('</div>', unsafe_allow_html=True)
                 
-                with st.expander("Forgot Password?"):
-                    st.write("Enter your email or username to receive a reset link.")
-                    reset_email = st.text_input("Email / Username", key="reset_req_email")
-                    if st.button("Send Reset Link", width="stretch"):
-                        if reset_email:
-                            with st.spinner("Sending link..."):
-                                res = api_client.request_password_reset(reset_email)
-                                if res and "msg" in res:
-                                    st.success(res["msg"])
-                                else:
-                                    st.error("Failed to process request.")
-                        else:
-                            st.warning("Please enter your email or username.")
+                # Link-like button to redirect to Forgot Password tab
+                st.button("Forgot Password?", on_click=set_forgot_password, key="btn_forgot_login", help="Click to reset your password")
         
-        with tab2:
-            st.info("💡 **Tip:** Detect your location to receive hyper-tailored health insights and outbreak alerts for your area.")
+        elif st.session_state.auth_mode == "Forgot Password":
+            st.info("🔑 **Password Reset**")
+            st.write("Enter your email or username to receive a reset link.")
+            reset_email = st.text_input("Email / Username", key="reset_req_email")
+            if st.button("Send Reset Link", width="stretch"):
+                if reset_email:
+                    with st.spinner("Sending link..."):
+                        res = api_client.request_password_reset(reset_email)
+                        if res and "msg" in res:
+                            st.success(res["msg"])
+                        else:
+                            st.error("Failed to process request.")
+                else:
+                    st.warning("Please enter your email or username.")
+        
+        elif st.session_state.auth_mode == "Sign Up":
+            st.info("💡 **Tip:** Complete your profile to receive hyper-tailored health insights and outbreak alerts for your area.")
             
-            # --- LOCATION DETECTION (Button-based) ---
+            new_user = st.text_input("Desired Username", key="signup_user")
+            new_email = st.text_input("Email Address", key="signup_email")
+            new_pass = st.text_input("Password", type="password", key="signup_pass")
+            new_full_name = st.text_input("Full Name", key="signup_name")
+            new_role = st.selectbox("I am a...", ["CITIZEN", "EXPERT"], key="signup_role")
+            
+            st.divider()
+            
             detected_loc = st.session_state.get('user_location')
+            # Allow manual override if detection fails
+            final_loc_input = st.text_input("Home Location (LGA)", value=detected_loc if detected_loc else "", help="Auto-filled if you clicked 'Detect Location'. You can also type it manually.")
+
+            # --- LOCATION DETECTION (Button-based) ---
             loc_col1, loc_col2 = st.columns([2, 1])
             with loc_col1:
                 if detected_loc:
@@ -197,17 +218,6 @@ def render_login_modal():
                           key="signup_geo_btn", on_click=geolocation.request_location_fetch)
                 if st.session_state.get("_geo_fetch_requested"):
                     st.caption("⏳ Requesting GPS... allow the prompt.")
-            
-            st.divider()
-            
-            new_user = st.text_input("Desired Username", key="signup_user")
-            new_email = st.text_input("Email Address", key="signup_email")
-            new_pass = st.text_input("Password", type="password", key="signup_pass")
-            new_full_name = st.text_input("Full Name", key="signup_name")
-            new_role = st.selectbox("I am a...", ["CITIZEN", "EXPERT"], key="signup_role")
-            
-            # Allow manual override if detection fails
-            final_loc_input = st.text_input("Home Location (LGA)", value=detected_loc if detected_loc else "", help="Auto-filled if you clicked 'Detect Location'. You can also type it manually.")
             
             signup_btn = st.button("Create Account", width='stretch', type="primary")
             
