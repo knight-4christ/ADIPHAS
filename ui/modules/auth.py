@@ -1,6 +1,7 @@
 import streamlit as st
 import api_client
 import time
+import streamlit.components.v1 as components
 import modules.geolocation as geolocation
 def render_login_modal():
     """
@@ -16,6 +17,11 @@ def render_login_modal():
                 border-radius: 12px;
                 max-width: 400px;
                 margin: 0 auto;
+            }
+            .google-btn-container {
+                display: flex;
+                justify-content: center;
+                margin-top: 1rem;
             }
         </style>
     """, unsafe_allow_html=True)
@@ -49,6 +55,22 @@ def render_login_modal():
                             else:
                                 st.error(f"Reset Failed: {res.get('detail', 'Unknown error')}")
             else:
+                # --- GOOGLE TOKEN LISTENER ---
+                g_token = st.query_params.get("g_token")
+                if g_token:
+                    with st.spinner("Google Authenticating..."):
+                        res = api_client.google_login(g_token)
+                        if "access_token" in res:
+                            token = res["access_token"]
+                            st.session_state.authenticated = True
+                            st.session_state.token = token
+                            st.session_state.user = api_client.get_me(token)
+                            st.query_params.clear()
+                            st.rerun()
+                        else:
+                            st.error("Google Sign-In Failed.")
+                            st.query_params.clear()
+
                 with st.form("login_form"):
                     user_input = st.text_input("Username")
                     pass_input = st.text_input("Password", type="password")
@@ -98,6 +120,51 @@ def render_login_modal():
                                             pass  # Non-critical — profile update can happen later
                                     
                                     if not me.get('location_lga') and me.get('role', 'CITIZEN') != 'ADMIN':
+                                        st.warning(f"Welcome {me.get('username')}!{loc_msg} Please complete your profile to enable personalized alerts.")
+                                    else:
+                                        st.success(f"Welcome back, {me.get('username')}!{loc_msg}")
+                                    
+                                    time.sleep(1)
+                                    st.rerun()
+                                else:
+                                    st.error(f"Login failed: {me.get('detail', 'Profile error')}")
+                            else:
+                                st.error(f"Login failed: {res.get('detail', 'Invalid credentials')}")
+
+                # --- GOOGLE SIGN-IN BUTTON ---
+                st.markdown('<div class="google-btn-container">', unsafe_allow_html=True)
+                client_id = "581777295975-3e074nkevgksedf84k61fg9e8kutfn13.apps.googleusercontent.com"
+                
+                # HTML component to render the official Google button
+                components.html(f"""
+                <div id="g_id_onload"
+                     data-client_id="{client_id}"
+                     data-context="signin"
+                     data-ux_mode="popup"
+                     data-callback="handleCredentialResponse"
+                     data-auto_prompt="false">
+                </div>
+                <div class="g_id_signin"
+                     data-type="standard"
+                     data-shape="rectangular"
+                     data-theme="outline"
+                     data-text="signin_with"
+                     data-size="large"
+                     data-logo_alignment="left">
+                </div>
+                <script src="https://accounts.google.com/gsi/client" async defer></script>
+                <script>
+                    function handleCredentialResponse(response) {{
+                        const token = response.credential;
+                        // Redirect with token in query param
+                        const url = new URL(window.parent.location.href);
+                        url.searchParams.set('g_token', token);
+                        window.parent.location.href = url.toString();
+                    }}
+                </script>
+                """, height=50)
+                st.markdown('</div>', unsafe_allow_html=True)
+
                                         st.session_state.active_nav_cat = "Account"
                                         st.session_state.active_nav_mod = "My Profile"
                                         st.warning("Please complete your biodata first.")

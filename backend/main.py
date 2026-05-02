@@ -89,42 +89,53 @@ async def startup_event():
     logger.info(f"spaCy NLP: {'ACTIVE' if nlp_agent.nlp else 'KEYWORD-ONLY MODE'}")
     logger.info("System ready.")
 
-# Apply missing columns for migrations (safe to run on every boot)
+# Apply missing columns for migrations (Safe to run on every boot)
 def migrate_database():
     from sqlalchemy import text
     db = database.SessionLocal()
-    try:
-        db.execute(text("ALTER TABLE users ADD COLUMN is_email_verified BOOLEAN DEFAULT FALSE;"))
-        db.commit()
-    except Exception:
-        db.rollback()
-        
-    try:
-        db.execute(text("ALTER TABLE users ADD COLUMN email_verification_token VARCHAR;"))
-        db.commit()
-    except Exception:
-        db.rollback()
-        
-    try:
-        db.execute(text("ALTER TABLE users ADD COLUMN password_reset_token VARCHAR;"))
-        db.commit()
-    except Exception:
-        db.rollback()
+    
+    # List of columns that might be missing in production
+    cols_to_add = [
+        ("is_email_verified", "BOOLEAN DEFAULT FALSE"),
+        ("email_verification_token", "VARCHAR"),
+        ("password_reset_token", "VARCHAR"),
+        ("receive_briefings", "BOOLEAN DEFAULT TRUE")
+    ]
+    
+    logger.info("Running database migration check...")
+    for col_name, col_type in cols_to_add:
+        try:
+            # Check if column exists using information_schema
+            check_query = text(f"SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='{col_name}';")
+            exists = db.execute(check_query).fetchone()
+            
+            if not exists:
+                logger.warning(f"Migration: Column '{col_name}' is missing. Attempting to add...")
+                db.execute(text(f"ALTER TABLE users ADD COLUMN {col_name} {col_type};"))
+                db.commit()
+                logger.info(f"Migration: Successfully added '{col_name}'.")
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Migration: Failed to add column '{col_name}': {e}")
+            
+    db.close()
 
-    try:
-        db.execute(text("ALTER TABLE users ADD COLUMN receive_briefings BOOLEAN DEFAULT TRUE;"))
-        db.commit()
-    except Exception:
-        db.rollback()
-    finally:
-        db.close()
-
-migrate_database()
+# Execute migration BEFORE anything else
+try:
+    migrate_database()
+except Exception as e:
+    logger.error(f"Critical Migration Failure: {e}")
 
 # Create default admin user on startup if not exists
 def create_default_admin():
     db = database.SessionLocal()
     try:
+        # Check if users table exists first to avoid crash on brand new DBs
+        check_table = db.execute(text("SELECT 1 FROM information_schema.tables WHERE table_name='users';")).fetchone()
+        if not check_table:
+            logger.warning("Users table does not exist yet. Skipping admin creation.")
+            return
+
         admin = db.query(models.User).filter(models.User.username == "admin").first()
         if not admin:
             hashed_pwd = get_password_hash("admin")
@@ -132,11 +143,15 @@ def create_default_admin():
                 username="admin",
                 full_name="System Administrator",
                 role="ADMIN",
-                hashed_password=hashed_pwd
+                hashed_password=hashed_pwd,
+                is_email_verified=True # Admin is always verified
             )
             db.add(new_admin)
             db.commit()
             logger.info("Default admin user created.")
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to check/create default admin: {e}")
     finally:
         db.close()
 
