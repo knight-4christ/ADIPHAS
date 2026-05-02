@@ -182,19 +182,11 @@ def verify_email(token: str, db: Session = Depends(get_db)):
     user.email_verification_token = None
     db.commit()
     
-    from fastapi.responses import HTMLResponse
-    html_content = """
-    <html>
-        <head><title>Email Verified</title></head>
-        <body style="text-align: center; font-family: sans-serif; padding-top: 50px;">
-            <h1 style="color: #0284c7;">ADIPHAS</h1>
-            <h2>Email Successfully Verified! ✅</h2>
-            <p>You can now receive real-time outbreak alerts.</p>
-            <p>You may close this window and return to the app.</p>
-        </body>
-    </html>
-    """
-    return HTMLResponse(content=html_content, status_code=200)
+    import os
+    from fastapi.responses import RedirectResponse
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:8501")
+    # Redirect to the frontend root page (Command Centre)
+    return RedirectResponse(url=frontend_url)
 
 from pydantic import BaseModel
 class PasswordResetRequest(BaseModel):

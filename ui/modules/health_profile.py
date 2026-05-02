@@ -20,8 +20,11 @@ def render(force_completion: bool = False):
                     updated_user = api_client.get_me(st.session_state.token)
                     if updated_user and "id" in updated_user:
                         st.session_state.user = updated_user
-                        st.success("Status updated!")
-                        st.rerun()
+                        if not updated_user.get('is_email_verified'):
+                            st.warning("⚠️ Email not yet verified. Please check your email inbox and click the verification link.")
+                        else:
+                            st.success("✅ Status updated! Email is verified.")
+                            st.rerun()
                     else:
                         st.error("Failed to refresh status.")
     
