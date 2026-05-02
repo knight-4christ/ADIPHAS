@@ -56,7 +56,7 @@ def render(force_completion: bool = False):
                 st.warning("📍 No location set yet — click the button to detect →")
         
         with loc_col2:
-            if st.button("📍 Detect My Location", use_container_width=True, type="primary"):
+            if st.button("📍 Detect My Location", width="stretch", type="primary"):
                 if detected_loc:
                     # Save detected browser location to profile
                     res = api_client.update_profile(st.session_state.token, {

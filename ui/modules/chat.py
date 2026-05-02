@@ -57,7 +57,7 @@ def render(is_overlay=False):
         web_search_on = st.toggle("🌐 Web", value=True, help="Include live internet results via Tavily")
     
     with header_col4:
-        if st.button("➕ New Chat", use_container_width=True):
+        if st.button("➕ New Chat", width="stretch"):
             new_id = str(uuid.uuid4())[:8]
             st.session_state.chat_threads[new_id] = {
                 "name": f"Chat {len(st.session_state.chat_threads)+1}",
@@ -104,11 +104,11 @@ def render(is_overlay=False):
                 data=conv_text_plain,
                 file_name=f"adiphas_chat_{now_wat().strftime('%Y%m%d_%H%M')}.txt",
                 mime="text/plain",
-                use_container_width=True,
+                width="stretch",
                 key=f"dl_chat_txt_{st.session_state.active_thread_id}"
             )
     with t_act4:
-        if st.button("🗑️ Delete", type="secondary", use_container_width=True):
+        if st.button("🗑️ Delete", type="secondary", width="stretch"):
             del st.session_state.chat_threads[st.session_state.active_thread_id]
             st.session_state.active_thread_id = None
             if not is_overlay: st.rerun()

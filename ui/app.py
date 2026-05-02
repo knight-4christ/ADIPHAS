@@ -436,7 +436,7 @@ def main():
             st.caption(f"📍 {st.session_state.global_location}{coord_str}")
             st.divider()
             
-            if st.button("Logout", key="logout_btn", use_container_width=True):
+            if st.button("Logout", key="logout_btn", width="stretch"):
                 st.query_params.clear()
                 auth.logout()
         else:

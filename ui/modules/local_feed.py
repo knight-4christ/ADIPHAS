@@ -84,7 +84,7 @@ def render():
                             "Disease": st.column_config.TextColumn("Disease/Topic", help="Detected entity"),
                             "Status": st.column_config.TextColumn("Status", width="small")
                         },
-                        use_container_width=True, 
+                        width="stretch", 
                         hide_index=True
                     )
                 

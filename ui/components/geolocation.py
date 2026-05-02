@@ -3,7 +3,7 @@ Browser Geolocation Component for Streamlit.
 Uses the browser's navigator.geolocation API to get the user's actual position.
 Zero API tokens — runs entirely in the browser.
 """
-import streamlit.components.v1 as components
+import streamlit as st
 
 
 def get_user_location(key="geolocation"):
@@ -59,7 +59,6 @@ def get_user_location(key="geolocation"):
     <div id="geo-result" style="display:none;"></div>
     """
     
-    import streamlit as st
     st.html(geolocation_js)
     
     # Note: Due to Streamlit's architecture, the JS result isn't directly
@@ -75,7 +74,6 @@ def render_location_picker():
     Renders a visible location request button with status feedback.
     Stores coordinates in st.session_state['user_lat'] and st.session_state['user_lon'].
     """
-    import streamlit as st
     
     location_js = """
     <div style="padding: 10px; border-radius: 8px; background: rgba(14, 165, 233, 0.1); margin: 10px 0;">

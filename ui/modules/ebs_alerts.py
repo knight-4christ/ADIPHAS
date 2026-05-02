@@ -63,7 +63,7 @@ def render():
                                                     st.markdown(f"**{title}**")
                                                 st.write(content[:300] + '...' if len(str(content)) > 300 else content)
                                                 if url:
-                                                    st.link_button("🔗 View Source", url, use_container_width=True)
+                                                    st.link_button("🔗 View Source", url, width="stretch")
                                                 else:
                                                     st.caption("💾 Local Knowledge Base")
                                     else:
@@ -117,7 +117,7 @@ def render():
                 cases_b = st.number_input("Reported Cases (B)", value=10, key="cases_b_sim")
                 loc_b = st.text_input("Location (B)", value="Ikeja", key="loc_b_sim")
                 
-            if st.button("Run Fusion Algorithm", use_container_width=True):
+            if st.button("Run Fusion Algorithm", width="stretch"):
                 with st.spinner("Calculating Dempster-Shafer Consensus..."):
                     reports = [
                         {"source": src_a, "cases": cases_a, "location": loc_a, "disease": "Cholera"},

@@ -124,7 +124,7 @@ def render():
             st.subheader("🆕 Fresh Intelligence")
             st.dataframe(
                 new_df.drop(columns=['is_new_val', 'is_local_val', '_sort_time', '_full_data']),
-                use_container_width=True,
+                width="stretch",
                 hide_index=True
             )
         
@@ -132,7 +132,7 @@ def render():
             st.subheader("📜 Historical Context")
             st.dataframe(
                 older_df.drop(columns=['is_new_val', 'is_local_val', '_sort_time', '_full_data']),
-                use_container_width=True,
+                width="stretch",
                 hide_index=True
             )
 
@@ -175,12 +175,12 @@ def render():
                 st.caption(f"🛰️ **Capture Node:** {item.get('source')}")
                 url = item.get('url')
                 if url:
-                    st.link_button("🔗 Open Source", url, use_container_width=True)
+                    st.link_button("🔗 Open Source", url, width="stretch")
                 else:
-                    if st.button("🔗 Open Source", use_container_width=True, disabled=True):
+                    if st.button("🔗 Open Source", width="stretch", disabled=True):
                         pass
                 
-                if st.button("📖 Get Deeper Context (RAG)", use_container_width=True):
+                if st.button("📖 Get Deeper Context (RAG)", width="stretch"):
                     with st.spinner("Retrieving intelligence..."):
                         q = f"Latest protocols and news for {item.get('disease')} in {item.get('location_text')}"
                         r = api_client.advisory_search(q)
@@ -199,7 +199,7 @@ def render():
                     if ts:
                         st.caption(f"Captured: {ts}")
                     if src_url:
-                        st.link_button("🔗 View Original Article/Report", src_url, use_container_width=True, key=f"orig_src_{selected_index}")
+                        st.link_button("🔗 View Original Article/Report", src_url, width="stretch", key=f"orig_src_{selected_index}")
                     else:
                         st.caption("💾 Internal surveillance data — no external URL available")
                 
@@ -222,7 +222,7 @@ def render():
                                     st.markdown(f"**{title}**")
                                 st.write(content[:400] + '...' if len(str(content)) > 400 else content)
                                 if r_url:
-                                    st.link_button(f"🔗 View Source", r_url, use_container_width=True, key=f"rag_link_{selected_index}_{idx}")
+                                    st.link_button(f"🔗 View Source", r_url, width="stretch", key=f"rag_link_{selected_index}_{idx}")
                                 else:
                                     st.caption("💾 Local RAG Knowledge Base")
                     else:

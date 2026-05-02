@@ -100,7 +100,7 @@ def render():
         else:
             st.info("🛰️ Generating next autonomous briefing... check back in a few minutes.")
             
-        if st.button("🔄 Force Real-time StAMP Sweep", key="manual_insight", use_container_width=True):
+        if st.button("🔄 Force Real-time StAMP Sweep", key="manual_insight", width="stretch"):
             with st.spinner("Executing StAMP Intelligence Sweep (Tavily + AI Synthesis)..."):
                 res = api_client.trigger_manual_briefing()
                 if res and not res.get("error"):
@@ -144,7 +144,7 @@ def render():
                             url = a.get('url')
                             if url:
                                 st.caption(f"Source: [{source_name}]({url}) | Risk: {risk}")
-                                st.link_button("🔗 View Original Source", url, use_container_width=True)
+                                st.link_button("🔗 View Original Source", url, width="stretch")
                             else:
                                 st.caption(f"Source: {source_name} | Risk: {risk}")
                 else:
