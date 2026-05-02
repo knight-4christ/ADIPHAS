@@ -114,9 +114,16 @@ def main():
         * {{ font-family: 'Inter', sans-serif; }}
         
         /* Main Container */
-        .main {{
-            background-color: {bg_color};
-            color: {text_color};
+        [data-testid="stAppViewContainer"], 
+        [data-testid="stAppViewBlockContainer"], 
+        .main, 
+        .stApp {{
+            background-color: {bg_color} !important;
+            color: {text_color} !important;
+        }}
+        
+        [data-testid="stHeader"] {{
+            background-color: transparent !important;
         }}
         
         /* Sidebar Styling */
