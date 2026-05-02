@@ -13,6 +13,18 @@ from jose import JWTError, jwt  # type: ignore[import-untyped]
 from fastapi.security import OAuth2PasswordBearer  # type: ignore[import-untyped]
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
+import os
+import logging
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
+from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "581777295975-3e074nkevgksedf84k61fg9e8kutfn13.apps.googleusercontent.com")
+
+class GoogleAuthPayload(BaseModel):
+    id_token: str
+
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     credentials_exception = HTTPException(
         status_code=401,
@@ -249,3 +261,55 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     
     access_token = auth_utils.create_access_token(data={"sub": user.id})
     return {"access_token": access_token, "token_type": "bearer"}
+
+@router.post("/api/auth/google", response_model=schemas.Token)
+def google_auth(payload: GoogleAuthPayload, db: Session = Depends(get_db)):
+    """Verifies Google ID token and logs in/registers the user."""
+    try:
+        # 1. Verify the Google ID Token
+        id_info = id_token.verify_oauth2_token(
+            payload.id_token, 
+            google_requests.Request(), 
+            GOOGLE_CLIENT_ID
+        )
+        
+        email = id_info.get("email")
+        full_name = id_info.get("name")
+        
+        if not email:
+            raise HTTPException(status_code=400, detail="Google account has no email.")
+            
+        # 2. Check if user exists
+        user = db.query(models.User).filter(models.User.email == email).first()
+        
+        if not user:
+            # Create new user automatically
+            username = email.split("@")[0]
+            # Ensure unique username
+            orig_username = username
+            counter = 1
+            while db.query(models.User).filter(models.User.username == username).first():
+                username = f"{orig_username}{counter}"
+                counter += 1
+                
+            user = models.User(
+                username=username,
+                email=email,
+                full_name=full_name,
+                is_email_verified=True, 
+                role="CITIZEN",
+                hashed_password="OAUTH_USER_NO_PASSWORD"
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+            
+        # 3. Issue ADIPHAS Token
+        access_token = auth_utils.create_access_token(data={"sub": user.id})
+        return {"access_token": access_token, "token_type": "bearer"}
+        
+    except ValueError:
+        raise HTTPException(status_code=401, detail="Invalid Google token")
+    except Exception as e:
+        logger.error(f"Google Auth Error: {e}")
+        raise HTTPException(status_code=500, detail="Authentication failed")
