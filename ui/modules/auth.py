@@ -3,6 +3,7 @@ import api_client
 import time
 import streamlit.components.v1 as components
 import modules.geolocation as geolocation
+
 def render_login_modal():
     """
     Renders the authentication interface. 
