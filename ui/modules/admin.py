@@ -4,7 +4,7 @@ import pandas as pd
 
 def render():
     st.title("🛡️ Admin Console")
-    st.caption("User Management & System Override")
+    st.caption("Central administrative interface for user provisioning, role management, and system-wide security overrides.")
     
     # 1. User Management
     st.subheader("👥 User Database")

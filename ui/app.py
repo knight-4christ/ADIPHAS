@@ -26,7 +26,12 @@ import modules.situational_awareness as situational_awareness
 import modules.geolocation as geolocation
 
 def is_profile_complete(user: dict) -> bool:
-    """Checks if the user has completed all mandatory bio-data fields."""
+    """Checks if the user has verified email and completed all mandatory bio-data fields."""
+    # 1. Check email verification
+    if not user.get('is_email_verified', False):
+        return False
+        
+    # 2. Check biodata fields
     required_fields = ['blood_group', 'genotype', 'location_lga', 'health_conditions']
     for field in required_fields:
         value = user.get(field)

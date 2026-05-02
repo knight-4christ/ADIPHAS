@@ -13,6 +13,8 @@ def render():
     
     # --- SUB-NAVIGATION (Consolidated Header) ---
     st.markdown("### 🔍 Health Intelligence Hub")
+    st.caption("Personalized situational intelligence and automated 2-hour strategic health briefings tailored to your LGA and role.")
+
     sub_view = st.segmented_control(
         "Navigation", 
         ["Main Inbox", "Executive Briefing", "Intelligence Trends"],

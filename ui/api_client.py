@@ -127,6 +127,10 @@ def get_me(token):
     headers = {"Authorization": f"Bearer {token}"}
     return _safe_request("GET", f"{API_URL}/api/users/me", headers=headers)
 
+def resend_verification(token):
+    headers = {"Authorization": f"Bearer {token}"}
+    return _safe_request("POST", f"{API_URL}/api/auth/resend-verification", headers=headers)
+
 def update_profile(token, profile_data):
     headers = {"Authorization": f"Bearer {token}"}
     return _safe_request("PUT", f"{API_URL}/api/users/profile", json=profile_data, headers=headers)

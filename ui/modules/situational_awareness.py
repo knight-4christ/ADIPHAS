@@ -6,7 +6,7 @@ from modules import to_wat
 
 def render():
     st.title("🛰️ Situational Awareness Dashboard")
-    st.caption("Central Command Centre for ADIPHAS — Real-time Intelligence Fusion.")
+    st.caption("Strategic hub for autonomous epidemiological surveillance, risk scoring, and StAMP intelligence briefings.")
 
     # --- TOP ROW: STRATEGIC METRICS ---
     alerts = api_client.get_alerts() if isinstance(api_client.get_alerts(), list) else []

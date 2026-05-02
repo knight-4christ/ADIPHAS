@@ -6,7 +6,7 @@ from datetime import datetime
 
 def render():
     st.title("🔬 NLP Evaluation & Scientific Rigor")
-    st.caption("Measure and audit the performance of ADIPHAS Analyst Agents.")
+    st.caption("Measure and audit the performance of ADIPHAS Analyst Agents. Real-time NLP tracking, manual annotation, and scientific F1-Score benchmarking.")
 
     tab1, tab2, tab3 = st.tabs(["📊 Performance Metrics", "✍️ Manual Annotation", "📜 History"])
 

@@ -135,6 +135,31 @@ def register(request: Request, user: schemas.UserCreate, db: Session = Depends(g
         logging.getLogger(__name__).error(f"Registration error: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
 
+@router.post("/api/auth/resend-verification")
+def resend_verification(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.is_email_verified:
+        return {"msg": "Email already verified."}
+    
+    if not current_user.email:
+        raise HTTPException(status_code=400, detail="Account has no email address.")
+        
+    import uuid
+    token = str(uuid.uuid4())
+    current_user.email_verification_token = token
+    db.commit()
+    
+    from backend.core.email_utils import send_verification_email
+    import os
+    backend_url = os.getenv("BACKEND_URL", "http://localhost:8000")
+    
+    try:
+        import threading
+        threading.Thread(target=send_verification_email, args=(current_user.email, current_user.username, token, backend_url)).start()
+    except Exception:
+        pass
+        
+    return {"msg": "Verification email resent."}
+
 @router.get("/api/auth/verify-email")
 def verify_email(token: str, db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.email_verification_token == token).first()

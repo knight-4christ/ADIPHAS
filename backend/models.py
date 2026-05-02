@@ -21,6 +21,7 @@ class User(Base):
     password_reset_token = Column(String, nullable=True)
     hashed_password = Column(String)
     role = Column(String, default="CITIZEN") # CITIZEN or EXPERT
+    receive_briefings = Column(Boolean, default=True)
     
     # Biodata / Health Profile
     blood_group = Column(String, nullable=True)

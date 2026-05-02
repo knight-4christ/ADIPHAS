@@ -110,6 +110,12 @@ def migrate_database():
         db.commit()
     except Exception:
         db.rollback()
+
+    try:
+        db.execute(text("ALTER TABLE users ADD COLUMN receive_briefings BOOLEAN DEFAULT TRUE;"))
+        db.commit()
+    except Exception:
+        db.rollback()
     finally:
         db.close()
 

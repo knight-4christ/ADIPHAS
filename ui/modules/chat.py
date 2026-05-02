@@ -8,6 +8,7 @@ from modules import now_wat
 def render(is_overlay=False):
     if not is_overlay:
         st.markdown("### 🤖 ADIPHAS Health Advisory Chat")
+        st.caption("AI-powered clinical assistant and symptom analyzer. Uses Hybrid-RAG to fuse local health alerts with global medical knowledge.")
     
     # 1. State Management (Conversations)
     if "chat_threads" not in st.session_state:

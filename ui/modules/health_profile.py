@@ -5,12 +5,25 @@ from datetime import datetime
 
 def render(force_completion: bool = False):
     st.title("👤 My Health Profile")
+    st.caption("Manage your personal health profile, geospatial anchoring, and intelligence delivery settings.")
     
     user = st.session_state.user
     
     # --- MANDATORY COMPLETION BANNER ---
     if force_completion:
-        st.error("🚨 **Action Required**: You must complete ALL bio-data fields below before accessing other modules. This ensures you receive personalized health intelligence tailored to your profile.")
+        st.error("🚨 **Action Required**: You must verify your email and complete ALL bio-data fields below before accessing other modules. This ensures you receive personalized health intelligence tailored to your profile.")
+        
+        if not user.get('is_email_verified'):
+            st.info("💡 **Tip**: Check your inbox for a verification link. Once clicked, use the button below to unlock the system.")
+            if st.button("🔄 Refresh My Status", key="refresh_status_btn", type="primary"):
+                with st.spinner("Checking verification..."):
+                    updated_user = api_client.get_me(st.session_state.token)
+                    if updated_user and "id" in updated_user:
+                        st.session_state.user = updated_user
+                        st.success("Status updated!")
+                        st.rerun()
+                    else:
+                        st.error("Failed to refresh status.")
     
     col1, col2 = st.columns([1, 2])
     
@@ -29,6 +42,7 @@ def render(force_completion: bool = False):
             st.write("---")
             st.markdown("**📋 Completion Status:**")
             fields_status = {
+                "Email Verified": user.get('is_email_verified'),
                 "Blood Group": user.get('blood_group'),
                 "Genotype": user.get('genotype'),
                 "Location": user.get('location_lga'),
@@ -218,3 +232,45 @@ def render(force_completion: bool = False):
                         st.markdown(f"- {sug}")
                 else:
                     st.info("Select symptoms to begin.")
+
+    # --- INTELLIGENCE & ACCOUNT SETTINGS ---
+    if not force_completion:
+        st.divider()
+        st.subheader("📩 Intelligence & Account Settings")
+        
+        c1, c2 = st.columns(2)
+        
+        with c1:
+            st.markdown("**Email Verification**")
+            email = user.get("email")
+            if not email:
+                st.warning("No email associated with this account.")
+            else:
+                is_verified = user.get("is_email_verified", False)
+                if is_verified:
+                    st.success(f"✅ Verified: `{email}`")
+                else:
+                    st.error(f"❌ Unverified: `{email}`")
+                    if st.button("Resend Verification Email", key="resend_ver_btn"):
+                        with st.spinner("Resending..."):
+                            res = api_client.resend_verification(st.session_state.token)
+                            if res and "msg" in res:
+                                st.success(res["msg"])
+                            else:
+                                st.error("Failed to resend.")
+
+        with c2:
+            st.markdown("**Proactive Briefings**")
+            current_briefing = user.get("receive_briefings", True)
+            briefing_toggle = st.toggle("Receive automated 2-hour health briefings", value=current_briefing, 
+                                      help="If enabled, ADIPHAS will email you tailored situational intelligence every 2 hours.")
+            
+            if briefing_toggle != current_briefing:
+                with st.spinner("Updating settings..."):
+                    res = api_client.update_profile(st.session_state.token, {
+                        "receive_briefings": briefing_toggle
+                    })
+                    if res and "id" in res:
+                        st.session_state.user = res
+                        st.success("Briefing settings updated!")
+                        st.rerun()
