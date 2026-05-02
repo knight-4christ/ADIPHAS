@@ -33,9 +33,33 @@ class AdvisoryEngine:
             role = "Assistant" if msg.get("role") == "assistant" else "User"
             history_str += f"{role}: {msg.get('content')}\n"
 
+        user_role = user_metadata.get('role', 'CITIZEN') if user_metadata else 'CITIZEN'
+        role_context = "a resident" if user_role == "CITIZEN" else f"a public health {user_role.lower()}"
+        
+        # Adjust rules based on role
+        if user_role in ["EXPERT", "ADMIN"]:
+            rules_block = """
+        CRITICAL OUTPUT RULES:
+        - Provide an expert-grade epidemiological or clinical analysis.
+        - Use professional medical and public health terminology.
+        - Keep responses under 400 words — detailed but focused.
+        - Reference the provided intelligence context analytically.
+        - Use bullet points for multiple items. DO NOT use markdown tables.
+        - Provide specific, actionable intelligence or clinical protocols.
+        """
+        else:
+            rules_block = """
+        CRITICAL OUTPUT RULES:
+        - Be professional, comprehensive, and simple to understand for the general public.
+        - Keep responses under 200 words — concise and actionable.
+        - Avoid unnecessary medical jargon.
+        - Use bullet points for multiple items. DO NOT use markdown tables.
+        - Every sentence must add value — avoid filler phrases.
+        """
+
         full_prompt = f"""
         Act as the ADIPHAS Health Advisory Agent. 
-        Context: You are helping a resident of Lagos, Nigeria named {user_metadata.get('name', 'User') if user_metadata else 'User'}.
+        Context: You are helping {role_context} of Lagos, Nigeria named {user_metadata.get('name', 'User') if user_metadata else 'User'}.
         Address them by their name directly.
         {bio_block}
         {context_block}
@@ -44,11 +68,7 @@ class AdvisoryEngine:
         {history_str}
         
         Provide the next response following NCDC and WHO guidelines. 
-        CRITICAL OUTPUT RULES:
-        - Be professional, comprehensive, and simple to understand.
-        - Keep responses under 200 words — concise but actionable.
-        - Use bullet points for multiple items. DO NOT use markdown tables.
-        - Every sentence must add value — avoid filler phrases.
+        {rules_block}
         """
         try:
             from backend.core.model_config import smart_generate  # type: ignore[import-untyped]

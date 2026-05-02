@@ -39,6 +39,7 @@ def chat_advisory(payload: schemas.ChatPayload, current_user: models.User = Depe
     """
     user_metadata = {
         "name": current_user.username,
+        "role": current_user.role,
         "genotype": current_user.genotype,
         "blood_group": current_user.blood_group,
         "health_conditions": current_user.health_conditions,
