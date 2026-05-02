@@ -18,8 +18,9 @@ Nigeria's Integrated Disease Surveillance and Response (IDSR) framework is large
 2.  **Hybrid NLP & Sanitization:** Implement a local-first **spaCy** pipeline for high-speed extraction, refined by **Gemini 2.5 Flash** for deep semantic analysis, guarded by a deep regex sanitization layer to prevent AI reasoning trace (`<think>`) leakage.
 3.  **Knowledge Fusion:** Reconcile conflicting multi-source signals using the **Dempster-Shafer Theory of Evidence**.
 4.  **Role-Specific & Location-Aware Intelligence:** Deliver actionable insights grounded by a resilient multi-provider Geolocation pipeline (Browser GPS → BigDataCloud → IP Fallback → Profile) to dynamically generate personalized insights while preventing GPS drift.
-5.  **Hybrid-RAG Advisory:** Ground AI responses in both local verified alerts (**Titan Vector Engine**) and global real-time context (**Tavily Search API**).
-6.  **AI Resilience:** Implement a tiered model rotation pool (exponential backoff) to ensure 24/7 intelligence availability during OpenRouter/Gemini API quota exhaustion.
+5.  **Proactive Intelligence Dispatch:** Automatically synthesize the health landscape into easily digestible (Citizen) or deep-dive (Expert) situational briefings every 2 hours, and dispatch them directly via email to verified users.
+6.  **Hybrid-RAG Advisory:** Ground AI responses in both local verified alerts (**Titan Vector Engine**) and global real-time context (**Tavily Search API**).
+7.  **AI Resilience:** Implement a tiered model rotation pool (exponential backoff) to ensure 24/7 intelligence availability during API quota exhaustion.
 
 ---
 
@@ -74,7 +75,9 @@ ADIPHAS is deployed on a **split-cloud architecture** designed for cost-efficien
 
 ### 4.2 Authentication & Security
 The authentication system implements several hardened security measures:
--   **Password Hashing:** Uses **native `bcrypt`** (not `passlib`) to avoid the known 72-byte wrap detection bug that crashes `passlib` on modern `bcrypt>=4.x` backends. Passwords are hashed via `bcrypt.hashpw()` with auto-generated salts.
+-   **Email Verification Engine:** Prevents unauthorized or spam accounts by requiring users to validate their identity through a secure, cryptographic token sent to their inbox before they can receive automated health briefings.
+-   **Secure Password Recovery:** Integrated a robust "Forgot Password" architecture, allowing users to securely reset their credentials using email-delivered reset tokens.
+-   **Password Hashing:** Uses **native `bcrypt`** (not `passlib`) to avoid the known 72-byte wrap detection bug. Passwords are hashed via `bcrypt.hashpw()` with auto-generated salts.
 -   **JWT Tokens:** Signed using `HS256` with a cryptographically random `SECRET_KEY` (environment variable). Tokens expire after 30 minutes.
 -   **Rate Limiting:** Registration endpoint is protected with `slowapi` at 5 requests/minute to prevent brute-force account creation.
 -   **Role-Based Access Control (RBAC):** Three-tier role hierarchy (`CITIZEN < EXPERT < ADMIN`) enforced at the router level via dependency injection.
@@ -97,8 +100,10 @@ ADIPHAS implements a **three-tier AI resilience architecture** to guarantee 24/7
 
 The background scheduler interval is set to **120 minutes (2 hours)** to optimise intelligence coverage within the free-tier rate limits (~50 requests/day on OpenRouter).
 
-### 4.6 Notification Infrastructure (Modular Status)
-The system includes modules for **SMS (Twilio)** and **Email (SMTP)** broadcasting. These are currently implemented as background utilities and can be activated for high-risk alerts (`risk_level == "High"`) once notification quotas are established.
+### 4.6 Notification Infrastructure (Proactive Dispatch)
+The system has transitioned from a passive dashboard to a proactive intelligence push-service. 
+- **Automated Intelligence Briefings:** The orchestration engine runs on a strict 2-hour cycle. Upon completing data harvesting and AI fusion, it automatically generates two distinct intelligence briefings: an accessible, community-focused update for Citizens, and a deeply technical, epidemiological briefing for Experts.
+- **Multithreaded Delivery:** To prevent network latency from hanging the main server, a multithreaded SMTP dispatch utility concurrently delivers these briefings (and critical health alerts) directly to verified user emails.
 
 ---
 
@@ -108,7 +113,9 @@ The system includes modules for **SMS (Twilio)** and **Email (SMTP)** broadcasti
 -   **Accuracy & Integrity:** Achieved $0.875$ micro-averaged F1 on representative health data, while implementing complete sanitization protocols ensuring 100% public-ready briefing output free of raw model reasoning tokens.
 -   **AI Resilience:** Built a **12-model deep fallback chain** (2 Gemini native + 9 OpenRouter free + 1 rule-based) ensuring intelligence generation even under complete API quota exhaustion. Removed dead model endpoints (`stepfun`, `mistral-small-3.1`, `xiaomi/mimo-v2-pro`) that were wasting API calls.
 -   **Efficiency:** Reduced LLM API calls by **95%** using local-first extraction and caching. Optimised the background scheduler from 15-minute to 2-hour intervals to sustainably operate within free-tier API budgets.
--   **UI Stability & Frontend Hardening:** Eliminated persistent WebGL initialization crashes and strict Pandas 2.2.0 `GroupBy` runtime errors on Streamlit Cloud. This was achieved by systematically replacing all `Plotly Express` analytical charts with memory-safe pure `plotly.graph_objects`, and entirely migrating the spatial analytics engine from Plotly Mapbox to **Folium (Leaflet.js)** for highly robust, DOM-native interactive mapping.
+-   **Proactive Intelligence Engine:** Engineered a 2-hour autonomous loop that generates role-specific situational intelligence (Citizen vs. Expert) and actively dispatches HTML-formatted email briefings to all verified users using a multithreaded delivery system.
+-   **Account Security Hardening:** Implemented full-scale email validation and secure password recovery mechanisms to guarantee data integrity and protect user communication channels.
+-   **UI Stability & Frontend Hardening:** Eliminated persistent WebGL initialization crashes and strict Pandas 2.2.0 `GroupBy` runtime errors on Streamlit Cloud. Migrated spatial analytics from Plotly Mapbox to **Folium (Leaflet.js)** for highly robust, DOM-native interactive mapping. Fixed critical mobile responsive "white screen" rendering bugs by properly positioning the configuration file (`.streamlit/config.toml`) at the repository root and overriding deep Streamlit CSS containers to force a seamless, cross-device Dark Mode aesthetic.
 -   **Security Hardening:** Replaced the vulnerable `passlib` password hashing library with native `bcrypt` to resolve the 72-byte wrap detection crash. Implemented server-side error logging with clean user-facing error messages.
 -   **Hyper-Personalization:** Connected browser-native HTML5 `navigator.geolocation` APIs with OpenStreetMap reverse geocoding to automatically center heatmaps and tailor instant epidemiological advisories based on the user's precise Local Government Area.
 -   **Information Warfare & Stealth Data Acquisition:** Successfully defeated complex Cloudflare and WAF (Web Application Firewall) blocks on government portals (NCDC, FMoH, The Guardian). By utilizing native Google Chrome TLS fingerprint impersonation via the **Scrapling** module (`Fetcher(stealthy_headers=True)`), ADIPHAS consistently bypasses 403 Forbidden constraints, allowing uninterrupted surveillance. Validated and patched internal parser argument incompatibilities to ensure robust 24/7 scraping stability.

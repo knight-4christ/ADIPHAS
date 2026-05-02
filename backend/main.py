@@ -89,6 +89,32 @@ async def startup_event():
     logger.info(f"spaCy NLP: {'ACTIVE' if nlp_agent.nlp else 'KEYWORD-ONLY MODE'}")
     logger.info("System ready.")
 
+# Apply missing columns for migrations (safe to run on every boot)
+def migrate_database():
+    from sqlalchemy import text
+    db = database.SessionLocal()
+    try:
+        db.execute(text("ALTER TABLE users ADD COLUMN is_email_verified BOOLEAN DEFAULT FALSE;"))
+        db.commit()
+    except Exception:
+        db.rollback()
+        
+    try:
+        db.execute(text("ALTER TABLE users ADD COLUMN email_verification_token VARCHAR;"))
+        db.commit()
+    except Exception:
+        db.rollback()
+        
+    try:
+        db.execute(text("ALTER TABLE users ADD COLUMN password_reset_token VARCHAR;"))
+        db.commit()
+    except Exception:
+        db.rollback()
+    finally:
+        db.close()
+
+migrate_database()
+
 # Create default admin user on startup if not exists
 def create_default_admin():
     db = database.SessionLocal()

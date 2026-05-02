@@ -25,11 +25,11 @@ The system leverages **Dempster-Shafer Theory of Evidence** to combine conflicti
 
 - **📡 Autonomous Scout (EBS)**: Real-time news scraping and NLP entity extraction using `spaCy` and **Gemini 2.5 Flash**.
 - **🧠 Knowledge Fusion**: Mathematical reconciliation of multi-source signals using the **Dempster-Shafer Framework**.
-- **🌐 Real-Time Intelligence**: Live global health event tracking powered by the **Tavily Search API**.
-- **📊 IDSR Analytics**: Deep statistical analysis of historical **Verified NCDC Data** with anomaly flagging and predictive forecasting.
+- **📩 Proactive Intelligence Delivery**: Automatically synthesizes and emails tailored situational briefings (Community vs. Expert) every 2 hours using a background multithreaded dispatcher.
+- **🔒 Secure Access & Verification**: Hardened user authentication featuring cryptographic email validation and secure "Forgot Password" recovery flows.
+- **📍 Hyper-Local Analytics**: Browser-native HTML5 Geolocation instantly anchors users to their exact Local Government Area (LGA) for tailored outbreak alerts.
 - **🛡️ Advisory Engine**: A Hybrid clinical assistant backed by an OpenRouter Tiered Model Rotation (exponential rate-limit backoff).
-- **📍 Resilient Geolocation**: Multi-provider fallback chain (Nominatim → BigDataCloud → IP → Profile) ensuring seamless locational tracking without GPS drift.
-- **⚡ Micro-Frontend UI Architecture**: Fully modularized dashboard leveraging lazy-loading (`@st.fragment`) to ensure instant page-shell rendering even under heavy AI computation.
+- **⚡ Micro-Frontend Architecture**: Fully modularized dashboard leveraging lazy-loading (`@st.fragment`) to ensure instant page-shell rendering even under heavy AI computation.
 
 ---
 
@@ -96,12 +96,12 @@ The easiest way to run the entire hybrid system (Backend, Frontend, and Autonomo
 
 ADIPHAS includes dedicated scripts to demonstrate its capabilities during live defenses:
 
-1. **Verify Real Epidemiological Seed Data**:
-   - Access the *Predictive Modeling* tab in the UI to view real 2024/2025 NCDC trajectories for Cholera and Lassa Fever.
+1. **Verify Automated Delivery Capabilities**:
+   - Register a new account and instantly receive a verification email. Once verified, observe how the system actively emails you tailored health summaries every 2 hours.
 2. **Observe Autonomous Cycles**:
-   - Watch the terminal running `start_adiphas.ps1` to see the Orchestrator, Scraper, and NLP processor actively categorizing new intelligence globally every 2 hours.
+   - Watch the terminal running `start_adiphas.ps1` to see the Orchestrator, Scraper, and NLP processor actively categorizing new intelligence globally.
 3. **Test the LLM Fallback Engine**:
-   - ADIPHAS features a proprietary robust fallback mechanism (`model_config.py`). If the primary Gemini model is rate-limited, it automatically swerves through a chain of **9 free OpenRouter models** (Gemma 4, Nemotron 3, Qwen3-Coder, GPT-OSS, Hermes 405B, and more) to keep the system alive without crashing.
+   - ADIPHAS features a proprietary robust fallback mechanism (`model_config.py`). If the primary Gemini model is rate-limited, it automatically swerves through a chain of **9 free OpenRouter models** to keep the system alive without crashing.
 
 ---
 
