@@ -26,7 +26,8 @@ def render(force_completion: bool = False):
                             st.success("✅ Status updated! Email is verified.")
                             st.rerun()
                     else:
-                        st.error("Failed to refresh status.")
+                        err_msg = updated_user.get('detail') if isinstance(updated_user, dict) else str(updated_user)
+                        st.error(f"Failed to refresh status: {err_msg}")
     
     col1, col2 = st.columns([1, 2])
     
