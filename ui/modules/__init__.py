@@ -1,4 +1,21 @@
 import streamlit as st
+from datetime import datetime, timezone, timedelta
+
+# --- West Africa Time (WAT = UTC+1) ---
+# All user-facing timestamps in the UI should use this timezone.
+# Backend/DB operations remain in UTC for consistency.
+WAT = timezone(timedelta(hours=1))
+
+def now_wat() -> datetime:
+    """Returns the current datetime in West Africa Time (UTC+1)."""
+    return datetime.now(WAT)
+
+def to_wat(dt: datetime) -> datetime:
+    """Converts a naive (assumed UTC) or aware datetime to WAT."""
+    if dt.tzinfo is None:
+        # Treat naive datetimes as UTC
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(WAT)
 
 def render_footer():
     """Renders the mandatory medical disclaimer footer."""

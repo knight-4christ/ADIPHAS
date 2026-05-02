@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import api_client
 from datetime import datetime
+from modules import to_wat
 
 def render():
     st.title("🛰️ Situational Awareness Dashboard")
@@ -86,7 +87,8 @@ def render():
             try:
                 # Convert ISO string to friendly format
                 dt = pd.to_datetime(briefing.get('generated_at', ''))
-                st.caption(f"📅 **Cycle Date:** {dt.strftime('%b %d, %Y - %I:%M %p')}")
+                dt_wat = to_wat(dt.to_pydatetime())
+                st.caption(f"📅 **Cycle Date:** {dt_wat.strftime('%b %d, %Y - %I:%M %p')} WAT")
             except Exception:
                 st.caption(f"📅 **Cycle Date:** {briefing.get('generated_at', 'N/A')}")
             

@@ -1,6 +1,7 @@
 import streamlit as st
 import api_client
 from datetime import datetime
+from modules import now_wat
 import pandas as pd
 
 @st.fragment(run_every="30s")
@@ -33,7 +34,7 @@ def render():
 
         # --- VIEW 1: EXECUTIVE BRIEFING (Tailored Insights) ---
         if sub_view == "Executive Briefing":
-            st.markdown(f"#### 📅 Situational Briefing for {datetime.now().strftime('%d %B %Y')}")
+            st.markdown(f"#### 📅 Situational Briefing for {now_wat().strftime('%d %B %Y')}")
             with st.status("🧠 Generating your tailored briefing...", expanded=True) as status:
                 briefing_res = api_client.get_briefing(lga=lga, role=role)
                 status.update(label="✅ Briefing Complete", state="complete")

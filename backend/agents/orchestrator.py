@@ -1,7 +1,7 @@
 import logging
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 from sqlalchemy.orm import Session  # type: ignore[import-untyped]
 from backend import models, database  # type: ignore[import-untyped]
@@ -9,6 +9,9 @@ from backend.agents.intelligence.alerting import AlertingEngine  # type: ignore[
 from backend.agents.intelligence.risk import RiskEngine  # type: ignore[import-untyped]
 
 logger = logging.getLogger(__name__)
+
+# West Africa Time (UTC+1) for user-facing date strings in briefings
+_WAT = timezone(timedelta(hours=1))
 
 class OrchestratorAgent:
     def __init__(self, gemini_model=None):
@@ -182,7 +185,7 @@ CRITICAL OUTPUT RULES:
 - DO NOT use markdown tables under any circumstances.
 - Be detailed and analytical but NEVER verbose — every sentence must carry actionable intelligence.
 - Focus on WHAT matters, WHY it matters, and WHAT to do about it.
-Today's Date: {datetime.now().strftime('%B %d, %Y')}
+Today's Date: {datetime.now(_WAT).strftime('%B %d, %Y')}
 DB Signals:
 {alert_ctx}
 Anomalies:
@@ -256,7 +259,7 @@ Include: 1) Executive Landscape (2-3 bullets) 2) Critical Geo-Hotspots (top 3 on
             locations_seen = set(a.location_text for a in recent_alerts if a.location_text) if recent_alerts else set()
             high_risk = [a for a in recent_alerts if a.risk_level in ('High', 'Critical')] if recent_alerts else []
             
-            fallback_content = f"""## 🛰️ ADIPHAS Intelligence Briefing — {datetime.now().strftime('%B %d, %Y')}
+            fallback_content = f"""## 🛰️ ADIPHAS Intelligence Briefing — {datetime.now(_WAT).strftime('%B %d, %Y')}
 
 **⚠️ AI-powered analysis temporarily unavailable. This is a data-driven summary.**
 

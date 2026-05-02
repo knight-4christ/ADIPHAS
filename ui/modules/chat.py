@@ -3,6 +3,7 @@ import os
 import uuid
 import api_client
 from datetime import datetime
+from modules import now_wat
 
 def render(is_overlay=False):
     if not is_overlay:
@@ -62,7 +63,7 @@ def render(is_overlay=False):
                 "name": f"Chat {len(st.session_state.chat_threads)+1}",
                 "messages": [],
                 "mode": selected_model,
-                "timestamp": datetime.now()
+                "timestamp": now_wat()
             }
             st.session_state.active_thread_id = new_id
             if not is_overlay: st.rerun()
@@ -74,7 +75,7 @@ def render(is_overlay=False):
             "name": "Quick Assistant",
             "messages": [],
             "mode": "Balanced (Gemini)",
-            "timestamp": datetime.now()
+            "timestamp": now_wat()
         }
         st.session_state.active_thread_id = new_id
 
@@ -101,7 +102,7 @@ def render(is_overlay=False):
             st.download_button(
                 "📝 Text",
                 data=conv_text_plain,
-                file_name=f"adiphas_chat_{datetime.now().strftime('%Y%m%d_%H%M')}.txt",
+                file_name=f"adiphas_chat_{now_wat().strftime('%Y%m%d_%H%M')}.txt",
                 mime="text/plain",
                 use_container_width=True,
                 key=f"dl_chat_txt_{st.session_state.active_thread_id}"
@@ -187,7 +188,7 @@ def render(is_overlay=False):
                 source_label = source_labels.get(source, f"Source: {source.upper()}")
                 
                 with st.expander(f"📚 Sources Used — {source_label}"):
-                    st.caption(f"Retrieved at {datetime.now().strftime('%H:%M:%S on %b %d, %Y')}")
+                    st.caption(f"Retrieved at {now_wat().strftime('%H:%M:%S on %b %d, %Y')}")
                     if results:
                         for r in results[:5]:
                             content = r.get("content") or r.get("snippet") or str(r)
