@@ -1,7 +1,6 @@
 import streamlit as st
 import api_client
 import time
-import streamlit.components.v1 as components
 import modules.geolocation as geolocation
 
 def render_login_modal():
@@ -32,16 +31,10 @@ def render_login_modal():
     with col2:
         st.subheader("🔐 Access ADIPHAS")
         
-        if "auth_mode" not in st.session_state:
-            st.session_state.auth_mode = "Login"
-            
-        def set_forgot_password():
-            st.session_state.auth_mode = "Forgot Password"
-
-        st.radio("Authentication Mode", ["Login", "Sign Up", "Forgot Password"], horizontal=True, label_visibility="collapsed", key="auth_mode")
+        # Remove forgot password redirect state logic
+        tab1, tab2, tab3 = st.tabs(["Login", "Sign Up", "Forgot Password"])
         
-        if st.session_state.auth_mode == "Login":
-            # Check if user arrived via reset email link
+        with tab1:
             reset_token = st.query_params.get("reset_token")
             if reset_token:
                 st.info("🔑 Password Reset Mode")
@@ -182,9 +175,9 @@ def render_login_modal():
                 st.markdown('</div>', unsafe_allow_html=True)
                 
                 # Link-like button to redirect to Forgot Password tab
-                st.button("Forgot Password?", on_click=set_forgot_password, key="btn_forgot_login", help="Click to reset your password")
+                st.info("Forgot your password? Click the 'Forgot Password' tab above.")
         
-        elif st.session_state.auth_mode == "Forgot Password":
+        with tab3:
             st.info("🔑 **Password Reset**")
             st.write("Enter your email or username to receive a reset link.")
             reset_email = st.text_input("Email / Username", key="reset_req_email")
@@ -199,7 +192,7 @@ def render_login_modal():
                 else:
                     st.warning("Please enter your email or username.")
         
-        elif st.session_state.auth_mode == "Sign Up":
+        with tab2:
             st.info("💡 **Tip:** Complete your profile to receive hyper-tailored health insights and outbreak alerts for your area.")
             
             new_user = st.text_input("Desired Username", key="signup_user")
