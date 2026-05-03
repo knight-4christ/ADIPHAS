@@ -6,6 +6,17 @@ if base_dir not in sys.path:
     sys.path.insert(0, base_dir)
 
 import streamlit as st
+import warnings
+
+# Suppress annoying third-party deprecation warnings from streamlit-js-eval
+warnings.filterwarnings("ignore", message=".*st.components.v1.html.*")
+warnings.filterwarnings("ignore", message=".*st.iframe.*")
+try:
+    from streamlit.errors import StreamlitDeprecationWarning
+    warnings.filterwarnings("ignore", category=StreamlitDeprecationWarning)
+except ImportError:
+    pass
+
 import api_client
 from datetime import datetime
 from dotenv import load_dotenv

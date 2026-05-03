@@ -305,3 +305,36 @@ def google_auth(payload: GoogleAuthPayload, db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"Google Auth Error: {e}")
         raise HTTPException(status_code=500, detail="Authentication failed")
+
+@router.get("/api/auth/google/callback")
+def google_callback(request: Request):
+    """
+    Receives the redirect from Google OAuth implicit flow.
+    Google returns the id_token in the URL hash fragment (#id_token=...), which the backend cannot read directly.
+    We return a small JS script that extracts it and redirects to the Streamlit frontend.
+    """
+    frontend_url = os.getenv("FRONTEND_URL", "https://adiphas.streamlit.app")
+    
+    html_content = f"""
+    <html>
+        <head><title>Authenticating...</title></head>
+        <body style="background-color: #0B1111; color: white; text-align: center; font-family: sans-serif; padding-top: 50px;">
+            <h2>Verifying Google Credentials...</h2>
+            <script>
+                // Extract hash fragment (e.g., #id_token=XYZ&...)
+                const hash = window.location.hash.substring(1);
+                const params = new URLSearchParams(hash);
+                const idToken = params.get('id_token');
+                
+                if (idToken) {{
+                    window.location.href = "{frontend_url}/?g_token=" + idToken;
+                }} else {{
+                    document.body.innerHTML = "<h2>Google Authentication Failed.</h2><p>No token received. Please go back and try again.</p>";
+                }}
+            </script>
+        </body>
+    </html>
+    """
+    from fastapi.responses import HTMLResponse
+    return HTMLResponse(content=html_content)
+

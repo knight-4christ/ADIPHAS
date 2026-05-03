@@ -131,48 +131,24 @@ def render_login_modal():
                             else:
                                 st.error(f"Login failed: {res.get('detail', 'Invalid credentials')}")
 
-                # --- GOOGLE SIGN-IN BUTTON ---
-                st.markdown('<div class="google-btn-container">', unsafe_allow_html=True)
+                # --- GOOGLE SIGN-IN BUTTON (OAUTH IMPLICIT FLOW) ---
                 client_id = "581777295975-3e074nkevgksedf84k61fg9e8kutfn13.apps.googleusercontent.com"
+                backend_url = api_client.API_URL
+                redirect_uri = f"{backend_url}/api/auth/google/callback"
                 
-                # HTML component to render the official Google button
-                # We use an iframe with srcdoc to avoid Streamlit's sandboxed iframe (which causes 'null origin' Google Auth errors)
-                import html as html_lib
-                google_html = f"""
-                <html>
-                <body style="margin:0; padding:0; display:flex; justify-content:center;">
-                    <div id="g_id_onload"
-                         data-client_id="{client_id}"
-                         data-context="signin"
-                         data-ux_mode="popup"
-                         data-callback="handleCredentialResponse"
-                         data-auto_prompt="false">
-                    </div>
-                    <div class="g_id_signin"
-                         data-type="standard"
-                         data-shape="rectangular"
-                         data-theme="outline"
-                         data-text="signin_with"
-                         data-size="large"
-                         data-logo_alignment="left">
-                    </div>
-                    <script src="https://accounts.google.com/gsi/client" async defer></script>
-                    <script>
-                        function handleCredentialResponse(response) {{
-                            const token = response.credential;
-                            // Redirect with token in query param
-                            const url = new URL(window.parent.location.href);
-                            url.searchParams.set('g_token', token);
-                            window.parent.location.href = url.toString();
-                        }}
-                    </script>
-                </body>
-                </html>
-                """
+                # Build the official Google OAuth URL
+                google_auth_url = (
+                    f"https://accounts.google.com/o/oauth2/v2/auth?"
+                    f"client_id={client_id}&"
+                    f"response_type=id_token&"
+                    f"redirect_uri={redirect_uri}&"
+                    f"scope=openid%20email%20profile&"
+                    f"nonce=adiphas123"
+                )
                 
-                escaped_html = html_lib.escape(google_html)
-                st.markdown(f'<iframe srcdoc="{escaped_html}" width="100%" height="80" style="border:none; overflow:hidden;"></iframe>', unsafe_allow_html=True)
-                st.markdown('</div>', unsafe_allow_html=True)
+                st.write("")
+                st.link_button("🌐 Continue with Google", url=google_auth_url, use_container_width=True)
+                st.write("")
                 
                 # Link-like button to redirect to Forgot Password tab
                 st.info("Forgot your password? Click the 'Forgot Password' tab above.")
