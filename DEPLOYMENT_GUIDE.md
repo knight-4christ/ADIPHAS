@@ -149,6 +149,19 @@ bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
 ---
 
+## 5.3 Google OAuth Configuration (Redirect Flow)
+To ensure Google Sign-In works in Streamlit Cloud, you must configure the **Authorized Redirect URI** in the Google Cloud Console:
+
+1. Go to **Google Cloud Console** → **APIs & Services** → **Credentials**.
+2. Edit your **OAuth 2.0 Client ID**.
+3. Under **Authorized redirect URIs**, add your backend callback URL:
+   `https://adiphas.onrender.com/api/auth/google/callback`
+4. Click **Save**.
+
+The frontend will automatically handle the redirection and token capture via the `g_token` query parameter.
+
+---
+
 ## 6. AI Model Configuration
 
 ### 6.1 Primary Chain (Google Gemini)

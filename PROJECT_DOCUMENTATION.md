@@ -75,12 +75,14 @@ ADIPHAS is deployed on a **split-cloud architecture** designed for cost-efficien
 
 ### 4.2 Authentication & Security
 The authentication system implements several hardened security measures:
--   **Email Verification Engine:** Prevents unauthorized or spam accounts by requiring users to validate their identity through a secure, cryptographic token sent to their inbox before they can receive automated health briefings.
--   **Secure Password Recovery:** Integrated a robust "Forgot Password" architecture, allowing users to securely reset their credentials using email-delivered reset tokens.
--   **Password Hashing:** Uses **native `bcrypt`** (not `passlib`) to avoid the known 72-byte wrap detection bug. Passwords are hashed via `bcrypt.hashpw()` with auto-generated salts.
--   **JWT Tokens:** Signed using `HS256` with a cryptographically random `SECRET_KEY` (environment variable). Tokens expire after 30 minutes.
--   **Rate Limiting:** Registration endpoint is protected with `slowapi` at 5 requests/minute to prevent brute-force account creation.
--   **Role-Based Access Control (RBAC):** Three-tier role hierarchy (`CITIZEN < EXPERT < ADMIN`) enforced at the router level via dependency injection.
+- **Google OAuth Redirect Flow:** To overcome the security restrictions of Streamlit Cloud's nested iframes (which block traditional Javascript popups), ADIPHAS implements an **OAuth 2.0 Implicit Redirect Flow**. This flow takes the user directly to Google's authentication page and uses a custom backend callback endpoint (`/api/auth/google/callback`) to securely capture and pass the identity token back to the frontend.
+- **Log Sanitization:** Implemented aggressive warning suppression in the main application entry point to silence third-party deprecation logs (e.g., from `streamlit-js-eval`), ensuring that production terminal logs remain clean and focused on critical system events.
+- **Email Verification Engine:** Prevents unauthorized or spam accounts by requiring users to validate their identity through a secure, cryptographic token sent to their inbox before they can receive automated health briefings.
+- **Secure Password Recovery:** Integrated a robust "Forgot Password" architecture, allowing users to securely reset their credentials using email-delivered reset tokens.
+- **Password Hashing:** Uses **native `bcrypt`** (not `passlib`) to avoid the known 72-byte wrap detection bug. Passwords are hashed via `bcrypt.hashpw()` with auto-generated salts.
+- **JWT Tokens:** Signed using `HS256` with a cryptographically random `SECRET_KEY` (environment variable). Tokens expire after 30 minutes.
+- **Rate Limiting:** Registration endpoint is protected with `slowapi` at 5 requests/minute to prevent brute-force account creation.
+- **Role-Based Access Control (RBAC):** Three-tier role hierarchy (`CITIZEN < EXPERT < ADMIN`) enforced at the router level via dependency injection.
 
 ### 4.3 Real-Time Metrics & Caching
 The system features a **5-second TTL (Time-To-Live)** cache for high-frequency dashboard metrics. It calculates cumulative daily totals for scraped articles and new signals, preventing database lockups during concurrent role access.
@@ -115,6 +117,7 @@ The system has transitioned from a passive dashboard to a proactive intelligence
 -   **Efficiency:** Reduced LLM API calls by **95%** using local-first extraction and caching. Optimised the background scheduler from 15-minute to 2-hour intervals to sustainably operate within free-tier API budgets.
 -   **Proactive Intelligence Engine:** Engineered a 2-hour autonomous loop that generates role-specific situational intelligence (Citizen vs. Expert) and actively dispatches HTML-formatted email briefings to all verified users using a multithreaded delivery system.
 -   **Account Security Hardening:** Implemented full-scale email validation and secure password recovery mechanisms to guarantee data integrity and protect user communication channels.
+-   **Production-Grade Authentication:** Resolved persistent "400 Invalid Request" errors in cloud environments by migrating Google Sign-In to a robust redirect-based architecture. Optimized the authentication UI with a streamlined `st.tabs` structure for superior user onboarding.
 -   **UI Stability & Frontend Hardening:** Eliminated persistent WebGL initialization crashes and strict Pandas 2.2.0 `GroupBy` runtime errors on Streamlit Cloud. Migrated spatial analytics from Plotly Mapbox to **Folium (Leaflet.js)** for highly robust, DOM-native interactive mapping. Fixed critical mobile responsive "white screen" rendering bugs by properly positioning the configuration file (`.streamlit/config.toml`) at the repository root and overriding deep Streamlit CSS containers to force a seamless, cross-device Dark Mode aesthetic.
 -   **Security Hardening:** Replaced the vulnerable `passlib` password hashing library with native `bcrypt` to resolve the 72-byte wrap detection crash. Implemented server-side error logging with clean user-facing error messages.
 -   **Hyper-Personalization:** Connected browser-native HTML5 `navigator.geolocation` APIs with OpenStreetMap reverse geocoding to automatically center heatmaps and tailor instant epidemiological advisories based on the user's precise Local Government Area.
