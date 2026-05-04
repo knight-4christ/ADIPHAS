@@ -1,30 +1,43 @@
 import os
-import resend
+import requests
 import logging
 
 logger = logging.getLogger(__name__)
 
-RESEND_API_KEY = os.getenv("RESEND_API_KEY", "re_cqnffcTD_Cgs4EKJd9MURGKxjFKxxx92p")
-resend.api_key = RESEND_API_KEY
+BREVO_API_KEY = os.getenv("BREVO_API_KEY", "")
+SENDER_EMAIL = os.getenv("SENDER_EMAIL", "greatifet12@gmail.com")
 
 def send_email(to_email: str, subject: str, html_content: str) -> bool:
-    """Sends an HTML email using Resend API to bypass Render SMTP blocks."""
-    if not RESEND_API_KEY:
-        logger.warning(f"Resend not configured. Mock Email sent to {to_email} | Subject: {subject}")
-        logger.debug(f"Email Content:\n{html_content}")
+    """Sends an HTML email using Brevo Transactional API to bypass Render SMTP blocks."""
+    if not BREVO_API_KEY:
+        logger.warning(f"BREVO_API_KEY is missing! Please set it in your Render environment variables.")
+        logger.debug(f"Mock Email to {to_email} | Subject: {subject}")
         return True
 
+    url = "https://api.brevo.com/v3/smtp/email"
+    headers = {
+        "api-key": BREVO_API_KEY,
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+    }
+    
+    payload = {
+        "sender": {"name": "ADIPHAS Notifications", "email": SENDER_EMAIL},
+        "to": [{"email": to_email}],
+        "subject": subject,
+        "htmlContent": html_content
+    }
+
     try:
-        r = resend.Emails.send({
-            "from": "ADIPHAS Notifications <onboarding@resend.dev>",
-            "to": to_email,
-            "subject": subject,
-            "html": html_content
-        })
-        logger.info(f"Email successfully sent to {to_email} via Resend. Response: {r}")
-        return True
+        response = requests.post(url, headers=headers, json=payload, timeout=10)
+        if response.status_code in [200, 201, 202]:
+            logger.info(f"Email successfully sent to {to_email} via Brevo. Response: {response.text}")
+            return True
+        else:
+            logger.error(f"Brevo API error for {to_email}: {response.status_code} - {response.text}")
+            return False
     except Exception as e:
-        logger.error(f"Failed to send email to {to_email} via Resend: {e}")
+        logger.error(f"Failed to send email to {to_email} via Brevo: {e}")
         return False
 
 def send_verification_email(to_email: str, username: str, token: str, backend_url: str):
