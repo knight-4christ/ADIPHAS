@@ -127,49 +127,18 @@ def register(request: Request, user: schemas.UserCreate, background_tasks: Backg
         db.commit()
         db.refresh(new_user)
         
-        # Background Email Verification
-        if user.email:
-            def background_verify_and_welcome(user_id: int, user_email: str, user_name: str):
-                from backend.core.email_utils import send_email
-                from backend.database import SessionLocal
-                import logging
-                logger = logging.getLogger("adiphas_backend")
-
-                logger.info(f"[Auth] Starting background verification for {user_email}")
-                subject = "Welcome to ADIPHAS Health Intelligence"
-                html_content = f"""
-                <html><body>
-                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                    <h2 style="color: #0284c7;">Welcome to ADIPHAS, {user_name}!</h2>
-                    <p>Your email has been successfully registered and verified for ADIPHAS alerts.</p>
-                    <p>You are now enrolled in the automated intelligence engine. You will automatically receive 2-hour situational health briefings and critical outbreak alerts for your area.</p>
-                    <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
-                    <p style="font-size: 12px; color: #888;">This is an automated message. Please do not reply.</p>
-                </div>
-                </body></html>
-                """
-                
-                try:
-                    success = send_email(user_email, subject, html_content)
-                    if success:
-                        db_session = SessionLocal()
-                        try:
-                            u = db_session.query(models.User).filter(models.User.id == user_id).first()
-                            if u:
-                                u.is_email_verified = True
-                                db_session.commit()
-                                logger.info(f"[Auth] Background verification successful for user {user_name}.")
-                        except Exception as e:
-                            logger.error(f"[Auth] Error updating user verification status: {e}")
-                        finally:
-                            db_session.close()
-                    else:
-                        logger.warning(f"[Auth] send_email returned False for {user_email}")
-                except Exception as e:
-                    logger.error(f"[Auth] Exception in background task: {e}")
-
-            # Use FastAPI native BackgroundTasks
-            background_tasks.add_task(background_verify_and_welcome, new_user.id, user.email, user.username)
+        # Temporarily auto-verify users to bypass Render's SMTP port block (Errno 101)
+        # This ensures users can still receive in-app notifications and briefings
+        db_session = SessionLocal()
+        try:
+            u = db_session.query(models.User).filter(models.User.id == new_user.id).first()
+            if u:
+                u.is_email_verified = True
+                db_session.commit()
+        except Exception as e:
+            pass
+        finally:
+            db_session.close()
                 
         return new_user
     except HTTPException:
