@@ -126,8 +126,8 @@ def autonomous_monitoring_job():
                             from backend.core.email_utils import send_alert_notification
                             import threading
                             
-                            # Find verified users in the affected LGA or globally if not specified
-                            query = db.query(models.User).filter(models.User.is_email_verified == True)
+                            # Find all users in the affected LGA or globally if not specified (Verification requirement bypassed)
+                            query = db.query(models.User)
                             if result['location'] and result['location'].lower() != "lagos":
                                 query = query.filter(models.User.location_lga.ilike(f"%{result['location']}%"))
                             
@@ -212,14 +212,14 @@ def autonomous_monitoring_job():
                 cit_brief, exp_brief = orchestrator.run_briefing_cycle(db)
                 log_activity("BriefingAgent", "New 2-hour StAMP Briefing generated.")
                 
-                # Dispatch briefing emails to verified users
+                # Dispatch briefing emails to all users (Verification requirement bypassed)
                 if cit_brief or exp_brief:
                     try:
                         from backend.core.email_utils import send_situational_briefing
                         import threading
-                        verified_users = db.query(models.User).filter(models.User.is_email_verified == True).all()
+                        all_users = db.query(models.User).all()
                         
-                        for user in verified_users:
+                        for user in all_users:
                             is_expert = user.role.upper() in ["EXPERT", "ADMIN"]
                             content = exp_brief if is_expert and exp_brief else cit_brief
                             if content:
@@ -228,8 +228,8 @@ def autonomous_monitoring_job():
                                     args=(user.email, user.username, content, is_expert)
                                 ).start()
                                 
-                        if verified_users:
-                            log_activity("NotificationEngine", f"Dispatched {len(verified_users)} situational briefing emails.")
+                        if all_users:
+                            log_activity("NotificationEngine", f"Dispatched {len(all_users)} situational briefing emails.")
                     except Exception as e:
                         logger.error(f"Failed to dispatch briefing emails: {e}")
         except Exception as e:

@@ -121,23 +121,24 @@ def register(request: Request, user: schemas.UserCreate, db: Session = Depends(g
             blood_group=user.blood_group,
             hashed_password=hashed_pwd,
             email_verification_token=verification_token,
-            is_email_verified=False
+            is_email_verified=True # Auto-verify for now
         )
         db.add(new_user)
         db.commit()
         db.refresh(new_user)
         
-        if user.email and verification_token:
-            from backend.core.email_utils import send_verification_email
-            import os
-            backend_url = os.getenv("BACKEND_URL", "http://localhost:8000")
-            # Fire and forget email dispatch
-            try:
-                import threading
-                threading.Thread(target=send_verification_email, args=(user.email, user.username, verification_token, backend_url)).start()
-            except Exception as e:
-                import logging
-                logging.getLogger(__name__).warning(f"Could not dispatch verification email: {e}")
+        # Email dispatch suspended
+        # if user.email and verification_token:
+        #     from backend.core.email_utils import send_verification_email
+        #     import os
+        #     backend_url = os.getenv("BACKEND_URL", "http://localhost:8000")
+        #     # Fire and forget email dispatch
+        #     try:
+        #         import threading
+        #         threading.Thread(target=send_verification_email, args=(user.email, user.username, verification_token, backend_url)).start()
+        #     except Exception as e:
+        #         import logging
+        #         logging.getLogger(__name__).warning(f"Could not dispatch verification email: {e}")
                 
         return new_user
     except HTTPException:

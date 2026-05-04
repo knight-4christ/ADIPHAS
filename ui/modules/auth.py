@@ -55,21 +55,21 @@ def render_login_modal():
                             else:
                                 st.error(f"Reset Failed: {res.get('detail', 'Unknown error')}")
             else:
-                # --- GOOGLE TOKEN LISTENER ---
-                g_token = st.query_params.get("g_token")
-                if g_token:
-                    with st.spinner("Google Authenticating..."):
-                        res = api_client.google_login(g_token)
-                        if "access_token" in res:
-                            token = res["access_token"]
-                            st.session_state.authenticated = True
-                            st.session_state.token = token
-                            st.session_state.user = api_client.get_me(token)
-                            st.query_params.clear()
-                            st.rerun()
-                        else:
-                            st.error("Google Sign-In Failed.")
-                            st.query_params.clear()
+                # --- GOOGLE TOKEN LISTENER (Suspended) ---
+                # g_token = st.query_params.get("g_token")
+                # if g_token:
+                #     with st.spinner("Google Authenticating..."):
+                #         res = api_client.google_login(g_token)
+                #         if "access_token" in res:
+                #             token = res["access_token"]
+                #             st.session_state.authenticated = True
+                #             st.session_state.token = token
+                #             st.session_state.user = api_client.get_me(token)
+                #             st.query_params.clear()
+                #             st.rerun()
+                #         else:
+                #             st.error("Google Sign-In Failed.")
+                #             st.query_params.clear()
 
                 with st.form("login_form"):
                     user_input = st.text_input("Username")
@@ -131,25 +131,23 @@ def render_login_modal():
                             else:
                                 st.error(f"Login failed: {res.get('detail', 'Invalid credentials')}")
 
-                # --- GOOGLE SIGN-IN BUTTON (OAUTH IMPLICIT FLOW) ---
-                client_id = "581777295975-3e074nkevgksedf84k61fg9e8kutfn13.apps.googleusercontent.com"
-                backend_url = api_client.API_URL
-                redirect_uri = f"{backend_url}/api/auth/google/callback"
-                
-                # Build the official Google OAuth URL
-                google_auth_url = (
-                    f"https://accounts.google.com/o/oauth2/v2/auth?"
-                    f"client_id={client_id}&"
-                    f"response_type=id_token&"
-                    f"redirect_uri={redirect_uri}&"
-                    f"scope=openid%20email%20profile&"
-                    f"nonce=adiphas123"
-                )
-                
-                st.write("")
-                st.link_button("🌐 Continue with Google", url=google_auth_url, use_container_width=True)
-                st.write("")
-                
+                # --- GOOGLE SIGN-IN BUTTON (Suspended) ---
+                # client_id = "581777295975-3e074nkevgksedf84k61fg9e8kutfn13.apps.googleusercontent.com"
+                # backend_url = api_client.API_URL
+                # redirect_uri = f"{backend_url}/api/auth/google/callback"
+                # 
+                # google_auth_url = (
+                #     f"https://accounts.google.com/o/oauth2/v2/auth?"
+                #     f"client_id={client_id}&"
+                #     f"response_type=id_token&"
+                #     f"redirect_uri={redirect_uri}&"
+                #     f"scope=openid%20email%20profile&"
+                #     f"nonce=adiphas123"
+                # )
+                # st.write("")
+                # st.link_button("🌐 Continue with Google", url=google_auth_url, use_container_width=True)
+                # st.write("")
+
                 # Link-like button to redirect to Forgot Password tab
                 st.info("Forgot your password? Click the 'Forgot Password' tab above.")
         
