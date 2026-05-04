@@ -11,23 +11,24 @@ def render(force_completion: bool = False):
     
     # --- MANDATORY COMPLETION BANNER ---
     if force_completion:
-        st.error("🚨 **Action Required**: You must verify your email and complete ALL bio-data fields below before accessing other modules. This ensures you receive personalized health intelligence tailored to your profile.")
+        st.error("🚨 **Action Required**: You must complete ALL bio-data fields below before accessing other modules. This ensures you receive personalized health intelligence tailored to your profile.")
         
-        if not user.get('is_email_verified'):
-            st.info("💡 **Tip**: Check your inbox for a verification link. Once clicked, use the button below to unlock the system.")
-            if st.button("🔄 Refresh My Status", key="refresh_status_btn", type="primary"):
-                with st.spinner("Checking verification..."):
-                    updated_user = api_client.get_me(st.session_state.token)
-                    if updated_user and "id" in updated_user:
-                        st.session_state.user = updated_user
-                        if not updated_user.get('is_email_verified'):
-                            st.warning("⚠️ Email not yet verified. Please check your email inbox and click the verification link.")
-                        else:
-                            st.success("✅ Status updated! Email is verified.")
-                            st.rerun()
-                    else:
-                        err_msg = updated_user.get('detail') if isinstance(updated_user, dict) else str(updated_user)
-                        st.error(f"Failed to refresh status: {err_msg}")
+        # Email verification suspended
+        # if not user.get('is_email_verified'):
+        #     st.info("💡 **Tip**: Check your inbox for a verification link. Once clicked, use the button below to unlock the system.")
+        #     if st.button("🔄 Refresh My Status", key="refresh_status_btn", type="primary"):
+        #         with st.spinner("Checking verification..."):
+        #             updated_user = api_client.get_me(st.session_state.token)
+        #             if updated_user and "id" in updated_user:
+        #                 st.session_state.user = updated_user
+        #                 if not updated_user.get('is_email_verified'):
+        #                     st.warning("⚠️ Email not yet verified. Please check your email inbox and click the verification link.")
+        #                 else:
+        #                     st.success("✅ Status updated! Email is verified.")
+        #                     st.rerun()
+        #             else:
+        #                 err_msg = updated_user.get('detail') if isinstance(updated_user, dict) else str(updated_user)
+        #                 st.error(f"Failed to refresh status: {err_msg}")
     
     col1, col2 = st.columns([1, 2])
     
