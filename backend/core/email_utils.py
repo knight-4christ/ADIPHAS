@@ -1,41 +1,30 @@
 import os
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import resend
 import logging
 
 logger = logging.getLogger(__name__)
 
-SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
-SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
-SMTP_USER = os.getenv("SMTP_USER", "")
-SMTP_PASS = os.getenv("SMTP_PASSWORD", "")
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "re_cqnffcTD_Cgs4EKJd9MURGKxjFKxxx92p")
+resend.api_key = RESEND_API_KEY
 
 def send_email(to_email: str, subject: str, html_content: str) -> bool:
-    """Sends an HTML email using SMTP. Falls back to console log if SMTP is not configured."""
-    if not SMTP_USER or not SMTP_PASS:
-        logger.warning(f"SMTP not configured. Mock Email sent to {to_email} | Subject: {subject}")
+    """Sends an HTML email using Resend API to bypass Render SMTP blocks."""
+    if not RESEND_API_KEY:
+        logger.warning(f"Resend not configured. Mock Email sent to {to_email} | Subject: {subject}")
         logger.debug(f"Email Content:\n{html_content}")
         return True
 
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = f"ADIPHAS Health Alerts <{SMTP_USER}>"
-    msg["To"] = to_email
-
-    part = MIMEText(html_content, "html")
-    msg.attach(part)
-
     try:
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        server.starttls()
-        server.login(SMTP_USER, SMTP_PASS)
-        server.sendmail(SMTP_USER, to_email, msg.as_string())
-        server.quit()
-        logger.info(f"Email successfully sent to {to_email}")
+        r = resend.Emails.send({
+            "from": "ADIPHAS Notifications <onboarding@resend.dev>",
+            "to": to_email,
+            "subject": subject,
+            "html": html_content
+        })
+        logger.info(f"Email successfully sent to {to_email} via Resend. Response: {r}")
         return True
     except Exception as e:
-        logger.error(f"Failed to send email to {to_email}: {e}")
+        logger.error(f"Failed to send email to {to_email} via Resend: {e}")
         return False
 
 def send_verification_email(to_email: str, username: str, token: str, backend_url: str):
