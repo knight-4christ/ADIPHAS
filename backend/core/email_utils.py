@@ -95,7 +95,8 @@ def send_password_reset_email(to_email: str, username: str, token: str, backend_
 
 def send_alert_notification(to_email: str, username: str, disease: str, location: str, risk_level: str, action: str):
     """Sends a critical health alert to the user."""
-    color = "#dc2626" if risk_level in ["High", "Critical"] else "#ca8a04"
+    try:
+        color = "#dc2626" if risk_level in ["High", "Critical"] else "#ca8a04"
     
     html = f"""
     <html>
@@ -122,15 +123,18 @@ def send_alert_notification(to_email: str, username: str, disease: str, location
     </html>
     """
     return send_email(to_email, f"ADIPHAS Alert: {disease} in {location}", html)
+    except Exception as e:
+        logger.error(f"Failed to process alert notification for {to_email}: {e}")
+        return False
 
 def send_situational_briefing(to_email: str, username: str, briefing_content: str, is_expert: bool):
     """Sends the 2-hour periodic StAMP situational briefing to the user."""
-    
-    import markdown
-    # Convert markdown briefing to HTML
-    html_briefing = markdown.markdown(briefing_content)
-    
-    header = "Expert Intelligence Briefing" if is_expert else "Community Health Update"
+    try:
+        import markdown
+        # Convert markdown briefing to HTML
+        html_briefing = markdown.markdown(briefing_content)
+        
+        header = "Expert Intelligence Briefing" if is_expert else "Community Health Update"
     
     import os
     frontend_url = os.getenv("FRONTEND_URL", "https://adiphas.streamlit.app")
@@ -159,3 +163,6 @@ def send_situational_briefing(to_email: str, username: str, briefing_content: st
     </html>
     """
     return send_email(to_email, f"ADIPHAS {header}", html)
+    except Exception as e:
+        logger.error(f"Failed to process situational briefing email for {to_email}: {e}")
+        return False

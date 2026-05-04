@@ -78,6 +78,7 @@ def _extract_coords_from_payload(geo_payload) -> tuple:
     return None, None, "No coordinates in payload"
 
 
+@st.fragment
 def inject_geolocation_js():
     """
     Button-triggered geolocation using streamlit-js-eval.
