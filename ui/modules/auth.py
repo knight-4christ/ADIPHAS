@@ -31,10 +31,17 @@ def render_login_modal():
     with col2:
         st.subheader("🔐 Access ADIPHAS")
         
-        # Remove forgot password redirect state logic
-        tab1, tab2, tab3 = st.tabs(["Login", "Sign Up", "Forgot Password"])
+        # Use horizontal radio as tabs to preserve state across reruns
+        selected_tab = st.radio(
+            "Auth Tabs", 
+            ["Login", "Sign Up", "Forgot Password"], 
+            horizontal=True, 
+            label_visibility="collapsed",
+            key="auth_tab_selector"
+        )
+        st.write("") # small spacing
         
-        with tab1:
+        if selected_tab == "Login":
             reset_token = st.query_params.get("reset_token")
             if reset_token:
                 st.info("🔑 Password Reset Mode")
@@ -149,9 +156,9 @@ def render_login_modal():
                 # st.write("")
 
                 # Link-like button to redirect to Forgot Password tab
-                st.info("Forgot your password? Click the 'Forgot Password' tab above.")
+                st.info("Forgot your password? Select the 'Forgot Password' tab above.")
         
-        with tab3:
+        elif selected_tab == "Forgot Password":
             st.info("🔑 **Password Reset**")
             st.write("Enter your email or username to receive a reset link.")
             reset_email = st.text_input("Email / Username", key="reset_req_email")
@@ -165,23 +172,13 @@ def render_login_modal():
                             st.error("Failed to process request.")
                 else:
                     st.warning("Please enter your email or username.")
-        
-        with tab2:
+
+        elif selected_tab == "Sign Up":
             st.info("💡 **Tip:** Complete your profile to receive hyper-tailored health insights and outbreak alerts for your area.")
             
-            new_user = st.text_input("Desired Username", key="signup_user")
-            new_email = st.text_input("Email Address", key="signup_email")
-            new_pass = st.text_input("Password", type="password", key="signup_pass")
-            new_full_name = st.text_input("Full Name", key="signup_name")
-            new_role = st.selectbox("I am a...", ["CITIZEN", "EXPERT"], key="signup_role")
-            
-            st.divider()
-            
             detected_loc = st.session_state.get('user_location')
-            # Allow manual override if detection fails
-            final_loc_input = st.text_input("Home Location (LGA)", value=detected_loc if detected_loc else "", help="Auto-filled if you clicked 'Detect Location'. You can also type it manually.")
-
-            # --- LOCATION DETECTION (Button-based) ---
+            
+            # --- LOCATION DETECTION (Outside Form) ---
             loc_col1, loc_col2 = st.columns([2, 1])
             with loc_col1:
                 if detected_loc:
@@ -195,25 +192,37 @@ def render_login_modal():
                 if st.session_state.get("_geo_fetch_requested"):
                     st.caption("⏳ Requesting GPS... allow the prompt.")
             
-            signup_btn = st.button("Create Account", width='stretch', type="primary")
-            
-            if signup_btn:
-                if not new_user or not new_pass or not new_email:
-                    st.error("Please fill in all required fields.")
-                else:
-                    with st.spinner("Creating account & setting up profile..."):
-                        # Immediate geocoding to ensure map marker is ready
-                        if final_loc_input:
-                            coords = geolocation._forward_geocode_nominatim(final_loc_input)
-                            if coords:
-                                st.session_state.user_lat, st.session_state.user_lon = coords
-                                st.session_state.user_location = final_loc_input
-                        
-                        res = api_client.register(new_user, new_pass, new_email, new_full_name, new_role, final_loc_input)
-                        if "id" in res:
-                            st.success("✅ Account created successfully! Please switch to the Login tab.")
-                        else:
-                            st.error(f"Signup Failed: {res.get('detail', 'Unknown error')}")
+            st.divider()
+
+            # --- SIGNUP FORM ---
+            with st.form("signup_form"):
+                new_user = st.text_input("Desired Username")
+                new_email = st.text_input("Email Address")
+                new_pass = st.text_input("Password", type="password")
+                new_full_name = st.text_input("Full Name")
+                new_role = st.selectbox("I am a...", ["CITIZEN", "EXPERT"])
+                
+                final_loc_input = st.text_input("Home Location (LGA)", value=detected_loc if detected_loc else "", help="Auto-filled if you clicked 'Detect Location'. You can also type it manually.")
+                
+                signup_btn = st.form_submit_button("Create Account", width='stretch', type="primary")
+                
+                if signup_btn:
+                    if not new_user or not new_pass or not new_email:
+                        st.error("Please fill in all required fields.")
+                    else:
+                        with st.spinner("Creating account & setting up profile..."):
+                            # Immediate geocoding to ensure map marker is ready
+                            if final_loc_input:
+                                coords = geolocation._forward_geocode_nominatim(final_loc_input)
+                                if coords:
+                                    st.session_state.user_lat, st.session_state.user_lon = coords
+                                    st.session_state.user_location = final_loc_input
+                            
+                            res = api_client.register(new_user, new_pass, new_email, new_full_name, new_role, final_loc_input)
+                            if "id" in res:
+                                st.success("✅ Account created successfully! Please switch to the Login tab.")
+                            else:
+                                st.error(f"Signup Failed: {res.get('detail', 'Unknown error')}")
 
 def logout():
     """Clears session state and logs the user out."""

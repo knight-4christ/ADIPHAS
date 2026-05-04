@@ -121,24 +121,50 @@ def register(request: Request, user: schemas.UserCreate, db: Session = Depends(g
             blood_group=user.blood_group,
             hashed_password=hashed_pwd,
             email_verification_token=verification_token,
-            is_email_verified=True # Auto-verify for now
+            is_email_verified=False # Now properly defaults to False, verified in background
         )
         db.add(new_user)
         db.commit()
         db.refresh(new_user)
         
-        # Email dispatch suspended
-        # if user.email and verification_token:
-        #     from backend.core.email_utils import send_verification_email
-        #     import os
-        #     backend_url = os.getenv("BACKEND_URL", "http://localhost:8000")
-        #     # Fire and forget email dispatch
-        #     try:
-        #         import threading
-        #         threading.Thread(target=send_verification_email, args=(user.email, user.username, verification_token, backend_url)).start()
-        #     except Exception as e:
-        #         import logging
-        #         logging.getLogger(__name__).warning(f"Could not dispatch verification email: {e}")
+        # Background Email Verification
+        if user.email:
+            def background_verify_and_welcome(user_id: int, user_email: str, user_name: str):
+                from backend.core.email_utils import send_email
+                from backend.database import SessionLocal
+                import logging
+                logger = logging.getLogger(__name__)
+
+                subject = "Welcome to ADIPHAS Health Intelligence"
+                html_content = f"""
+                <html><body>
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h2 style="color: #0284c7;">Welcome to ADIPHAS, {user_name}!</h2>
+                    <p>Your email has been successfully registered and verified for ADIPHAS alerts.</p>
+                    <p>You are now enrolled in the automated intelligence engine. You will automatically receive 2-hour situational health briefings and critical outbreak alerts for your area.</p>
+                    <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+                    <p style="font-size: 12px; color: #888;">This is an automated message. Please do not reply.</p>
+                </div>
+                </body></html>
+                """
+                
+                success = send_email(user_email, subject, html_content)
+                if success:
+                    db_session = SessionLocal()
+                    try:
+                        u = db_session.query(models.User).filter(models.User.id == user_id).first()
+                        if u:
+                            u.is_email_verified = True
+                            db_session.commit()
+                            logger.info(f"Background verification successful for user {user_name}.")
+                    except Exception as e:
+                        logger.error(f"Error updating user verification status: {e}")
+                    finally:
+                        db_session.close()
+
+            # Using threading for background task to avoid modifying endpoint signature
+            import threading
+            threading.Thread(target=background_verify_and_welcome, args=(new_user.id, user.email, user.username)).start()
                 
         return new_user
     except HTTPException:

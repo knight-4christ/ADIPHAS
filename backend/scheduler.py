@@ -212,14 +212,16 @@ def autonomous_monitoring_job():
                 cit_brief, exp_brief = orchestrator.run_briefing_cycle(db)
                 log_activity("BriefingAgent", "New 2-hour StAMP Briefing generated.")
                 
-                # Dispatch briefing emails to all users (Verification requirement bypassed)
+                # Dispatch briefing emails to all verified users
                 if cit_brief or exp_brief:
                     try:
                         from backend.core.email_utils import send_situational_briefing
                         import threading
-                        all_users = db.query(models.User).all()
                         
-                        for user in all_users:
+                        # Only send to users whose email was successfully verified in the background
+                        verified_users = db.query(models.User).filter(models.User.is_email_verified == True).all()
+                        
+                        for user in verified_users:
                             is_expert = user.role.upper() in ["EXPERT", "ADMIN"]
                             content = exp_brief if is_expert and exp_brief else cit_brief
                             if content:
@@ -228,8 +230,8 @@ def autonomous_monitoring_job():
                                     args=(user.email, user.username, content, is_expert)
                                 ).start()
                                 
-                        if all_users:
-                            log_activity("NotificationEngine", f"Dispatched {len(all_users)} situational briefing emails.")
+                        if verified_users:
+                            log_activity("NotificationEngine", f"Dispatched {len(verified_users)} situational briefing emails.")
                     except Exception as e:
                         logger.error(f"Failed to dispatch briefing emails: {e}")
         except Exception as e:
