@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException  # type: ignore[import-untyped]
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks  # type: ignore[import-untyped]
 from fastapi.security import OAuth2PasswordRequestForm  # type: ignore[import-untyped]
 from sqlalchemy.orm import Session  # type: ignore[import-untyped]
 from typing import List
@@ -90,7 +90,7 @@ def delete_user(user_id: str, db: Session = Depends(get_db), current_user: model
 
 @router.post("/api/auth/register", response_model=schemas.UserOut)
 @limiter.limit("5/minute") # Protect registration from brute-force
-def register(request: Request, user: schemas.UserCreate, db: Session = Depends(get_db)):
+def register(request: Request, user: schemas.UserCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     try:
         db_user = db.query(models.User).filter(models.User.username == user.username).first()
         if db_user:
@@ -133,8 +133,9 @@ def register(request: Request, user: schemas.UserCreate, db: Session = Depends(g
                 from backend.core.email_utils import send_email
                 from backend.database import SessionLocal
                 import logging
-                logger = logging.getLogger(__name__)
+                logger = logging.getLogger("adiphas_backend")
 
+                logger.info(f"[Auth] Starting background verification for {user_email}")
                 subject = "Welcome to ADIPHAS Health Intelligence"
                 html_content = f"""
                 <html><body>
@@ -148,23 +149,27 @@ def register(request: Request, user: schemas.UserCreate, db: Session = Depends(g
                 </body></html>
                 """
                 
-                success = send_email(user_email, subject, html_content)
-                if success:
-                    db_session = SessionLocal()
-                    try:
-                        u = db_session.query(models.User).filter(models.User.id == user_id).first()
-                        if u:
-                            u.is_email_verified = True
-                            db_session.commit()
-                            logger.info(f"Background verification successful for user {user_name}.")
-                    except Exception as e:
-                        logger.error(f"Error updating user verification status: {e}")
-                    finally:
-                        db_session.close()
+                try:
+                    success = send_email(user_email, subject, html_content)
+                    if success:
+                        db_session = SessionLocal()
+                        try:
+                            u = db_session.query(models.User).filter(models.User.id == user_id).first()
+                            if u:
+                                u.is_email_verified = True
+                                db_session.commit()
+                                logger.info(f"[Auth] Background verification successful for user {user_name}.")
+                        except Exception as e:
+                            logger.error(f"[Auth] Error updating user verification status: {e}")
+                        finally:
+                            db_session.close()
+                    else:
+                        logger.warning(f"[Auth] send_email returned False for {user_email}")
+                except Exception as e:
+                    logger.error(f"[Auth] Exception in background task: {e}")
 
-            # Using threading for background task to avoid modifying endpoint signature
-            import threading
-            threading.Thread(target=background_verify_and_welcome, args=(new_user.id, user.email, user.username)).start()
+            # Use FastAPI native BackgroundTasks
+            background_tasks.add_task(background_verify_and_welcome, new_user.id, user.email, user.username)
                 
         return new_user
     except HTTPException:
