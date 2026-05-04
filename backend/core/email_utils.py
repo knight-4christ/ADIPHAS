@@ -56,8 +56,7 @@ def send_password_reset_email(to_email: str, username: str, token: str, backend_
     """Sends a password reset email to the user."""
     # We will pass the token in the URL. In the UI, the user will enter this token or we will have a reset page.
     # For a Streamlit frontend, we can direct them back to the app with the token in the URL as a query param.
-    # Since Streamlit runs on a different port usually (8501), let's assume the frontend URL.
-    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:8501")
+    frontend_url = os.getenv("FRONTEND_URL", "https://adiphas.streamlit.app")
     reset_url = f"{frontend_url}/?reset_token={token}"
     
     html = f"""

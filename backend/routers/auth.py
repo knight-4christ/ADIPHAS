@@ -179,7 +179,7 @@ def register(request: Request, user: schemas.UserCreate, background_tasks: Backg
         raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
 
 @router.post("/api/auth/resend-verification")
-def resend_verification(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+def resend_verification(background_tasks: BackgroundTasks, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     if current_user.is_email_verified:
         return {"msg": "Email already verified."}
     
@@ -193,11 +193,10 @@ def resend_verification(current_user: models.User = Depends(get_current_user), d
     
     from backend.core.email_utils import send_verification_email
     import os
-    backend_url = os.getenv("BACKEND_URL", "http://localhost:8000")
+    backend_url = os.getenv("BACKEND_URL", "https://adiphas.onrender.com")
     
     try:
-        import threading
-        threading.Thread(target=send_verification_email, args=(current_user.email, current_user.username, token, backend_url)).start()
+        background_tasks.add_task(send_verification_email, current_user.email, current_user.username, token, backend_url)
     except Exception:
         pass
         
@@ -215,7 +214,7 @@ def verify_email(token: str, db: Session = Depends(get_db)):
     
     import os
     from fastapi.responses import RedirectResponse
-    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:8501")
+    frontend_url = os.getenv("FRONTEND_URL", "https://adiphas.streamlit.app")
     # Redirect to the frontend root page (Command Centre)
     return RedirectResponse(url=frontend_url)
 
@@ -228,7 +227,7 @@ class PasswordResetConfirm(BaseModel):
     new_password: str
 
 @router.post("/api/auth/request-password-reset")
-def request_password_reset(payload: PasswordResetRequest, db: Session = Depends(get_db)):
+def request_password_reset(payload: PasswordResetRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """Generates a password reset token and sends an email."""
     user = db.query(models.User).filter(
         (models.User.email == payload.email_or_username) | 
@@ -249,14 +248,10 @@ def request_password_reset(payload: PasswordResetRequest, db: Session = Depends(
     
     from backend.core.email_utils import send_password_reset_email
     import os
-    backend_url = os.getenv("BACKEND_URL", "http://localhost:8000")
+    backend_url = os.getenv("BACKEND_URL", "https://adiphas.onrender.com")
     
     try:
-        import threading
-        threading.Thread(
-            target=send_password_reset_email, 
-            args=(user.email, user.username, token, backend_url)
-        ).start()
+        background_tasks.add_task(send_password_reset_email, user.email, user.username, token, backend_url)
     except Exception as e:
         import logging
         logging.getLogger(__name__).warning(f"Could not dispatch reset email: {e}")
