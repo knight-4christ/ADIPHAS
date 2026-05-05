@@ -52,6 +52,42 @@ class NLPProcessor:
         if self.gemini_enabled:
             logger.info("NLP Processor: Gemini AI augmentation enabled (shared client).")
 
+    def _close_json(self, json_str: str) -> str:
+        """Attempts to close unclosed JSON brackets/braces for truncated responses."""
+        stack = []
+        # Basic state tracking for strings to avoid counting braces inside them
+        in_string = False
+        escaped = False
+        
+        for char in json_str:
+            if char == '"' and not escaped:
+                in_string = not in_string
+            elif char == '\\' and in_string:
+                escaped = not escaped
+                continue
+            
+            if not in_string:
+                if char in '{[':
+                    stack.append(char)
+                elif char in '}]':
+                    if stack:
+                        top = stack[-1]
+                        if (top == '{' and char == '}') or (top == '[' and char == ']'):
+                            stack.pop()
+            
+            escaped = False
+        
+        # If we stopped inside a string, close it
+        if in_string:
+            json_str += '"'
+            
+        # Reverse the stack and append closing characters
+        while stack:
+            top = stack.pop()
+            if top == '{': json_str += '}'
+            else: json_str += ']'
+        return json_str
+
     def _robust_json_parse(self, raw_text: str) -> Any:
         """Cleans and extracts JSON from AI responses that might contain markdown or filler."""
         if not raw_text: return None
@@ -113,6 +149,14 @@ class NLPProcessor:
                     
                 # Try regex trailing comma fix
                 clean_text = re.sub(r',\s*([\]}])', r'\1', clean_text)
+                
+                # Try closing unclosed brackets as a last resort
+                try:
+                    fixed_text = self._close_json(clean_text)
+                    return json.loads(fixed_text)
+                except Exception:
+                    pass
+                    
                 return json.loads(clean_text)
             except Exception:
                 logger.error(f"[NLP] Final JSON parse failed: {e} | Text excerpt: {clean_text[:100]}...")

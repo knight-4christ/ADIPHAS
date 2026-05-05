@@ -66,33 +66,40 @@ def autonomous_monitoring_job():
             log_activity("SCOUT", f"Scraping failed: {e}")
             headlines = []
             
-        # 1.5 Batching (Increased limit as processing is now LOCAL)
-        batch_limit = 50 
-        new_count = len(headlines)
-        if new_count > batch_limit:
-            log_activity("IntelligenceEngine", f"Batching: Processing top {batch_limit} out of {new_count} new articles.")
-            hl_list: List[Dict[str, Any]] = list(headlines)
-            headlines = hl_list[:batch_limit]  # type: ignore[index]
+        # 1.5 Batching (Process in chunks of 15 to avoid AI output truncation)
+        chunk_size = 15
+        hl_list = list(headlines)
+        total_new = len(hl_list)
         
-        # Group reports for fusion (Now LOCAL and INSTANT via Batching)
-        pending_reports = []
-        if headlines:
-            log_activity("IntelligenceEngine", f"Running AI batch extraction on {len(headlines)} articles...")
-            batch_results = nlp_agent.extract_entities_batch(headlines)
+        if total_new > 0:
+            log_activity("IntelligenceEngine", f"Processing {total_new} new articles in chunks of {chunk_size}...")
             
-            for item, (entities, nlp_trace) in zip(headlines, batch_results):
-                if entities and entities.get('diseases') and entities.get('locations'):
-                    for disease in entities['diseases']:
-                        for location in entities['locations']:
-                            pending_reports.append({
-                                "source": item.get('source', 'Unknown'),
-                                "url": item.get('url'),
-                                "disease": disease,
-                                "location": location,
-                                "cases": 1, # Minimal observation
-                                "text": item.get('title', item.get('text', '')),
-                                "timestamp": item.get('timestamp')
-                            })
+            # Group reports for fusion
+            pending_reports = []
+            
+            for i in range(0, total_new, chunk_size):
+                chunk = hl_list[i : i + chunk_size]
+                log_activity("IntelligenceEngine", f"Running AI batch extraction on chunk {i//chunk_size + 1} ({len(chunk)} articles)...")
+                
+                try:
+                    batch_results = nlp_agent.extract_entities_batch(chunk)
+                    
+                    for item, (entities, nlp_trace) in zip(chunk, batch_results):
+                        if entities and entities.get('diseases') and entities.get('locations'):
+                            for disease in entities['diseases']:
+                                for location in entities['locations']:
+                                    pending_reports.append({
+                                        "source": item.get('source', 'Unknown'),
+                                        "url": item.get('url'),
+                                        "disease": disease,
+                                        "location": location,
+                                        "cases": 1, # Minimal observation
+                                        "text": item.get('title', item.get('text', '')),
+                                        "timestamp": item.get('timestamp')
+                                    })
+                except Exception as e:
+                    logger.error(f"Chunk processing failed: {e}")
+                    continue
         
         if pending_reports:
             log_activity("IntelligenceEngine", f"Fusing {len(pending_reports)} candidate reports...")

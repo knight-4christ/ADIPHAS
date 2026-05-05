@@ -15,7 +15,7 @@ Nigeria's Integrated Disease Surveillance and Response (IDSR) framework is large
 
 ### 1.2 Objectives
 1.  **Autonomous Pipeline:** Harvest disease signals from 20+ authoritative sources using **Scrapling v0.4** with anti-bot bypass.
-2.  **Hybrid NLP & Sanitization:** Implement a local-first **spaCy** pipeline for high-speed extraction, refined by **Gemini 2.5 Flash** for deep semantic analysis, guarded by a deep regex sanitization layer to prevent AI reasoning trace (`<think>`) leakage.
+2.  **Hybrid NLP & Sanitization:** Implement a local-first **spaCy** pipeline for high-speed extraction, refined by **Gemini 2.5 Flash** for deep semantic analysis, guarded by a deep regex sanitization layer to prevent AI reasoning trace (`<think>`) leakage and protected by a chunked-execution parallel processing strategy to eliminate output truncation failures.
 3.  **Knowledge Fusion:** Reconcile conflicting multi-source signals using the **Dempster-Shafer Theory of Evidence**.
 4.  **Role-Specific & Location-Aware Intelligence:** Deliver actionable insights grounded by a resilient multi-provider Geolocation pipeline (Browser GPS → BigDataCloud → IP Fallback → Profile) to dynamically generate personalized insights while preventing GPS drift.
 5.  **Proactive Intelligence Dispatch:** Automatically synthesize the health landscape into easily digestible (Citizen) or deep-dive (Expert) situational briefings every 2 hours, and dispatch them directly via email to verified users.
@@ -29,7 +29,7 @@ Nigeria's Integrated Disease Surveillance and Response (IDSR) framework is large
 ADIPHAS utilizes a four-layer architecture:
 1.  **Presentation Layer:** Streamlit-based micro-frontend completely modularized via `@st.fragment`. This enforces lazy-loading of heavy algorithmic components (Folium mapping, Mathematical Fusion) preventing UI lock-ups and guaranteeing instant page-shell renders.
 2.  **Application Layer:** FastAPI backend managing JWT authentication, Resilient AI Failover, data sanitization, and Hybrid-RAG retrieval.
-3.  **Intelligence Agent Layer:** Multithreaded fleet (Scout, NLP, Fusion, StAMP Briefing Agent) running continuously on a **2-hour APScheduler** background cycle, optimised to maximise intelligence coverage within free-tier API rate limits.
+3.  **Intelligence Agent Layer:** Multithreaded fleet (Scout, NLP, Fusion, StAMP Briefing Agent) running continuously on a **2-hour APScheduler** background cycle, optimized to maximize intelligence coverage within free-tier API rate limits using a 15-article chunked micro-batching architecture.
 4.  **Persistence Layer:** Hosted physically on **Neon Cloud PostgreSQL**, offering robust connection pooling (`pool_size=10`, `max_overflow=20`, `pool_pre_ping=True`) to efficiently handle massive parallel read/writes from the multithreaded AI extractors, entirely eliminating the concurrency locks associated with embedded SQLite.
 
 ### 2.2 Local-First AI Strategy
@@ -118,7 +118,7 @@ To truly contextualize the architectural advancements of ADIPHAS, it must be eva
 | **Geospatial Granularity** | **Hyper-Local (LGA/LCDA):** Native HTML5 GPS + BigDataCloud reverse geocoding with IP Fallback. | **State/Facility Level:** Tied to the static location of the reporting clinic. | **Regional/National Level:** Broad global mapping (Country/State). | **Regional Level:** Text-based geographical descriptions. |
 | **Proactive Notification Engine** | **Multithreaded HTTP API (Brevo):** Auto-dispatches HTML briefings securely over port 443, bypassing SMTP firewalls and sandbox recipient limits. | **Passive Dashboard:** Requires users to log in to view charts. | **Passive Dashboard:** Users must actively search the map. | **Text-Only Mailing List:** Sends raw, unformatted text emails. |
 | **Role-Based Personalization** | **Dual-Tier Output:** Generates unique, simplified summaries for Citizens and complex metrics for Experts. | **Clinical Only:** Designed strictly for health administrators. | **One-Size-Fits-All:** Same map view for all users. | **Expert Only:** Highly academic and technical text. |
-| **System Thresholds & Limits** | **Batch Cap:** 50 articles/cycle.<br>**Email Limit:** 300/day (Brevo API).<br>**NLP:** 2-hour pulse intervals. | **Scale Bound:** Limited by human typing speed and clinic connectivity. | **Scale Bound:** Millions of global articles, but lacks localized depth. | **Scale Bound:** Moderation queue creates severe backlog during pandemics. |
+| **System Thresholds & Limits** | **Batch Cap:** Chunked (15 per pass).<br>**Email Limit:** 300/day (Brevo API).<br>**NLP:** 2-hour pulse intervals. | **Scale Bound:** Limited by human typing speed and clinic connectivity. | **Scale Bound:** Millions of global articles, but lacks localized depth. | **Scale Bound:** Moderation queue creates severe backlog during pandemics. |
 
 #### Architectural Superiority
 1. **Zero-Touch Surveillance:** Unlike SORMAS, which actively burdens already overworked health professionals with data entry, ADIPHAS operates strictly in the background (zero-touch), freeing clinicians to focus on patient care while still providing superior signal latency.
@@ -146,7 +146,7 @@ To truly contextualize the architectural advancements of ADIPHAS, it must be eva
 ## 6. Limitations & Future Improvements
 ### 6.1 Current System Limitations
 - **Geolocation Resolution Limits:** The current HTML5 reverse geocoding via OpenStreetMap relies on the accuracy of the user's device. Devices lacking GPS hardware (like some desktops) fall back to ISP-level IP coordinates, which may lack the specific Local Government Area (LGA) granularity required for hyper-local intelligence.
-- **LLM Quota Constraints:** The batch intelligence engine aggressively processes up to 50 raw articles concurrently. While highly efficient, this burst computation safely navigates limits utilizing Exponential Backoff, but sustained anomalies can occasionally exhaust free-tier Gemini API caps, requesting the fallback systems engage secondary API networks.
+- **LLM Quota Constraints:** The batch intelligence engine now utilizes a resilient chunking strategy (15 articles per pass) to process high volumes without hitting LLM output truncation limits. While highly efficient, this burst computation safely navigates limits utilizing Exponential Backoff and a self-healing "unclosed-JSON" recovery algorithm. Sustained anomalies can still occasionally exhaust free-tier Gemini API caps, triggering the fallback systems.
 - **Render Free Tier Constraints:** The Render free tier spins down after 15 minutes of inactivity, requiring an external keep-alive cron job. Cold starts take 30-60 seconds, during which the first user request may timeout.
 - **Gemini Embedding Regional Restrictions:** The Gemini Embedding API returns `FAILED_PRECONDITION: User location is not supported` from certain server regions. The system auto-falls back to OpenRouter's `nvidia/llama-nemotron-embed-vl-1b-v2:free` for vector embeddings.
 
