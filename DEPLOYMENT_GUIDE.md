@@ -144,7 +144,7 @@ bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
 ### 5.2 JWT Tokens
 - **Algorithm:** HS256
-- **Expiry:** 30 minutes (configurable via `ACCESS_TOKEN_EXPIRE_MINUTES`)
+- **Expiry:** 60 minutes (configurable via `ACCESS_TOKEN_EXPIRE_MINUTES`)
 - **Library:** `python-jose[cryptography]`
 
 ---

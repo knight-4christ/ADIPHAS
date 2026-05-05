@@ -79,9 +79,10 @@ The authentication system implements several hardened security measures:
 - **Email Verification Engine:** Prevents unauthorized or spam accounts by requiring users to validate their identity through a secure, cryptographic token sent to their inbox before they can receive automated health briefings.
 - **Secure Password Recovery:** Integrated a robust "Forgot Password" architecture, allowing users to securely reset their credentials using email-delivered reset tokens.
 - **Password Hashing:** Uses **native `bcrypt`** (not `passlib`) to avoid the known 72-byte wrap detection bug. Passwords are hashed via `bcrypt.hashpw()` with auto-generated salts.
-- **JWT Tokens:** Signed using `HS256` with a cryptographically random `SECRET_KEY` (environment variable). Tokens expire after 30 minutes.
+- **JWT Tokens:** Signed using `HS256` with a cryptographically random `SECRET_KEY` (environment variable). Tokens expire after 60 minutes.
 - **Rate Limiting:** Registration endpoint is protected with `slowapi` at 5 requests/minute to prevent brute-force account creation.
 - **Role-Based Access Control (RBAC):** Three-tier role hierarchy (`CITIZEN < EXPERT < ADMIN`) enforced at the router level via dependency injection.
+- **Deep-Link Navigation Routing:** Automated deep-linking forces all inbound redirects (from email verification, login loops, or password resets) directly to the unified Command Centre dashboard using Streamlit URL query parameter routing, resolving previously disruptive login-state reloads.
 
 ### 4.3 Real-Time Metrics & Caching
 The system features a **5-second TTL (Time-To-Live)** cache for high-frequency dashboard metrics. It calculates cumulative daily totals for scraped articles and new signals, preventing database lockups during concurrent role access.
