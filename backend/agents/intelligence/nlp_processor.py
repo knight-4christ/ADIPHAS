@@ -56,14 +56,41 @@ class NLPProcessor:
         """Cleans and extracts JSON from AI responses that might contain markdown or filler."""
         if not raw_text: return None
         
-        # 1. Remove Markdown code blocks if present
-        clean_text = re.sub(r'```json\s*|\s*```', '', raw_text).strip()
+        # 1. Remove reasoning blocks (e.g. from DeepSeek models)
+        clean_text = re.sub(r'<think>.*?</think>', '', raw_text, flags=re.DOTALL)
         
-        # 2. Isolate the first [ or { and the last ] or } to ignore conversational filler
+        # 2. Remove Markdown code blocks if present
+        clean_text = re.sub(r'```(?:json)?\s*|\s*```', '', clean_text).strip()
+        
+        # 3. Isolate the first [ or { and the last ] or } to ignore conversational filler
         try:
-            start_idx = min(clean_text.find('['), clean_text.find('{'))
-            end_idx = max(clean_text.rfind(']'), clean_text.rfind('}'))
-            if start_idx != -1 and end_idx != -1:
+            # Find the very first '{' or '['
+            idx1 = clean_text.find('[')
+            idx2 = clean_text.find('{')
+            
+            if idx1 == -1 and idx2 == -1:
+                start_idx = -1
+            elif idx1 == -1:
+                start_idx = idx2
+            elif idx2 == -1:
+                start_idx = idx1
+            else:
+                start_idx = min(idx1, idx2)
+                
+            # Find the very last ']' or '}'
+            idx3 = clean_text.rfind(']')
+            idx4 = clean_text.rfind('}')
+            
+            if idx3 == -1 and idx4 == -1:
+                end_idx = -1
+            elif idx3 == -1:
+                end_idx = idx4
+            elif idx4 == -1:
+                end_idx = idx3
+            else:
+                end_idx = max(idx3, idx4)
+                
+            if start_idx != -1 and end_idx != -1 and start_idx < end_idx:
                 clean_text = clean_text[start_idx:end_idx+1]
         except Exception:
             pass # Fallback to original text if slicing fails
@@ -71,13 +98,24 @@ class NLPProcessor:
         try:
             return json.loads(clean_text)
         except json.JSONDecodeError as e:
-            # 3. Final attempt: basic string cleanup for trailing commas or common AI typos
+            # 4. Final attempt: basic string cleanup for trailing commas or Python-style formatting
             try:
-                # Remove trailing commas in objects/arrays
+                import ast
+                # Try literal_eval first (handles single quotes and python booleans)
+                try:
+                    # literal_eval needs True/False/None, not true/false/null
+                    python_text = re.sub(r'\btrue\b', 'True', clean_text)
+                    python_text = re.sub(r'\bfalse\b', 'False', python_text)
+                    python_text = re.sub(r'\bnull\b', 'None', python_text)
+                    return ast.literal_eval(python_text)
+                except Exception:
+                    pass
+                    
+                # Try regex trailing comma fix
                 clean_text = re.sub(r',\s*([\]}])', r'\1', clean_text)
                 return json.loads(clean_text)
             except Exception:
-                logger.error(f"[NLP] Final JSON parse failed: {e}")
+                logger.error(f"[NLP] Final JSON parse failed: {e} | Text excerpt: {clean_text[:100]}...")
                 return None
 
     def analyze_with_gemini(self, text, baseline_entities):
