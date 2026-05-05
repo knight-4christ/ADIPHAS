@@ -115,7 +115,7 @@ def send_alert_notification(to_email: str, username: str, disease: str, location
                 <strong>Recommended Action:</strong><br/>
                 {action}
             </div>
-            <p>Please log in to your ADIPHAS dashboard for the full intelligence briefing and local health feed.</p>
+            <p>Please log in to your <a href="{frontend_url}/?nav=Command_Centre">ADIPHAS dashboard</a> for the full intelligence briefing and local health feed.</p>
             <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
             <p style="font-size: 12px; color: #888;">You are receiving this because you are a registered user on ADIPHAS.</p>
         </div>
@@ -153,7 +153,7 @@ def send_situational_briefing(to_email: str, username: str, briefing_content: st
             </div>
             
             <p style="text-align: center; margin-top: 30px;">
-                <a href="{frontend_url}" style="background-color: #0284c7; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; font-weight: bold;">Go to Dashboard</a>
+                <a href="{frontend_url}/?nav=Command_Centre" style="background-color: #0284c7; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; font-weight: bold;">Go to Dashboard</a>
             </p>
             
             <hr style="border: 0; border-top: 1px solid #eee; margin: 30px 0 20px 0;">

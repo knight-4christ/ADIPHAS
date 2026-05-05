@@ -216,7 +216,7 @@ def verify_email(token: str, db: Session = Depends(get_db)):
     from fastapi.responses import RedirectResponse
     frontend_url = os.getenv("FRONTEND_URL", "https://adiphas.streamlit.app")
     # Redirect to the frontend root page (Command Centre)
-    return RedirectResponse(url=frontend_url)
+    return RedirectResponse(url=f"{frontend_url}/?nav=Command_Centre")
 
 from pydantic import BaseModel
 class PasswordResetRequest(BaseModel):

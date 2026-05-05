@@ -379,7 +379,21 @@ def main():
             if user_role == "ADMIN":
                 if "My Profile" in categories["Account"]: categories["Account"].remove("My Profile")
 
-        # Category Selection
+        # Parse incoming nav query parameter to force routing (e.g. from emails)
+        nav_param = st.query_params.get("nav")
+        if nav_param:
+            nav_param = nav_param.replace("_", " ")
+            for cat, mods in categories.items():
+                if nav_param in mods:
+                    st.session_state.active_nav_cat = cat
+                    st.session_state.active_nav_mod = nav_param
+                    # Remove it from URL so it doesn't stick
+                    try:
+                        del st.query_params["nav"]
+                    except KeyError:
+                        pass
+                    break
+
         cat_list = list(categories.keys())
         if "active_nav_cat" not in st.session_state or st.session_state.active_nav_cat not in cat_list:
             st.session_state.active_nav_cat = cat_list[0]

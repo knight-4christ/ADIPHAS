@@ -64,8 +64,10 @@ def render_login_modal():
                             res = api_client.reset_password(reset_token, new_pass1)
                             if res and "msg" in res and "success" in str(res.get("msg")).lower():
                                 st.success("Password successfully reset! You can now log in.")
-                                # Clear token from URL
+                                # Clear token from URL and force routing to Command Centre
                                 st.query_params.clear()
+                                st.session_state.active_nav_cat = "Surveillance"
+                                st.session_state.active_nav_mod = "Command Centre"
                                 time.sleep(2)
                                 st.rerun()
                             else:
@@ -122,6 +124,10 @@ def render_login_modal():
                                         st.warning(f"Welcome {me.get('username')}!{loc_msg} Please complete your profile to enable personalized alerts.")
                                     else:
                                         st.success(f"Welcome back, {me.get('username')}!{loc_msg}")
+                                    
+                                    # Force route to Command Centre immediately after login
+                                    st.session_state.active_nav_cat = "Surveillance"
+                                    st.session_state.active_nav_mod = "Command Centre"
                                     
                                     time.sleep(1)
                                     st.rerun()
