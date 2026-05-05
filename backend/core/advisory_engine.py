@@ -269,7 +269,7 @@ class AdvisoryEngine:
         """
         try:
             from backend.core.model_config import smart_generate # type: ignore[import-untyped]
-            reply, _ = smart_generate(self.gemini_model, prompt, enable_reasoning=False)
+            reply, _ = smart_generate(self.gemini_model, prompt, context="DashboardInsight", enable_reasoning=False)
             return reply or "Stay safe and monitor local health feeds."
         except Exception as e:
             return f"Stay safe and monitor local health feeds. (Error: {str(e)})"

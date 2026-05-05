@@ -23,84 +23,87 @@ def autonomous_monitoring_job():
     Background job that runs every 2 hours to scrape news and extract alerts.
     """
     logger.info(f"[{datetime.now().replace(microsecond=0)}] Autonomous Agent waking up to scan for outbreaks...")
-    db = database.SessionLocal()
+    
+    # 1. Acquire News Intelligence (Scraping phase - No DB session yet)
+    headlines = []
     try:
         logger.info("Starting Autonomous Monitoring Cycle...")
+        # Note: log_activity internally opens/closes its own session, so it's safe.
         log_activity("AutonomousAgent", "Waking up to scan for outbreaks...")
         
-        # 1. Acquire News Intelligence (scrape returns (results, trace))
-        try:
-            headlines, scrape_trace = news_agent.scrape()
-            sources_hit = set(h.get('source') for h in headlines if h.get('source'))
-            sources_str = ", ".join(sources_hit) if sources_hit else "None"
-            log_activity("SCOUT", f"Scraped {len(headlines)} articles. Sources: {sources_str}")
-            
-            # Log exact scraper trace to db
-            for st in scrape_trace:
-                if st.get('level') == 'info':
-                    log_activity("SCOUT", st.get('step'))
-                
-            # Filter out already existing URLs (DEDUPLICATION LOGIC)
-            filtered_headlines = []
-            skipped_count: int = 0
-            for item in headlines:
-                url: Optional[str] = item.get('url')
-                item_title: str = str(item.get('title', ''))
-                if not url:
-                    # Fallback to headline text dedupe if no URL provided by scraper
-                    exists = db.query(models.EBSAlert).filter(models.EBSAlert.text == item_title).first()
-                else:
-                    exists = db.query(models.EBSAlert).filter(models.EBSAlert.url == url).first()
-                
-                if exists:
-                    skipped_count = skipped_count + 1  # type: ignore[operator]
-                else:
-                    filtered_headlines.append(item)
-            
-            if skipped_count > 0:
-                log_activity("IntelligenceEngine", f"Skipped {skipped_count} previously processed articles.")
-                
-            headlines = filtered_headlines
-                
-        except Exception as e:
-            log_activity("SCOUT", f"Scraping failed: {e}")
-            headlines = []
-            
-        # 1.5 Batching (Process in chunks of 15 to avoid AI output truncation)
-        chunk_size = 15
-        hl_list = list(headlines)
-        total_new = len(hl_list)
+        headlines, scrape_trace = news_agent.scrape()
+        sources_hit = set(h.get('source') for h in headlines if h.get('source'))
+        sources_str = ", ".join(sources_hit) if sources_hit else "None"
+        log_activity("SCOUT", f"Scraped {len(headlines)} articles. Sources: {sources_str}")
         
-        if total_new > 0:
-            log_activity("IntelligenceEngine", f"Processing {total_new} new articles in chunks of {chunk_size}...")
-            
-            # Group reports for fusion
-            pending_reports = []
-            
-            for i in range(0, total_new, chunk_size):
-                chunk = hl_list[i : i + chunk_size]
-                log_activity("IntelligenceEngine", f"Running AI batch extraction on chunk {i//chunk_size + 1} ({len(chunk)} articles)...")
+        for st in scrape_trace:
+            if st.get('level') == 'info':
+                log_activity("SCOUT", st.get('step'))
                 
-                try:
-                    batch_results = nlp_agent.extract_entities_batch(chunk)
-                    
-                    for item, (entities, nlp_trace) in zip(chunk, batch_results):
-                        if entities and entities.get('diseases') and entities.get('locations'):
-                            for disease in entities['diseases']:
-                                for location in entities['locations']:
-                                    pending_reports.append({
-                                        "source": item.get('source', 'Unknown'),
-                                        "url": item.get('url'),
-                                        "disease": disease,
-                                        "location": location,
-                                        "cases": 1, # Minimal observation
-                                        "text": item.get('title', item.get('text', '')),
-                                        "timestamp": item.get('timestamp')
-                                    })
-                except Exception as e:
-                    logger.error(f"Chunk processing failed: {e}")
-                    continue
+    except Exception as e:
+        log_activity("SCOUT", f"Scraping failed: {e}")
+        headlines = []
+
+    # 1.2 Deduplication (Short DB burst)
+    filtered_headlines = []
+    skipped_count = 0
+    db_dedupe = database.SessionLocal()
+    try:
+        for item in headlines:
+            url: Optional[str] = item.get('url')
+            item_title: str = str(item.get('title', ''))
+            if not url:
+                exists = db_dedupe.query(models.EBSAlert).filter(models.EBSAlert.text == item_title).first()
+            else:
+                exists = db_dedupe.query(models.EBSAlert).filter(models.EBSAlert.url == url).first()
+            
+            if exists:
+                skipped_count += 1
+            else:
+                filtered_headlines.append(item)
         
+        if skipped_count > 0:
+            log_activity("IntelligenceEngine", f"Skipped {skipped_count} previously processed articles.")
+        db_dedupe.commit()
+    except Exception as e:
+        logger.error(f"Deduplication failed: {e}")
+        db_dedupe.rollback()
+    finally:
+        db_dedupe.close()
+
+    # 1.5 Batching & AI Extraction (Long AI phase - DB IS CLOSED)
+    chunk_size = 15
+    hl_list = filtered_headlines
+    total_new = len(hl_list)
+    pending_reports = []
+    
+    if total_new > 0:
+        log_activity("IntelligenceEngine", f"Processing {total_new} new articles in chunks of {chunk_size}...")
+        for i in range(0, total_new, chunk_size):
+            chunk = hl_list[i : i + chunk_size]
+            log_activity("IntelligenceEngine", f"Running AI batch extraction on chunk {i//chunk_size + 1} ({len(chunk)} articles)...")
+            try:
+                batch_results = nlp_agent.extract_entities_batch(chunk)
+                for item, (entities, nlp_trace) in zip(chunk, batch_results):
+                    if entities and entities.get('diseases') and entities.get('locations'):
+                        for disease in entities['diseases']:
+                            for location in entities['locations']:
+                                pending_reports.append({
+                                    "source": item.get('source', 'Unknown'),
+                                    "url": item.get('url'),
+                                    "disease": disease,
+                                    "location": location,
+                                    "cases": 1,
+                                    "text": item.get('title', item.get('text', '')),
+                                    "timestamp": item.get('timestamp')
+                                })
+            except Exception as e:
+                logger.error(f"Chunk processing failed: {e}")
+                continue
+
+    # 2. Saving Fused Alerts (DB session burst)
+    db_save = database.SessionLocal()
+    try:
         if pending_reports:
             log_activity("IntelligenceEngine", f"Fusing {len(pending_reports)} candidate reports...")
             groups = {}
@@ -118,143 +121,106 @@ def autonomous_monitoring_job():
                         text=f"Confirmed {result['disease']} activity in {result['location']}",
                         timestamp=datetime.now().replace(microsecond=0),
                         location_text=result['location'],
-                        disease=result.get('disease'),  # Fixed: was missing
+                        disease=result.get('disease'),
                         collected_by="AutonomousAgent",
                         verified=False,
                         risk_level="High" if result.get('severity_score', 0) > 0.7 or result['confidence_score'] > 0.8 else ("Medium" if result['confidence_score'] > 0.5 else "Low")
                     )
-                    db.add(alert)
-                    db.flush() # Flush to get IDs
+                    db_save.add(alert)
+                    db_save.flush()
                     log_activity("AlertingEngine", f"Fused alert: {result['disease']} in {result['location']} (confidence={result['confidence_score']:.2f})")
                     
-                    # --- Dispatch Email Notifications for High/Critical Alerts ---
                     if alert.risk_level in ["High", "Critical"]:
                         try:
                             from backend.core.email_utils import send_alert_notification
                             import threading
-                            
-                            # Find all users in the affected LGA or globally if not specified (Verification requirement bypassed)
-                            query = db.query(models.User)
+                            notified_users = db_save.query(models.User)
                             if result['location'] and result['location'].lower() != "lagos":
-                                query = query.filter(models.User.location_lga.ilike(f"%{result['location']}%"))
+                                notified_users = notified_users.filter(models.User.location_lga.ilike(f"%{result['location']}%"))
                             
-                            notified_users = query.all()
-                            for user in notified_users:
-                                action = f"Please remain vigilant regarding {result['disease']}. Follow NCDC protocols."
+                            users_list = notified_users.all()
+                            for user in users_list:
                                 threading.Thread(
                                     target=send_alert_notification, 
-                                    args=(user.email, user.username, result['disease'], result['location'], alert.risk_level, action)
+                                    args=(user.email, user.username, result['disease'], result['location'], alert.risk_level, "Stay vigilant.")
                                 ).start()
-                                
-                            if notified_users:
-                                log_activity("NotificationEngine", f"Dispatched {len(notified_users)} email alerts for {result['disease']}.")
-                        except Exception as e:
-                            logger.error(f"Failed to dispatch email alerts: {e}")
-                            
+                            if users_list:
+                                log_activity("NotificationEngine", f"Dispatched {len(users_list)} email alerts.")
+                        except Exception: pass
         else:
-            # No dual-entity headlines — save disease-only articles as raw signals
+            # Raw disease signals
             saved_raw = 0
-            for item in headlines:
-                item_dict = dict(item) if isinstance(item, dict) else {}
-                item_title = str(item_dict.get('title', ''))
-                entities, _ = nlp_agent.extract_entities(item_title)
-                entities_dict: Dict[str, Any] = dict(entities) if isinstance(entities, dict) else {}
-                
-                diseases: List[str] = entities_dict.get('diseases', [])  # type: ignore[assignment]
-                locations: List[str] = entities_dict.get('locations', [])  # type: ignore[assignment]
-                # Save if at least a disease is found (location defaults to 'Lagos')
+            for item in hl_list:
+                entities, _ = nlp_agent.extract_entities(str(item.get('title', '')))
+                diseases = entities.get('diseases', [])
                 if diseases:
                     alert = models.EBSAlert(
-                        source=item_dict.get('source', 'NewsScout'),
-                        url=item_dict.get('url'),
-                        text=item_title,
-                        timestamp=item_dict.get('timestamp') or datetime.now().replace(microsecond=0),
-                        location_text=locations[0] if locations else 'Lagos',
+                        source=item.get('source', 'NewsScout'),
+                        url=item.get('url'),
+                        text=str(item.get('title', '')),
+                        timestamp=item.get('timestamp') or datetime.now().replace(microsecond=0),
+                        location_text=entities.get('locations', ['Lagos'])[0],
                         disease=diseases[0],
                         collected_by="AutonomousAgent",
                         verified=False,
                         risk_level="Low"
                     )
-                    db.add(alert)
-                    saved_raw = saved_raw + 1  # type: ignore[operator]
+                    db_save.add(alert)
+                    saved_raw += 1
             if saved_raw > 0:
-                log_activity("AlertingEngine", f"Saved {saved_raw} new raw disease signals to EBS database.")
-        
-        db.commit()
-        
-        # 3. Vectorize verified alerts for RAG
+                log_activity("AlertingEngine", f"Saved {saved_raw} new raw disease signals.")
+
+        # 3. Vector Ingestion
         try:
             vm = get_vector_manager()
-            new_docs = vm.ingest_ebs_alerts(db)
+            new_docs = vm.ingest_ebs_alerts(db_save)
             if new_docs:
-                log_activity("VectorEngine", f"Ingested {new_docs} text chunks into TitanVector.")
-        except Exception as e:
-            logger.error(f"Vector ingestion failed: {e}")
-            
+                log_activity("VectorEngine", f"Ingested {new_docs} text chunks.")
+        except Exception: pass
+
+        db_save.commit()
         log_activity("AutonomousAgent", "Monitoring cycle complete.")
-        
-        # --- Autonomous Phase 2 Cycles (with cooldowns to prevent rate limit bursts) ---
-        try:
-            orchestrator.run_predictive_cycle(db)
-            log_activity("PredictiveAgent", "Forecast snapshots updated.")
-            
-            time.sleep(10)  # Cooldown between AI-heavy phases
-            
-            orchestrator.run_auto_verification_cycle(db)
-            log_activity("VerifierAgent", "Auto-verification pass complete.")
-            
-            time.sleep(10)  # Cooldown between AI-heavy phases
-            
-            # Realtime Tavily intelligence (self-throttles to every 6h)
-            orchestrator.run_realtime_intelligence_cycle(db)
-            
-            time.sleep(10)  # Cooldown between AI-heavy phases
-            
-            # Briefing run every 2 hours
-            last_briefing = db.query(models.AutonomousSnapshot)\
-                .filter(models.AutonomousSnapshot.snapshot_type == "daily_briefing")\
-                .order_by(models.AutonomousSnapshot.generated_at.desc()).first()
-            
-            if not last_briefing or (datetime.utcnow() - last_briefing.generated_at).total_seconds() > 7200:
-                cit_brief, exp_brief = orchestrator.run_briefing_cycle(db)
-                log_activity("BriefingAgent", "New 2-hour StAMP Briefing generated.")
-                
-                # Dispatch briefing emails to all verified users
-                if cit_brief or exp_brief:
-                    try:
-                        from backend.core.email_utils import send_situational_briefing
-                        import threading
-                        
-                        # Only send to users whose email was successfully verified in the background
-                        verified_users = db.query(models.User).filter(models.User.is_email_verified == True).all()
-                        
-                        for user in verified_users:
-                            is_expert = user.role.upper() in ["EXPERT", "ADMIN"]
-                            content = exp_brief if is_expert and exp_brief else cit_brief
-                            if content:
-                                threading.Thread(
-                                    target=send_situational_briefing,
-                                    args=(user.email, user.username, content, is_expert)
-                                ).start()
-                                
-                        if verified_users:
-                            log_activity("NotificationEngine", f"Dispatched {len(verified_users)} situational briefing emails.")
-                    except Exception as e:
-                        logger.error(f"Failed to dispatch briefing emails: {e}")
-        except Exception as e:
-            logger.error(f"Error in Phase 2 Autonomous cycles: {e}")
 
     except Exception as e:
-        error_str = str(e)
-        if "UNIQUE constraint" in error_str or "duplicate key" in error_str:
-            # Duplicate URL — expected when re-scraping same articles
-            logger.warning(f"[System] Duplicate alert skipped (already in DB): {error_str[:80]}")
-            db.rollback()
-        else:
-            log_activity("System", f"Error in monitoring job: {error_str}")
-            db.rollback()
+        logger.error(f"Error in monitoring save phase: {e}")
+        db_save.rollback()
     finally:
-        db.close()
+        db_save.close()
+
+    # 4. Phase 2 (Predictive, Briefing, etc. - Isolated sessions)
+    db_p2 = database.SessionLocal()
+    try:
+        orchestrator.run_predictive_cycle(db_p2)
+        time.sleep(5)
+        orchestrator.run_auto_verification_cycle(db_p2)
+        time.sleep(5)
+        orchestrator.run_realtime_intelligence_cycle(db_p2)
+        time.sleep(5)
+        
+        # StAMP Briefing
+        last_briefing = db_p2.query(models.AutonomousSnapshot)\
+            .filter(models.AutonomousSnapshot.snapshot_type == "daily_briefing")\
+            .order_by(models.AutonomousSnapshot.generated_at.desc()).first()
+        
+        if not last_briefing or (datetime.utcnow() - last_briefing.generated_at).total_seconds() > 7200:
+            cit_brief, exp_brief = orchestrator.run_briefing_cycle(db_p2)
+            if cit_brief or exp_brief:
+                # Dispatch Briefings (Threading handles its own logic)
+                verified_users = db_p2.query(models.User).filter(models.User.is_email_verified == True).all()
+                from backend.core.email_utils import send_situational_briefing
+                import threading
+                for user in verified_users:
+                    is_expert = user.role.upper() in ["EXPERT", "ADMIN"]
+                    content = exp_brief if is_expert and exp_brief else cit_brief
+                    if content:
+                        threading.Thread(target=send_situational_briefing, args=(user.email, user.username, content, is_expert)).start()
+
+        db_p2.commit()
+    except Exception as e:
+        logger.error(f"Error in Autonomous Phase 2: {e}")
+        db_p2.rollback()
+    finally:
+        db_p2.close()
 
 
 def _generate_startup_insight():

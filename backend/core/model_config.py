@@ -61,6 +61,7 @@ AGENT_MODEL_ASSIGNMENTS = {
     "IntelligenceBriefing": {"start_offset": 2,  "max_tries": 15},  # hermes-405b first
     "StartupInsight":       {"start_offset": 9,  "max_tries": 15},  # gemma-4-31b-it first
     "AdvisoryChat":         {"start_offset": 0,  "max_tries": 25},  # user-facing, maximum resilience
+    "DashboardInsight":     {"start_offset": 5,  "max_tries": 10},  # rapid summary
 }
 
 # Default fallback for unknown contexts
