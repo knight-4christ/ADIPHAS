@@ -222,20 +222,31 @@ class NewsScraperAgent:
         return any(kw.lower() in text_lower for kw in keywords)
 
     def _scrape_rss(self, source: dict) -> list:
-        """Parse an RSS/Atom feed using httpx."""
+        """Parse an RSS/Atom feed using httpx with Scrapling stealth fallback."""
+        content_str = ""
         try:
-            # RSS Feeds typically don't block basic HTTP clients
-            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+            # RSS Feeds typically don't block basic HTTP clients, but some do
+            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
             with httpx.Client(timeout=30, verify=False, follow_redirects=True) as client:
                 res = client.get(source["url"], headers=headers)
-                res.raise_for_status()
-                content_str = res.text.strip()
+                if res.status_code == 403:
+                    logger.info(f"[Scraper] RSS {source['name']} blocked (403). Engaging Scrapling fallback...")
+                    s_res = Fetcher.get(source["url"], stealthy_headers=True, timeout=20)
+                    if s_res.status == 200:
+                        content_str = s_res.html_content.strip()
+                    else:
+                        logger.warning(f"[Scraper] RSS fallback failed for {source['name']} (Status: {s_res.status})")
+                        return []
+                else:
+                    res.raise_for_status()
+                    content_str = res.text.strip()
             
             if "</rss>" in content_str:
                 content_str = content_str[:content_str.find("</rss>") + 6]
             elif "</feed>" in content_str:
                 content_str = content_str[:content_str.find("</feed>") + 7]
             
+            if not content_str: return []
             root = ET.fromstring(content_str)
         except Exception as e:
             logger.error(f"Error scraping RSS for {source['name']}: {e}")
@@ -281,14 +292,16 @@ class NewsScraperAgent:
                     try:
                         from curl_cffi import requests as c_req
                         # Impersonating a modern MacOS Safari/Chrome handshake perfectly bypasses Cloudflare
-                        fallback = c_req.get(source["url"], impersonate="chrome110", timeout=20)
+                        # Using chrome120 as it's more modern than 110
+                        fallback = c_req.get(source["url"], impersonate="chrome120", timeout=25)
                         if fallback.status_code == 200:
                             page = BeautifulSoup(fallback.text, "lxml")
                             logger.info(f"[Scraper] Successfully bypassed firewall for {source['name']}!")
                         else:
+                            logger.warning(f"[Scraper] Bypass failed for {source['name']} (Status: {fallback.status_code})")
                             return []
                     except Exception as bypass_err:
-                        logger.warning(f"[Scraper] Bypass failed for {source['name']}: {bypass_err}")
+                        logger.warning(f"[Scraper] Bypass exception for {source['name']}: {bypass_err}")
                         return []
                 else:
                     logger.warning(f"[Scraper] {source['name']} returned status {res.status}")
