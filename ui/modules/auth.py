@@ -141,17 +141,16 @@ def render_login_modal():
             detected_loc = st.session_state.get('user_location')
             
             # --- LOCATION DETECTION ---
-            loc_col1, loc_col2 = st.columns([2, 1])
-            with loc_col1:
-                if detected_loc:
-                    st.success(f"📍 Location detected: **{detected_loc}**")
-                else:
-                    st.warning("📍 Location not detected yet.")
-            with loc_col2:
-                st.button("📍 Detect Location", type="secondary",
-                          key="signup_geo_btn", on_click=geolocation.request_location_fetch)
-                if st.session_state.get("_geo_fetch_requested"):
-                    st.caption("⏳ Requesting GPS... allow the prompt.")
+            st.button("📍 Detect Location", type="secondary",
+                      key="signup_geo_btn", on_click=geolocation.request_location_fetch, use_container_width=True)
+            
+            if st.session_state.get("_geo_fetch_requested"):
+                st.caption("⏳ Requesting GPS... allow the prompt.")
+                
+            if detected_loc:
+                st.success(f"📍 Location detected: **{detected_loc}**")
+            else:
+                st.warning("📍 Location not detected yet.")
             
             st.divider()
 
