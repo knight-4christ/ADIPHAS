@@ -200,16 +200,11 @@ class ChromaManager:
         tavily_key = os.getenv("TAVILY_API_KEY")
         if tavily_key:
             try:
-                from langchain_tavily import TavilySearch
-                web_search = TavilySearch(tavily_api_key=tavily_key)
-                raw_response = web_search.invoke(query)
-                # New TavilySearch returns a dict with 'results' key
-                if isinstance(raw_response, dict):
-                    web_results = raw_response.get("results", [])
-                elif isinstance(raw_response, list):
-                    web_results = raw_response
-                else:
-                    web_results = []
+                from tavily import TavilyClient
+                client = TavilyClient(api_key=tavily_key)
+                # TavilyClient.search returns a dict with 'results' key
+                raw_response = client.search(query, search_depth="basic", max_results=k)
+                web_results = raw_response.get("results", [])
                 
                 if force_combine:
                     return {"source": "combined", "results": local_results + web_results}

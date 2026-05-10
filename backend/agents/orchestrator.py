@@ -88,19 +88,13 @@ class OrchestratorAgent:
         
         all_results: List[str] = []
         try:
-            from langchain_tavily import TavilySearch  # type: ignore[import-untyped]
-            web_search = TavilySearch(tavily_api_key=tavily_key, max_results=3)
+            from tavily import TavilyClient
+            client = TavilyClient(api_key=tavily_key)
             
             for query in queries:
                 try:
-                    raw_response = web_search.invoke(query)
-                    # New TavilySearch returns a dict with 'results' key
-                    if isinstance(raw_response, dict):
-                        results = raw_response.get("results", [])
-                    elif isinstance(raw_response, list):
-                        results = raw_response
-                    else:
-                        results = []
+                    raw_response = client.search(query, search_depth="basic", max_results=3)
+                    results = raw_response.get("results", [])
                     
                     for r in results:
                         content = r.get("content") or r.get("snippet") or str(r)
