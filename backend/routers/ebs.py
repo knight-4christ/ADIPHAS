@@ -128,22 +128,45 @@ def get_briefing(lga: Optional[str] = None, role: str = "CITIZEN", db: Session =
             {summary_alerts}
             
             Analyze these signals for immediate threats or trends. If the data is sparse, provide a general vigilance advisory.
+            DO NOT start with a greeting (e.g., no "Good morning"). Start directly with the briefing content.
             """
             from backend.core.model_config import smart_generate  # type: ignore[import-untyped]
             text, model_used = smart_generate(gemini_model, prompt, context="IntelligenceBriefing")
             
+            from datetime import timedelta, timezone
+            _WAT = timezone(timedelta(hours=1))
+            hour = datetime.now(_WAT).hour
+            if hour < 12:
+                greeting = "Good morning"
+                emoji = "🌤️"
+            elif hour < 17:
+                greeting = "Good afternoon"
+                emoji = "☀️"
+            else:
+                greeting = "Good evening"
+                emoji = "🌙"
+                
             if text:
-                ai_insight = text
+                import re
+                text = re.sub(r'^(Good morning|Good afternoon|Good evening|Hello|Hi|Greetings)[^!.\n]*[!\.]\s*', '', text, flags=re.IGNORECASE).strip()
+                ai_insight = f"**{emoji} {greeting}!** {text}"
                 # Update Cache
                 briefing_ai_cache[cache_key] = (ai_insight, now)
             else:
-                ai_insight = "AI analysis temporarily unavailable across all models."
+                ai_insight = f"**{emoji} {greeting}!** AI analysis temporarily unavailable across all models."
             
         except Exception as e:
             import logging
             logger = logging.getLogger(__name__)
             logger.error(f"Briefing generation failed: {e}")
-            ai_insight = "AI analysis encountered a temporary buffer issue. Review raw signals below."
+            
+            from datetime import timedelta, timezone
+            _WAT = timezone(timedelta(hours=1))
+            hour = datetime.now(_WAT).hour
+            greeting = "Good morning" if hour < 12 else ("Good afternoon" if hour < 17 else "Good evening")
+            emoji = "🌤️" if hour < 12 else ("☀️" if hour < 17 else "🌙")
+            
+            ai_insight = f"**{emoji} {greeting}!** AI analysis encountered a temporary buffer issue. Review raw signals below."
 
     return {
         "lga": lga, 

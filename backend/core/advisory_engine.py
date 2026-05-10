@@ -254,6 +254,21 @@ class AdvisoryEngine:
         bio_block = f"Genotype: {user_metadata.get('genotype', 'N/A')}, Blood Group: {user_metadata.get('blood_group', 'N/A')}, Conditions: {user_metadata.get('health_conditions', 'None')}"
         
         user_name = user_metadata.get('name', 'User')
+        
+        # Determine greeting
+        from datetime import datetime, timedelta, timezone
+        _WAT = timezone(timedelta(hours=1))
+        hour = datetime.now(_WAT).hour
+        if hour < 12:
+            greeting = "Good morning"
+            emoji = "🌤️"
+        elif hour < 17:
+            greeting = "Good afternoon"
+            emoji = "☀️"
+        else:
+            greeting = "Good evening"
+            emoji = "🌙"
+            
         prompt = f"""
         Act as the ADIPHAS public health intelligence director.
         User Name: {user_name}
@@ -266,10 +281,15 @@ class AdvisoryEngine:
         1. DESCRIBE the specific diseases or outbreaks mentioned in 'Local Health Signals' (e.g., 'There are Cholera signals near you') so the user knows exactly what the threat is. If there are no signals, explicitly tell them their area is clear.
         2. Provide concrete, practical health advice tailored strictly to their biological profile if relevant.
         3. Break down the jargon. Do not use generic militaristic terms like 'route recalibration', 'cognitive load', or 'operational continuity'. Speak like an expert medical advisor.
+        4. DO NOT start with a greeting (e.g., no "Good morning" or "Hello"). Start directly with the intelligence.
         """
         try:
             from backend.core.model_config import smart_generate # type: ignore[import-untyped]
             reply, _ = smart_generate(self.gemini_model, prompt, context="DashboardInsight", enable_reasoning=False)
-            return reply or "Stay safe and monitor local health feeds."
+            if reply:
+                import re
+                reply = re.sub(r'^(Good morning|Good afternoon|Good evening|Hello|Hi|Greetings)[^!.\n]*[!\.]\s*', '', reply, flags=re.IGNORECASE).strip()
+                return f"**{emoji} {greeting}!** {reply}"
+            return f"**{emoji} {greeting}!** Stay safe and monitor local health feeds."
         except Exception as e:
-            return f"Stay safe and monitor local health feeds. (Error: {str(e)})"
+            return f"**{emoji} {greeting}!** Stay safe and monitor local health feeds. (Error: {str(e)})"
