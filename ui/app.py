@@ -395,14 +395,17 @@ def main():
                     break
 
         cat_list = list(categories.keys())
-        if "active_nav_cat" not in st.session_state or st.session_state.active_nav_cat not in cat_list:
-            st.session_state.active_nav_cat = cat_list[0]
+        
+        # Initialize widget key if not present
+        if f"nav_cat_sb_{user_role}" not in st.session_state:
+            fallback = st.session_state.get("active_nav_cat", cat_list[0])
+            if fallback not in cat_list:
+                fallback = cat_list[0]
+            st.session_state[f"nav_cat_sb_{user_role}"] = fallback
             
-        cat_index = cat_list.index(st.session_state.active_nav_cat)
         cat_choice = st.selectbox(
             "Select Area", 
             cat_list, 
-            index=cat_index,
             key=f"nav_cat_sb_{user_role}"
         )
         st.session_state.active_nav_cat = cat_choice
@@ -426,10 +429,13 @@ def main():
         
         # Menu Selection within category
         menu_options = categories[cat_choice]
-        if "active_nav_mod" not in st.session_state or st.session_state.active_nav_mod not in menu_options:
-            st.session_state.active_nav_mod = menu_options[0]
-            
-        mod_index = menu_options.index(st.session_state.active_nav_mod)
+        
+        current_mod = st.session_state.get(f"nav_mod_rd_{user_role}")
+        if not current_mod or current_mod not in menu_options:
+            fallback_mod = st.session_state.get("active_nav_mod", menu_options[0])
+            if fallback_mod not in menu_options:
+                fallback_mod = menu_options[0]
+            st.session_state[f"nav_mod_rd_{user_role}"] = fallback_mod
         
         def format_nav(label):
             if label == "Health Intel Inbox" or label == "Local Health Feed":
@@ -441,7 +447,6 @@ def main():
         choice = st.radio(
             "Module", 
             menu_options, 
-            index=mod_index,
             format_func=format_nav, 
             label_visibility="collapsed", 
             key=f"nav_mod_rd_{user_role}"

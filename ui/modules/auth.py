@@ -30,27 +30,9 @@ def render_login_modal():
     
     with col2:
         st.subheader("🔐 Access ADIPHAS")
-        if "active_auth_tab" not in st.session_state:
-            st.session_state.active_auth_tab = "Login"
-
-        tab_c1, tab_c2, tab_c3 = st.columns(3)
-        with tab_c1:
-            if st.button("Login", use_container_width=True, type="primary" if st.session_state.active_auth_tab == "Login" else "secondary"):
-                st.session_state.active_auth_tab = "Login"
-                st.rerun()
-        with tab_c2:
-            if st.button("Sign Up", use_container_width=True, type="primary" if st.session_state.active_auth_tab == "Sign Up" else "secondary"):
-                st.session_state.active_auth_tab = "Sign Up"
-                st.rerun()
-        with tab_c3:
-            if st.button("Forgot Password", use_container_width=True, type="primary" if st.session_state.active_auth_tab == "Forgot Password" else "secondary"):
-                st.session_state.active_auth_tab = "Forgot Password"
-                st.rerun()
+        login_tab, signup_tab, reset_tab = st.tabs(["Login", "Sign Up", "Forgot Password"])
         
-        st.write("") # small spacing
-        selected_tab = st.session_state.active_auth_tab
-        
-        if selected_tab == "Login":
+        with login_tab:
             reset_token = st.query_params.get("reset_token")
             if reset_token:
                 st.info("🔑 Password Reset Mode")
@@ -138,7 +120,7 @@ def render_login_modal():
 
                 st.info("Forgot your password? Select the 'Forgot Password' tab above.")
         
-        elif selected_tab == "Forgot Password":
+        with reset_tab:
             st.info("🔑 **Password Reset**")
             st.write("Enter your email or username to receive a reset link.")
             reset_email = st.text_input("Email / Username", key="reset_req_email")
@@ -153,7 +135,7 @@ def render_login_modal():
                 else:
                     st.warning("Please enter your email or username.")
 
-        elif selected_tab == "Sign Up":
+        with signup_tab:
             st.info("💡 **Tip:** Complete your profile to receive hyper-tailored health insights and outbreak alerts for your area.")
             
             detected_loc = st.session_state.get('user_location')

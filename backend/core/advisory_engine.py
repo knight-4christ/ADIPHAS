@@ -16,7 +16,7 @@ class AdvisoryEngine:
         }
         self.gemini_model = gemini_model
 
-    def chat_with_ai(self, messages: list, user_metadata: dict = None, enable_reasoning: bool = False, context: str = "") -> str:
+    def chat_with_ai(self, messages: list, user_metadata: Optional[dict] = None, enable_reasoning: bool = False, context: str = "") -> str:
         """
         Conversational entry point for the Advisory Chat.
         Injects user biodata and real-time search context.
@@ -81,7 +81,7 @@ class AdvisoryEngine:
         except Exception:
             return "AI chat currently unavailable."
 
-    def analyze_with_ai(self, symptoms: list, duration_days: int, context_str: str = "", user_metadata: dict = None) -> Optional[str]:
+    def analyze_with_ai(self, symptoms: list, duration_days: int, context_str: str = "", user_metadata: Optional[dict] = None) -> Optional[str]:
         """
         Uses Gemini to provide a deep clinical analysis of symptoms.
         Optionally enriched with RAG context and User Biodata (Genotype/Blood Group).
@@ -117,7 +117,7 @@ class AdvisoryEngine:
         except Exception:
             return "AI clinical deep-dive currently unavailable."
 
-    def analyze_symptoms(self, symptoms: list, duration_days: int, user_metadata: dict = None) -> dict:
+    def analyze_symptoms(self, symptoms: list, duration_days: int, user_metadata: Optional[dict] = None) -> dict:
         """
         Analyzes user input symptoms using a hybrid (Rule + AI) approach.
         """
