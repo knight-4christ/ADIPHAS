@@ -201,14 +201,6 @@ SOURCES = [
     },
     # ── VI. International Outbreak Intelligence (high-reliability) ──────────
     {
-        "name": "ReliefWeb Nigeria",
-        "category": "International",
-        "url": "https://api.reliefweb.int/v2/reports?appname=adiphas&filter[operator]=AND&filter[conditions][0][field]=country.name&filter[conditions][0][value]=Nigeria&filter[conditions][1][field]=theme.name&filter[conditions][1][value]=Health&limit=15&sort[]=date:desc&fields[include][]=title&fields[include][]=url",
-        "method": "reliefweb_api",
-        "priority": 1,
-        "keywords": [],
-    },
-    {
         "name": "Google News Health Nigeria",
         "category": "Aggregator",
         "url": "https://news.google.com/rss/search?q=disease+outbreak+Nigeria+health&hl=en-NG&gl=NG&ceid=NG:en",
@@ -247,26 +239,6 @@ class NewsScraperAgent:
         text_lower = text.lower()
         return any(kw.lower() in text_lower for kw in keywords)
 
-    def _scrape_reliefweb_api(self, source: dict) -> list:
-        """Fetch structured outbreak reports from ReliefWeb REST API (JSON)."""
-        results = []
-        try:
-            headers = {"User-Agent": "ADIPHAS/1.0 (adiphas.ai; health-intel)"}
-            with httpx.Client(timeout=30, verify=False) as client:
-                res = client.get(source["url"], headers=headers)
-                if res.status_code != 200:
-                    logger.warning(f"[Scraper] ReliefWeb API returned {res.status_code}")
-                    return []
-                data = res.json()
-                for item in data.get("data", [])[:15]:
-                    fields = item.get("fields", {})
-                    title = fields.get("title", "").strip()
-                    url = fields.get("url", "").strip()
-                    if title and url:
-                        results.append({"title": title, "url": url})
-        except Exception as e:
-            logger.error(f"[Scraper] ReliefWeb API error: {e}")
-        return results
 
     def _scrape_rss(self, source: dict) -> list:
         """Parse an RSS/Atom feed using httpx with Scrapling stealth fallback."""
@@ -518,8 +490,6 @@ class NewsScraperAgent:
 
                 if source["method"] == "rss":
                     extracted = self._scrape_rss(source)
-                elif source["method"] == "reliefweb_api":
-                    extracted = self._scrape_reliefweb_api(source)
                 else:
                     extracted = self._scrape_html(source)
 
