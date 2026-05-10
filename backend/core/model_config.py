@@ -22,12 +22,12 @@ UNIFIED_MODEL_POOL = [
     {"id": "openai/gpt-oss-120b:free",                      "provider": "openrouter", "tier": 1},
     {"id": "qwen/qwen3-next-80b-a3b-instruct:free",         "provider": "openrouter", "tier": 1},
     {"id": "meta-llama/llama-3.3-70b-instruct:free",        "provider": "openrouter", "tier": 1},
-    {"id": "openrouter/elephant-alpha",                     "provider": "openrouter", "tier": 1},
+    {"id": "deepseek/deepseek-r1-0528:free",                 "provider": "openrouter", "tier": 1},
     {"id": "google/gemma-4-26b-a4b-it:free",                "provider": "openrouter", "tier": 1},
     
     # --- OpenRouter Tier 2: Mid-range ---
     {"id": "google/gemma-4-31b-it:free",                    "provider": "openrouter", "tier": 2},
-    {"id": "google/gemma-3-27b-it:free",                    "provider": "openrouter", "tier": 2},
+    {"id": "qwen/qwen3-coder-480b-a35b:free",               "provider": "openrouter", "tier": 2},
     {"id": "qwen/qwen3-coder:free",                         "provider": "openrouter", "tier": 2},
     {"id": "nvidia/nemotron-3-nano-30b-a3b:free",           "provider": "openrouter", "tier": 2},
     {"id": "openai/gpt-oss-20b:free",                       "provider": "openrouter", "tier": 2},
@@ -35,13 +35,13 @@ UNIFIED_MODEL_POOL = [
     {"id": "cognitivecomputations/dolphin-mistral-24b-venice-edition:free", "provider": "openrouter", "tier": 2},
     
     # --- OpenRouter Tier 3: Lightweight Fallbacks ---
-    {"id": "google/gemma-3-12b-it:free",                    "provider": "openrouter", "tier": 3},
+    {"id": "google/gemma-4-12b-it:free",                    "provider": "openrouter", "tier": 3},
     {"id": "nvidia/nemotron-nano-9b-v2:free",               "provider": "openrouter", "tier": 3},
     {"id": "meta-llama/llama-3.2-3b-instruct:free",         "provider": "openrouter", "tier": 3},
-    {"id": "google/gemma-3-4b-it:free",                     "provider": "openrouter", "tier": 3},
+    {"id": "google/gemma-4-4b-it:free",                     "provider": "openrouter", "tier": 3},
     {"id": "liquid/lfm-2.5-1.2b-instruct:free",             "provider": "openrouter", "tier": 3},
-    {"id": "google/gemma-3n-e2b-it:free",                   "provider": "openrouter", "tier": 3},
-    {"id": "google/gemma-3n-e4b-it:free",                   "provider": "openrouter", "tier": 3},
+    {"id": "deepseek/deepseek-chat-v3-0324:free",           "provider": "openrouter", "tier": 3},
+    {"id": "mistralai/mistral-small-3.2-24b-instruct:free", "provider": "openrouter", "tier": 3},
     {"id": "z-ai/glm-4.5-air:free",                         "provider": "openrouter", "tier": 3},
     {"id": "liquid/lfm-2.5-1.2b-thinking:free",             "provider": "openrouter", "tier": 3},
 ]

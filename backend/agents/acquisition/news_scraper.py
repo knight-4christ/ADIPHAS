@@ -7,6 +7,7 @@ import time
 import xml.etree.ElementTree as ET
 import re
 from scrapling import Fetcher  # type: ignore[import-untyped]
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,10 @@ SOURCES = [
         "method": "html",
         "priority": 1,
         "keywords": [], # Bypasses all filters
+        "fallback_urls": [
+            "https://ncdc.gov.ng/diseases/sitreps",
+            "https://ncdc.gov.ng/news",
+        ],
     },
     {
         "name": "FMoH",
@@ -120,8 +125,8 @@ SOURCES = [
     {
         "name": "Public Health Nigeria",
         "category": "Health Journalism",
-        "url": "https://www.publichealth.com.ng/feed/",
-        "method": "rss",
+        "url": "https://www.publichealth.com.ng",
+        "method": "html",
         "priority": 2,
         "keywords": [],
     },
@@ -190,6 +195,27 @@ SOURCES = [
         "method": "html",
         "priority": 2,
         "keywords": [],
+        "fallback_urls": [
+            "https://guardian.ng/news/health/",
+        ],
+    },
+    # ── VI. International Outbreak Intelligence (high-reliability) ──────────
+    {
+        "name": "ReliefWeb Nigeria",
+        "category": "International",
+        "url": "https://api.reliefweb.int/v2/reports?appname=adiphas&filter[operator]=AND&filter[conditions][0][field]=country.name&filter[conditions][0][value]=Nigeria&filter[conditions][1][field]=theme.name&filter[conditions][1][value]=Health&limit=15&sort[]=date:desc&fields[include][]=title&fields[include][]=url",
+        "method": "reliefweb_api",
+        "priority": 1,
+        "keywords": [],
+    },
+    {
+        "name": "Google News Health Nigeria",
+        "category": "Aggregator",
+        "url": "https://news.google.com/rss/search?q=disease+outbreak+Nigeria+health&hl=en-NG&gl=NG&ceid=NG:en",
+        "method": "rss",
+        "priority": 3,
+        "keywords": ["outbreak", "cholera", "lassa", "mpox", "cases", "virus",
+                     "infection", "deaths", "epidemic", "disease", "health"],
     },
     {
         "name": "Premium Times Health",
@@ -220,6 +246,27 @@ class NewsScraperAgent:
         if not keywords: return True
         text_lower = text.lower()
         return any(kw.lower() in text_lower for kw in keywords)
+
+    def _scrape_reliefweb_api(self, source: dict) -> list:
+        """Fetch structured outbreak reports from ReliefWeb REST API (JSON)."""
+        results = []
+        try:
+            headers = {"User-Agent": "ADIPHAS/1.0 (adiphas.ai; health-intel)"}
+            with httpx.Client(timeout=30, verify=False) as client:
+                res = client.get(source["url"], headers=headers)
+                if res.status_code != 200:
+                    logger.warning(f"[Scraper] ReliefWeb API returned {res.status_code}")
+                    return []
+                data = res.json()
+                for item in data.get("data", [])[:15]:
+                    fields = item.get("fields", {})
+                    title = fields.get("title", "").strip()
+                    url = fields.get("url", "").strip()
+                    if title and url:
+                        results.append({"title": title, "url": url})
+        except Exception as e:
+            logger.error(f"[Scraper] ReliefWeb API error: {e}")
+        return results
 
     def _scrape_rss(self, source: dict) -> list:
         """Parse an RSS/Atom feed using httpx with Scrapling stealth fallback."""
@@ -292,16 +339,42 @@ class NewsScraperAgent:
                     try:
                         from curl_cffi import requests as c_req
                         # Rotate through modern browser profiles to find one that bypasses the WAF
-                        browsers = ["chrome124", "safari17_0", "chrome120", "chrome116"]
+                        browsers = ["chrome124", "safari17_0", "chrome120", "chrome116", "safari17_2_ios", "edge101"]
                         
+                        # Enhanced stealth headers
+                        stealth_headers = {
+                            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+                            "Accept-Language": "en-US,en;q=0.9",
+                            "Accept-Encoding": "gzip, deflate, br",
+                            "Sec-Fetch-Dest": "document",
+                            "Sec-Fetch-Mode": "navigate",
+                            "Sec-Fetch-Site": "none",
+                            "Sec-Fetch-User": "?1",
+                            "Upgrade-Insecure-Requests": "1",
+                            "Cache-Control": "max-age=0",
+                        }
                         for browser in browsers:
-                            fallback = c_req.get(source["url"], impersonate=browser, timeout=25)
+                            fallback = c_req.get(source["url"], impersonate=browser, headers=stealth_headers, timeout=25)
                             if fallback.status_code == 200:
                                 page = BeautifulSoup(fallback.text, "lxml")
                                 logger.info(f"[Scraper] Successfully bypassed firewall for {source['name']} using {browser}!")
                                 break
                             else:
                                 logger.warning(f"[Scraper] Bypass failed for {source['name']} with {browser} (Status: {fallback.status_code})")
+                        
+                        # --- Fallback URLs: try alternative endpoints if all fingerprints failed ---
+                        if not page:
+                            fallback_urls = source.get("fallback_urls", [])
+                            for fb_url in fallback_urls:
+                                try:
+                                    fb_res = c_req.get(fb_url, impersonate="chrome124", headers=stealth_headers, timeout=25)
+                                    if fb_res.status_code == 200:
+                                        page = BeautifulSoup(fb_res.text, "lxml")
+                                        logger.info(f"[Scraper] Fallback URL succeeded for {source['name']}: {fb_url}")
+                                        break
+                                except Exception:
+                                    pass
                         
                         if not page:
                             return []
@@ -396,6 +469,13 @@ class NewsScraperAgent:
                         url = "https://www.afro.who.int" + url
                     extracted.append({"title": text, "url": url})
 
+        elif name == "Public Health Nigeria":
+            for item in page.select('article h2 a, .entry-title a, h3.post-title a')[:15]:
+                text = item.get_text(strip=True)
+                url = item.get('href')
+                if text and url:
+                    extracted.append({"title": text, "url": url})
+
         # Generic fallback: works for all other sites
         if not extracted:
             for item in page.select('h1 a, h2 a, h3 a')[:20]:
@@ -438,6 +518,8 @@ class NewsScraperAgent:
 
                 if source["method"] == "rss":
                     extracted = self._scrape_rss(source)
+                elif source["method"] == "reliefweb_api":
+                    extracted = self._scrape_reliefweb_api(source)
                 else:
                     extracted = self._scrape_html(source)
 

@@ -124,10 +124,13 @@ def autonomous_monitoring_job():
             for key, group in groups.items():
                 result, f_trace = fusion_agent.fuse_reports(group)
                 if result and result.get('confidence_score', 0) > 0.4:
+                    import uuid
                     alert_url = result.get('url')
-                    if alert_url and alert_url in saved_urls:
-                        # Ensure URL uniqueness if an article yields multiple alerts
-                        alert_url = f"{alert_url}#{result['disease'].replace(' ', '')}-{result['location'].replace(' ', '')}"
+                    if alert_url:
+                        # Check DB for existing URL to prevent UniqueViolation
+                        existing = db_save.query(models.EBSAlert).filter(models.EBSAlert.url == alert_url).first()
+                        if existing or alert_url in saved_urls:
+                            alert_url = f"{alert_url}#{result['disease'].replace(' ', '')}-{result['location'].replace(' ', '')}-{uuid.uuid4().hex[:8]}"
                         
                     alert = models.EBSAlert(
                         source="Fused Intelligence",
