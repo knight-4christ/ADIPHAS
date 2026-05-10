@@ -48,10 +48,16 @@ def autonomous_monitoring_job():
     filtered_headlines = []
     skipped_count = 0
     db_dedupe = database.SessionLocal()
+    seen_urls = set()
     try:
         for item in headlines:
             url: Optional[str] = item.get('url')
             item_title: str = str(item.get('title', ''))
+            
+            if url and url in seen_urls:
+                skipped_count += 1
+                continue
+                
             if not url:
                 exists = db_dedupe.query(models.EBSAlert).filter(models.EBSAlert.text == item_title).first()
             else:
@@ -61,6 +67,8 @@ def autonomous_monitoring_job():
                 skipped_count += 1
             else:
                 filtered_headlines.append(item)
+                if url:
+                    seen_urls.add(url)
         
         if skipped_count > 0:
             log_activity("IntelligenceEngine", f"Skipped {skipped_count} previously processed articles.")
@@ -103,6 +111,7 @@ def autonomous_monitoring_job():
 
     # 2. Saving Fused Alerts (DB session burst)
     db_save = database.SessionLocal()
+    saved_urls = set()
     try:
         if pending_reports:
             log_activity("IntelligenceEngine", f"Fusing {len(pending_reports)} candidate reports...")
@@ -115,9 +124,14 @@ def autonomous_monitoring_job():
             for key, group in groups.items():
                 result, f_trace = fusion_agent.fuse_reports(group)
                 if result and result.get('confidence_score', 0) > 0.4:
+                    alert_url = result.get('url')
+                    if alert_url and alert_url in saved_urls:
+                        # Ensure URL uniqueness if an article yields multiple alerts
+                        alert_url = f"{alert_url}#{result['disease'].replace(' ', '')}-{result['location'].replace(' ', '')}"
+                        
                     alert = models.EBSAlert(
                         source="Fused Intelligence",
-                        url=result.get('url'),
+                        url=alert_url,
                         text=f"Confirmed {result['disease']} activity in {result['location']}",
                         timestamp=datetime.now().replace(microsecond=0),
                         location_text=result['location'],
@@ -128,6 +142,8 @@ def autonomous_monitoring_job():
                     )
                     db_save.add(alert)
                     db_save.flush()
+                    if alert_url:
+                        saved_urls.add(alert_url)
                     log_activity("AlertingEngine", f"Fused alert: {result['disease']} in {result['location']} (confidence={result['confidence_score']:.2f})")
                     
                     if alert.risk_level in ["High", "Critical"]:

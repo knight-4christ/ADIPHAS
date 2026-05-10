@@ -291,15 +291,21 @@ class NewsScraperAgent:
                     logger.info(f"Target {source['name']} blocked connection ({res.status}). Engaging TLS Impersonation Bypass...")
                     try:
                         from curl_cffi import requests as c_req
-                        # Impersonating a modern MacOS Safari/Chrome handshake perfectly bypasses Cloudflare
-                        # Using chrome120 as it's more modern than 110
-                        fallback = c_req.get(source["url"], impersonate="chrome120", timeout=25)
-                        if fallback.status_code == 200:
-                            page = BeautifulSoup(fallback.text, "lxml")
-                            logger.info(f"[Scraper] Successfully bypassed firewall for {source['name']}!")
-                        else:
-                            logger.warning(f"[Scraper] Bypass failed for {source['name']} (Status: {fallback.status_code})")
+                        # Rotate through modern browser profiles to find one that bypasses the WAF
+                        browsers = ["chrome124", "safari17_0", "chrome120", "chrome116"]
+                        
+                        for browser in browsers:
+                            fallback = c_req.get(source["url"], impersonate=browser, timeout=25)
+                            if fallback.status_code == 200:
+                                page = BeautifulSoup(fallback.text, "lxml")
+                                logger.info(f"[Scraper] Successfully bypassed firewall for {source['name']} using {browser}!")
+                                break
+                            else:
+                                logger.warning(f"[Scraper] Bypass failed for {source['name']} with {browser} (Status: {fallback.status_code})")
+                        
+                        if not page:
                             return []
+                            
                     except Exception as bypass_err:
                         logger.warning(f"[Scraper] Bypass exception for {source['name']}: {bypass_err}")
                         return []
