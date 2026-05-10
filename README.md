@@ -101,7 +101,7 @@ ADIPHAS includes dedicated scripts to demonstrate its capabilities during live d
 2. **Observe Autonomous Cycles**:
    - Watch the terminal running `start_adiphas.ps1` to see the Orchestrator, Scraper, and NLP processor actively categorizing new intelligence globally.
 3. **Test the LLM Fallback Engine**:
-   - ADIPHAS features a proprietary robust fallback mechanism (`model_config.py`). If the primary Gemini model is rate-limited, it automatically swerves through a chain of **9 free OpenRouter models** to keep the system alive without crashing.
+   - ADIPHAS features a proprietary robust fallback mechanism (`model_config.py`). If the primary Gemini model is rate-limited, it automatically swerves through a chain of **25 free OpenRouter models** to keep the system alive without crashing.
 
 ---
 
@@ -110,7 +110,7 @@ ADIPHAS includes dedicated scripts to demonstrate its capabilities during live d
 - **Database:** ADIPHAS uses **Neon PostgreSQL** in production. For local development, it falls back to SQLite automatically if `DATABASE_URL` is not set.
 - **Authentication:** Password hashing uses native `bcrypt` (not `passlib`). The `SECRET_KEY` environment variable is mandatory.
 - **AI Budget:** The scheduler runs every 2 hours to stay within free-tier API limits. Add OpenRouter credits ($5-10) for higher frequency.
-- **Keep-Alive:** Render free tier requires a cron job pinging `/healthcheck` every 14 minutes.
+- **Keep-Alive:** Render free tier requires a cron job pinging `/healthcheck` every 5 minutes.
 - **Full deployment details:** See **[Deployment Guide](./DEPLOYMENT_GUIDE.md)**.
 
 ---
