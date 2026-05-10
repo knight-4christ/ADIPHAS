@@ -179,7 +179,19 @@ class OrchestratorAgent:
         anom_ctx = "\n".join([f"- ANOMALY: {s.disease} in {s.lga_code}" for s in active_anomalies]) if active_anomalies else "None"
         rt_ctx = realtime_snap.content[:500] if realtime_snap else "No web intelligence available"
         
-        data_block = f"""Today's Date: {datetime.now(_WAT).strftime('%B %d, %Y')}
+        now_wat = datetime.now(_WAT)
+        hour = now_wat.hour
+        if hour < 12:
+            greeting = "Good morning"
+            greeting_prefix = f"### 🌤️ {greeting}!\n\n"
+        elif hour < 17:
+            greeting = "Good afternoon"
+            greeting_prefix = f"### ☀️ {greeting}!\n\n"
+        else:
+            greeting = "Good evening"
+            greeting_prefix = f"### 🌙 {greeting}!\n\n"
+        
+        data_block = f"""Today's Date: {now_wat.strftime('%B %d, %Y')}
 DB Signals:
 {alert_ctx}
 Anomalies:
@@ -246,7 +258,7 @@ Include ALL of the following sections:
                     if text:
                         text = re.sub(r'\[Reasoning\].*?\[Response\]\s*', '', text, flags=re.DOTALL)
                         text = re.sub(r"\[?\{['\"]type['\"]:\s*['\"]reasoning\.text['\"].*?\}\]?", '', text, flags=re.DOTALL)
-                        generated_text = text.strip() + sources_footer
+                        generated_text = greeting_prefix + text.strip() + sources_footer
                         break
                 except Exception as e:
                     wait_time = 15 * (attempt + 1)
@@ -263,7 +275,7 @@ Include ALL of the following sections:
                 locations_seen = set(a.location_text for a in recent_alerts if a.location_text) if recent_alerts else set()
                 high_risk = [a for a in recent_alerts if a.risk_level in ('High', 'Critical')] if recent_alerts else []
                 
-                fallback_content = f"## 🛰️ ADIPHAS Intelligence Briefing — {datetime.now(_WAT).strftime('%B %d, %Y')}\n**⚠️ AI-powered analysis temporarily unavailable. This is a data-driven summary.**\n### Executive Landscape\n- **{alert_count}** active disease signals across **{len(locations_seen)}** locations\n- **{anomaly_count}** anomalies flagged\n- Active diseases: **{', '.join(diseases_seen) if diseases_seen else 'None detected'}**\n### Critical Signals\n"
+                fallback_content = f"{greeting_prefix}## 🛰️ ADIPHAS Intelligence Briefing — {now_wat.strftime('%B %d, %Y')}\n**⚠️ AI-powered analysis temporarily unavailable. This is a data-driven summary.**\n### Executive Landscape\n- **{alert_count}** active disease signals across **{len(locations_seen)}** locations\n- **{anomaly_count}** anomalies flagged\n- Active diseases: **{', '.join(diseases_seen) if diseases_seen else 'None detected'}**\n### Critical Signals\n"
                 if high_risk:
                     for a in high_risk[:5]: fallback_content += f"- 🔴 **{a.disease}** in {a.location_text} — Risk: {a.risk_level}\n"
                 else:
