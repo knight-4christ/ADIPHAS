@@ -9,6 +9,13 @@ Emerging and re-emerging disease outbreaks continue to pose severe public health
 
 ---
 
+### Live System Dashboard
+*Figure 1: ADIPHAS Situational Awareness Dashboard showing real-time epidemiological metrics — 131 active signals, ELEVATED system posture, and 0.99 F1-Extraction score across 8 monitored sources.*
+
+![ADIPHAS Situational Awareness Dashboard](docs/screenshots/01_dashboard_overview.png)
+
+---
+
 ## 1. Introduction
 ### 1.1 Problem Statement
 Nigeria's Integrated Disease Surveillance and Response (IDSR) framework is largely passive, relying on health facility reports aggregated weekly. In a city like Lagos, outbreaks of cholera, Lassa fever, or mpox demonstrate that detection-to-response latency under traditional frameworks can exceed 14 days — a window within which epidemic spread becomes exponential. ADIPHAS addresses this "signal latency" by turning the open web into a real-time Early Warning System.
@@ -41,6 +48,12 @@ To ensure cost-efficiency and performance, ADIPHAS implements a tiered AI strate
 ---
 
 ## 3. Methodology & Mathematical Framework
+
+### Live Intelligence Feed
+*Figure 2: The Local Health Feed displaying 50 freshly fused intelligence signals across diseases including Cardiovascular Disease, Hantavirus, Diabetes, Hypertension, and Cervical Cancer — each autonomously extracted, classified, and geo-tagged by the NLP pipeline.*
+
+![ADIPHAS Local Health Feed](docs/screenshots/04_health_feed.png)
+
 ### 3.1 Entity Extraction Pipeline
 Extraction follows three stages:
 1.  **Stage 1 - NER (Local):** spaCy `en_core_web_sm` identifies GPE/LOC entities, cross-referenced against a 20-LGA/37-LCDA Lagos gazetteer.
@@ -84,6 +97,10 @@ The authentication system implements several hardened security measures:
 - **Role-Based Access Control (RBAC):** Three-tier role hierarchy (`CITIZEN < EXPERT < ADMIN`) enforced at the router level via dependency injection.
 - **Deep-Link Navigation Routing:** Automated deep-linking forces all inbound redirects (from email verification, login loops, or password resets) directly to the unified Command Centre dashboard using Streamlit URL query parameter routing, resolving previously disruptive login-state reloads.
 
+*Figure 3: The ADIPHAS authentication interface featuring secure JWT login with password recovery, protected by rate-limiting and a medical advisory disclaimer.*
+
+![ADIPHAS Login Interface](docs/screenshots/03_login_page.png)
+
 ### 4.3 Real-Time Metrics & Caching
 The system features a **5-second TTL (Time-To-Live)** cache for high-frequency dashboard metrics. It calculates cumulative daily totals for scraped articles and new signals, preventing database lockups during concurrent role access.
 
@@ -93,6 +110,14 @@ The RAG pipeline utilizes a dual-path retrieval strategy:
 - **Global Path**: If local data is insufficient or a query involves emerging global trends, the system triggers the **Tavily Search API** for real-time web context.
 - **StAMP Synthesis & Manual Bypass**: The **Situational Awareness & Monitoring Protocol (StAMP)** generates a daily strategic briefing by fusing these paths. To aid immediate incident investigation, experts can utilize the explicit "Force Real-time StAMP Sweep" bypass, directly commanding the pipeline to run instantaneous fresh reconnaissance outside standard scheduling boundaries.
 - **Reasoning Trace Sanitization**: All generative outputs are passed through a defensive 3-layer architecture (Generation, Storage, Serving) utilizing strict Regex algorithms to successfully strip any internal Chain-of-Thought (e.g., `<think>`) leakage produced by advanced reasoning models like DeepSeek.
+
+*Figure 4: The live StAMP Strategic Intelligence Briefing — an AI-synthesized situational report generated on a 2-hour autonomous cycle, featuring the Executive Landscape, Cycle Date, and greeting localized to West Africa Time (WAT).*
+
+![StAMP Strategic Intelligence Briefing](docs/screenshots/02_stamp_briefing.png)
+
+*Figure 5: Actionable recommendations auto-generated for community health workers and local authorities, with verifiable intelligence sources listed for transparency and audit.*
+
+![Actionable Recommendations and Intelligence Sources](docs/screenshots/05_actionable_recommendations.png)
 
 ### 4.5 AI Model Resilience & Universal Fallback
 ADIPHAS implements a **three-tier AI resilience architecture** to guarantee 24/7 intelligence availability:
