@@ -93,7 +93,8 @@ class OrchestratorAgent:
             
             for query in queries:
                 try:
-                    raw_response = client.search(query, search_depth="basic", max_results=3)
+                    # Deep web crawling enabled for richer intelligence extraction
+                    raw_response = client.search(query, search_depth="advanced", max_results=3, include_raw_content=True)
                     results = raw_response.get("results", [])
                     
                     for r in results:

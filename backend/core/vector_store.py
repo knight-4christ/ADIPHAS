@@ -203,7 +203,8 @@ class ChromaManager:
                 from tavily import TavilyClient
                 client = TavilyClient(api_key=tavily_key)
                 # TavilyClient.search returns a dict with 'results' key
-                raw_response = client.search(query, search_depth="basic", max_results=k)
+                # Deep web crawling enabled for richer intelligence extraction
+                raw_response = client.search(query, search_depth="advanced", max_results=k, include_raw_content=True)
                 web_results = raw_response.get("results", [])
                 
                 if force_combine:

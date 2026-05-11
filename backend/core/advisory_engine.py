@@ -59,8 +59,8 @@ class AdvisoryEngine:
 
         full_prompt = f"""
         Act as the ADIPHAS Health Advisory Agent. 
-        Context: You are helping {role_context} of Lagos, Nigeria named {user_metadata.get('name', 'User') if user_metadata else 'User'}.
-        Address them by their name directly.
+        You are speaking directly with {user_metadata.get('name', 'User') if user_metadata else 'User'}, {role_context} based in {user_metadata.get('location', 'Lagos, Nigeria') if user_metadata else 'Lagos, Nigeria'}.
+        Converse naturally. Address them by their name when appropriate to be warm and personal, but do NOT robotically start every single message with a greeting.
         {bio_block}
         {context_block}
         
