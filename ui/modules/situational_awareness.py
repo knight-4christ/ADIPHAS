@@ -73,7 +73,12 @@ def render():
                         user_location,
                         context_str
                     )
-                    st.session_state.dashboard_insight = res.get("insight", "No insights available.")
+                    # Handle auth errors (401) and other failures gracefully
+                    if isinstance(res, dict) and (res.get("detail") or res.get("error")):
+                        # Token expired or backend error — show fallback instead of raw error
+                        st.session_state.dashboard_insight = f"Monitoring active — {context_str}"
+                    else:
+                        st.session_state.dashboard_insight = res.get("insight", "No insights available.") if isinstance(res, dict) else "No insights available."
                     st.session_state.dashboard_insight_loc = user_location
             
             st.info(f"📍 **{user_location}**: {st.session_state.dashboard_insight}")
